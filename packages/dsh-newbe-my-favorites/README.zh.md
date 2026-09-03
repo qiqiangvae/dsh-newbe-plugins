@@ -12,13 +12,13 @@ DSH Desktop 的本机收藏插件。
 ## 安装
 
 ```bash
-# 从 GitHub 安装（推荐）
-dsh plugin --profile web add github:qiqiangvae/dsh-my-favorites
+# 从合集仓库 GitHub 安装（子目录）
+dsh plugin --profile web add github:qiqiangvae/dsh-newbe-plugins#path:packages/dsh-newbe-my-favorites
 
 # 本机开发：本地路径软链接
-dsh plugin --profile web add link:/path/to/dsh-my-favorites
+dsh plugin --profile web add "link:$(pwd)/packages/dsh-newbe-my-favorites"
 ```
 
-并确认 `dsh-my-favorites` 已列入该 profile `package.json` 的 `dsh.profile.bundles`。
+并确认 `dsh-newbe-my-favorites` 已列入该 profile `package.json` 的 `dsh.profile.bundles`。
 
 详情请参阅 [README.md](./README.md)。

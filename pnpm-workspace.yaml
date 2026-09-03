@@ -1,2 +1,9 @@
 packages:
   - 'packages/*'
+
+# esbuild 需要 postinstall 下载平台二进制；预发布版 dsh-home-paths 豁免最短发布年龄检查。
+allowBuilds:
+  esbuild: true
+
+minimumReleaseAgeExclude:
+  - '@deepseek-ai/dsh-home-paths@0.1.2-rc.1'

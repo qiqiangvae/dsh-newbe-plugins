@@ -1,4 +1,4 @@
-export declare const NS = "my-favorites";
+export declare const NS = "newbe-my-favorites";
 export type SessionFavorite = {
     id: string;
     title: string;

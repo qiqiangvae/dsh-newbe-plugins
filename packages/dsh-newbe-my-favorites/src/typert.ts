@@ -1,5 +1,5 @@
 /**
- * dsh-my-favorites 的 Host 面 Typert 清单（由 typert-loader 自动扫描注册）。
+ * dsh-newbe-my-favorites 的 Host 面 Typert 清单（由 typert-loader 自动扫描注册）。
  * 手写清单，结构与 @deepseek-ai/dsh-typert-generator 产物一致：
  * `./typert` 导出 TYPERT，invocations 的 codec 必须是 zod v4 实例。
  */
@@ -11,29 +11,29 @@ import {
 
 const stateCodec = {
   mode: 'strict' as const,
-  typeSymbol: 'dsh-my-favorites#FavoritesState',
+  typeSymbol: 'dsh-newbe-my-favorites#FavoritesState',
   schema: favoritesStateSchema,
 };
 
 const fieldCodec = {
   mode: 'strict' as const,
-  typeSymbol: 'dsh-my-favorites#FavoritesField',
+  typeSymbol: 'dsh-newbe-my-favorites#FavoritesField',
   schema: favoritesFieldSchema,
 };
 
 const valueCodec = {
   mode: 'strict' as const,
-  typeSymbol: 'dsh-my-favorites#FavoritesFieldValue',
+  typeSymbol: 'dsh-newbe-my-favorites#FavoritesFieldValue',
   schema: favoritesFieldValueSchema,
 };
 
 export const TYPERT = {
-  package: 'dsh-my-favorites',
+  package: 'dsh-newbe-my-favorites',
   face: 'host',
   schemas: [],
   invocations: [
     {
-      id: 'dsh-my-favorites#myFavorites/getState',
+      id: 'dsh-newbe-my-favorites#myFavorites/getState',
       service: 'myFavorites',
       namespace: 'myFavorites',
       method: 'getState',
@@ -42,7 +42,7 @@ export const TYPERT = {
       result: stateCodec,
     },
     {
-      id: 'dsh-my-favorites#myFavorites/setField',
+      id: 'dsh-newbe-my-favorites#myFavorites/setField',
       service: 'myFavorites',
       namespace: 'myFavorites',
       method: 'setField',
@@ -57,7 +57,7 @@ export const TYPERT = {
   model: {
     services: [
       {
-        description: '收藏状态的宿主存储服务：读取完整状态或按字段写入，落盘到 $DSH_HOME/storages/dsh-my-favorites.json。',
+        description: '收藏状态的宿主存储服务：读取完整状态或按字段写入，落盘到 $DSH_HOME/storages/dsh-newbe-my-favorites.json。',
         summary: '收藏状态存储服务。',
         tags: [],
         key: 'myFavorites',

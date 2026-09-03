@@ -1,12 +1,12 @@
 /**
- * dsh-my-favorites Host 侧：
- * 1. 收藏状态持久化到 `$DSH_HOME/storages/dsh-my-favorites.json`（原子写），
+ * dsh-newbe-my-favorites Host 侧：
+ * 1. 收藏状态持久化到 `$DSH_HOME/storages/dsh-newbe-my-favorites.json`（原子写），
  *    不再注册 DSH settings 命名空间，不污染 settings.yaml。
  * 2. 提供 `myFavorites` 服务（getState / setField），经手写 Typert 清单
  *    （./typert → lib/typert.host.js，由 typert-loader 自动注册）暴露给 Web 客户端，
  *    客户端经 `remote.myFavorites.*` 调用。
  */
-import { closeSync, fsyncSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, writeSync } from 'node:fs';
+import { closeSync, copyFileSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, writeSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { dshHomePath } from '@deepseek-ai/dsh-home-paths';
@@ -23,8 +23,25 @@ import {
 export { FAVORITES_NAMESPACE, MIN_RECENT, MAX_RECENT, DEFAULT_RECENT };
 export type { FavoritesState, FavoritesField };
 
-/** 持久化文件：$DSH_HOME/storages/dsh-my-favorites.json（与其它领域存储同目录）。 */
-export const STORAGE_PATH = dshHomePath('storages', 'dsh-my-favorites.json');
+/** 持久化文件：$DSH_HOME/storages/dsh-newbe-my-favorites.json（与其它领域存储同目录）。 */
+export const STORAGE_PATH = dshHomePath('storages', 'dsh-newbe-my-favorites.json');
+
+/** 旧名存储文件（改名前的落盘位置），仅用于一次性迁移，避免老用户收藏丢失。 */
+const LEGACY_STORAGE_PATH = dshHomePath('storages', 'dsh-my-favorites.json');
+
+/** 一次性迁移：新文件不存在而旧文件存在时，把旧文件改名（rename 失败则复制兜底），原数据不丢。 */
+function migrateLegacyStorage(): void {
+  if (existsSync(STORAGE_PATH) || !existsSync(LEGACY_STORAGE_PATH)) return;
+  try {
+    renameSync(LEGACY_STORAGE_PATH, STORAGE_PATH);
+  } catch {
+    try {
+      copyFileSync(LEGACY_STORAGE_PATH, STORAGE_PATH);
+    } catch {
+      /* 迁移失败：旧文件保留，下次启动仍会重试 */
+    }
+  }
+}
 
 export function defaultState(): FavoritesState {
   return { sessions: [], urls: [], mode: 'favorites', recentCount: DEFAULT_RECENT, urlsEnabled: true };
@@ -89,7 +106,7 @@ export function loadState(file: string): FavoritesState {
   try {
     return normalizeState(JSON.parse(text));
   } catch (error) {
-    console.warn(`[dsh-my-favorites] 存储文件损坏，使用默认状态（${file}）：${String(error)}`);
+    console.warn(`[dsh-newbe-my-favorites] 存储文件损坏，使用默认状态（${file}）：${String(error)}`);
     return defaultState();
   }
 }
@@ -181,11 +198,12 @@ function createFavoritesService(file: string) {
   return service;
 }
 
-export const name = 'dsh-my-favorites';
+export const name = 'dsh-newbe-my-favorites';
 
 export function apply(ctx: any) {
+  migrateLegacyStorage();
   const service = createFavoritesService(STORAGE_PATH);
-  console.log(`[dsh-my-favorites] 存储文件：${STORAGE_PATH}`);
+  console.log(`[dsh-newbe-my-favorites] 存储文件：${STORAGE_PATH}`);
   // 客户端经 remote.myFavorites.* 调用（./typert 清单由 typert-loader 自动注册）。
   ctx.provide('myFavorites', service);
 }

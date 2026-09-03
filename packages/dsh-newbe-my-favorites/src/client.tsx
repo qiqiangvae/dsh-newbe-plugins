@@ -5,7 +5,7 @@ import { IconFolderClose16, IconFolderOpen16 } from '@deepseek-ai/dsh-client-ui-
 import { favoritesFieldSchema, favoritesFieldValueSchema, favoritesStateSchema } from './schema.js';
 import { MIN_RECENT, MAX_RECENT, DEFAULT_RECENT } from './constants.js';
 
-export const NS = 'my-favorites';
+export const NS = 'newbe-my-favorites';
 
 export type SessionFavorite = { id: string; title: string };
 export type UrlFavorite = { id: string; name: string; url: string; icon: string; useFavicon: boolean };
@@ -23,21 +23,21 @@ type RemoteFavorites = {
 
 /** 客户端 Remote contribution：与宿主 ./typert 清单的端点（namespace/method）逐一对应。 */
 const REMOTE_CONTRIBUTION = {
-  package: 'dsh-my-favorites',
+  package: 'dsh-newbe-my-favorites',
   descriptors: [
     {
-      id: 'dsh-my-favorites#myFavorites/getState', service: 'myFavorites', namespace: 'myFavorites', method: 'getState',
+      id: 'dsh-newbe-my-favorites#myFavorites/getState', service: 'myFavorites', namespace: 'myFavorites', method: 'getState',
       invocation: { kind: 'direct' as const }, parameters: [],
-      result: { mode: 'strict' as const, typeSymbol: 'dsh-my-favorites#FavoritesState', schema: favoritesStateSchema },
+      result: { mode: 'strict' as const, typeSymbol: 'dsh-newbe-my-favorites#FavoritesState', schema: favoritesStateSchema },
     },
     {
-      id: 'dsh-my-favorites#myFavorites/setField', service: 'myFavorites', namespace: 'myFavorites', method: 'setField',
+      id: 'dsh-newbe-my-favorites#myFavorites/setField', service: 'myFavorites', namespace: 'myFavorites', method: 'setField',
       invocation: { kind: 'direct' as const },
       parameters: [
-        { name: 'field', wire: 'field', source: 'json' as const, codec: { mode: 'strict' as const, typeSymbol: 'dsh-my-favorites#FavoritesField', schema: favoritesFieldSchema } },
-        { name: 'value', wire: 'value', source: 'json' as const, codec: { mode: 'strict' as const, typeSymbol: 'dsh-my-favorites#FavoritesFieldValue', schema: favoritesFieldValueSchema } },
+        { name: 'field', wire: 'field', source: 'json' as const, codec: { mode: 'strict' as const, typeSymbol: 'dsh-newbe-my-favorites#FavoritesField', schema: favoritesFieldSchema } },
+        { name: 'value', wire: 'value', source: 'json' as const, codec: { mode: 'strict' as const, typeSymbol: 'dsh-newbe-my-favorites#FavoritesFieldValue', schema: favoritesFieldValueSchema } },
       ],
-      result: { mode: 'strict' as const, typeSymbol: 'dsh-my-favorites#FavoritesState', schema: favoritesStateSchema },
+      result: { mode: 'strict' as const, typeSymbol: 'dsh-newbe-my-favorites#FavoritesState', schema: favoritesStateSchema },
     },
   ],
 };
@@ -62,7 +62,7 @@ function envelopeValue(result: RemoteEnvelope<unknown>, action: string): unknown
 
 /**
  * 收藏设置 scope：与旧 settingsScope 完全相同的契约（getSnapshot/subscribe/set），
- * 数据经 remote.myFavorites RPC 读写宿主侧 ~/.dsh/storages/dsh-my-favorites.json。
+ * 数据经 remote.myFavorites RPC 读写宿主侧 ~/.dsh/storages/dsh-newbe-my-favorites.json。
  * remote 不可用（非回环浏览器等）时退化为内存态：读默认值、写 no-op。
  */
 function createFavoritesScope(remote: RemoteFavorites | undefined, ctx: any): Scope {
@@ -72,25 +72,25 @@ function createFavoritesScope(remote: RemoteFavorites | undefined, ctx: any): Sc
   const reload = async () => {
     if (!remote) return;
     try { applyState(envelopeValue(await remote.getState(), 'getState')); }
-    catch (error) { console.error('[my-favorites] 状态加载失败', error); }
+    catch (error) { console.error('[newbe-my-favorites] 状态加载失败', error); }
   };
   const set = (field: SettingField, value: unknown): Promise<void> => {
     if (!remote) return Promise.resolve();
     const task = tail.then(async () => {
       try { applyState(envelopeValue(await remote.setField(field, value), 'setField')); }
-      catch (error) { console.error('[my-favorites] 状态写入失败', error); await reload(); }
+      catch (error) { console.error('[newbe-my-favorites] 状态写入失败', error); await reload(); }
     });
     tail = task.catch(() => {});
     return task;
   };
   if (remote) {
     void reload();
-    ctx.effect(() => ctx.on('connection/reset', () => { void reload(); }), 'my-favorites: reconnect reload');
+    ctx.effect(() => ctx.on('connection/reset', () => { void reload(); }), 'newbe-my-favorites: reconnect reload');
   }
   return { getSnapshot: store.getSnapshot, subscribe: store.subscribe, set };
 }
 
-const STYLE_ID = 'dsh-my-favorites';
+const STYLE_ID = 'dsh-newbe-my-favorites';
 
 function ensureStyles() {
   if (document.querySelector(`style[data-plugin="${STYLE_ID}"]`)) return () => {};
@@ -466,13 +466,13 @@ export async function apply(ctx: any) {
     try {
       unmount = await host.$mount(REMOTE_CONTRIBUTION);
       remote = ctx.get('remote.myFavorites');
-      if (remote === undefined) console.warn('[my-favorites] remote.myFavorites 不可用，收藏设置退化为内存态');
+      if (remote === undefined) console.warn('[newbe-my-favorites] remote.myFavorites 不可用，收藏设置退化为内存态');
     } catch (error) {
-      console.error('[my-favorites] remote contribution 挂载失败', error);
+      console.error('[newbe-my-favorites] remote contribution 挂载失败', error);
     }
   } else {
-    console.warn('[my-favorites] 客户端缺少 remote 服务，收藏设置退化为内存态');
+    console.warn('[newbe-my-favorites] 客户端缺少 remote 服务，收藏设置退化为内存态');
   }
-  if (unmount) ctx.effect(() => () => { void unmount(); }, 'my-favorites: remote unmount');
+  if (unmount) ctx.effect(() => () => { void unmount(); }, 'newbe-my-favorites: remote unmount');
   const scope: Scope = createFavoritesScope(remote, ctx);
-  ctx.effect(() => ensureStyles(), 'my-favorites: styles'); ctx.effect(() => { try { const sessionsList = ctx.sessions.list; const workspacesList = ctx.workspaces.list; switcherMachine.start({ openSession: (id: string) => ctx.sessions.open(id), getList: () => sessionsList.getSnapshot(), subscribeList: (fn) => sessionsList.subscribe(fn), getWorkspaces: () => workspacesList.getSnapshot(), subscribeWorkspaces: (fn) => workspacesList.subscribe(fn), getSettings: () => scope.getSnapshot().value ?? { sessions: [], urls: [], mode: 'favorites', recentCount: DEFAULT_RECENT }, subscribeSettings: (fn) => scope.subscribe(fn), setSettings: (field, value) => scope.set(field, value) }); } catch (e) { console.error('[my-favorites] switcher start FAILED', e); } return () => switcherMachine.dispose(); }, 'my-favorites: switcher'); ctx.slots.inject('conversation.session.header.actions', () => ctx.slots.register({ name: 'conversation.session.header.actions', id: 'my-favorites-toggle', order: -5, inject: () => ({ scope }) }, FavoriteToggle)); ctx.slots.inject('sidebar.footer.action', () => ctx.slots.register({ name: 'sidebar.footer.action', id: 'my-favorites-below-new-session-bridge', order: 5, inject: () => ({ scope, openSession: (id: string) => ctx.sessions.open(id) }) }, SidebarBelowNewSessionBridge)); ctx.slots.inject('sidebar.footer.action', () => ctx.slots.register({ name: 'sidebar.footer.action', id: 'my-favorites-session-switcher', order: 6, inject: () => ({}) }, SessionSwitcherHost)); ctx.slots.inject('sidebar.footer.action', () => ctx.slots.register({ name: 'sidebar.footer.action', id: 'my-favorites-switcher-hint', order: 7, inject: () => ({}) }, SwitcherHintHost)); ctx.slots.inject('settings.plugins.tab', () => ctx.slots.register({ name: 'settings.plugins.tab', id: 'my-favorites', order: 30, label: () => '收藏', inject: () => ({ scope }) }, SettingsCard)); }
+  ctx.effect(() => ensureStyles(), 'newbe-my-favorites: styles'); ctx.effect(() => { try { const sessionsList = ctx.sessions.list; const workspacesList = ctx.workspaces.list; switcherMachine.start({ openSession: (id: string) => ctx.sessions.open(id), getList: () => sessionsList.getSnapshot(), subscribeList: (fn) => sessionsList.subscribe(fn), getWorkspaces: () => workspacesList.getSnapshot(), subscribeWorkspaces: (fn) => workspacesList.subscribe(fn), getSettings: () => scope.getSnapshot().value ?? { sessions: [], urls: [], mode: 'favorites', recentCount: DEFAULT_RECENT }, subscribeSettings: (fn) => scope.subscribe(fn), setSettings: (field, value) => scope.set(field, value) }); } catch (e) { console.error('[newbe-my-favorites] switcher start FAILED', e); } return () => switcherMachine.dispose(); }, 'newbe-my-favorites: switcher'); ctx.slots.inject('conversation.session.header.actions', () => ctx.slots.register({ name: 'conversation.session.header.actions', id: 'newbe-my-favorites-toggle', order: -5, inject: () => ({ scope }) }, FavoriteToggle)); ctx.slots.inject('sidebar.footer.action', () => ctx.slots.register({ name: 'sidebar.footer.action', id: 'newbe-my-favorites-below-new-session-bridge', order: 5, inject: () => ({ scope, openSession: (id: string) => ctx.sessions.open(id) }) }, SidebarBelowNewSessionBridge)); ctx.slots.inject('sidebar.footer.action', () => ctx.slots.register({ name: 'sidebar.footer.action', id: 'newbe-my-favorites-session-switcher', order: 6, inject: () => ({}) }, SessionSwitcherHost)); ctx.slots.inject('sidebar.footer.action', () => ctx.slots.register({ name: 'sidebar.footer.action', id: 'newbe-my-favorites-switcher-hint', order: 7, inject: () => ({}) }, SwitcherHintHost)); ctx.slots.inject('settings.plugins.tab', () => ctx.slots.register({ name: 'settings.plugins.tab', id: 'newbe-my-favorites', order: 30, label: () => '收藏', inject: () => ({ scope }) }, SettingsCard)); }

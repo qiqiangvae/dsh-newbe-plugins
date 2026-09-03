@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented in this file.
 
+## [Unreleased]
+
+### Changed
+
+- 迁入 newbe 插件合集 monorepo（`qiqiangvae/dsh-newbe-plugins`，子目录 `packages/dsh-newbe-my-favorites`），包名由 `dsh-my-favorites` 改为 `dsh-newbe-my-favorites`（插件 id / settings namespace / RPC·typeSymbol 前缀 / 槽位 id 全量同步）。
+- 历史收藏数据自动迁移：首次启动时若存在旧存储文件 `~/.dsh/storages/dsh-my-favorites.json`，自动改名为新路径 `dsh-newbe-my-favorites.json`，老用户收藏不丢失。
+
 ## [0.5.4] - 2026-09-03
 
 ### Fixed

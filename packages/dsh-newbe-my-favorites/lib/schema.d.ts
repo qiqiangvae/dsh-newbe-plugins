@@ -16,7 +16,7 @@ export declare const urlFavoriteSchema: z.ZodObject<{
     useFavicon: z.ZodBoolean;
 }, z.core.$strip>;
 export declare const switcherModeSchema: z.ZodUnion<readonly [z.ZodLiteral<"favorites">, z.ZodLiteral<"recent">]>;
-/** 收藏持久化状态（~/.dsh/storages/dsh-my-favorites.json 的完整内容）。 */
+/** 收藏持久化状态（~/.dsh/storages/dsh-newbe-my-favorites.json 的完整内容）。 */
 export declare const favoritesStateSchema: z.ZodObject<{
     sessions: z.ZodArray<z.ZodObject<{
         id: z.ZodString;

@@ -1,11 +1,16 @@
 {
-  "name": "dsh-my-favorites",
+  "name": "dsh-newbe-my-favorites",
   "version": "0.5.4",
   "description": "Session and URL favorites for DeepSeek Harness Desktop",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/qiqiangvae/dsh-my-favorites.git"
+    "url": "git+https://github.com/qiqiangvae/dsh-newbe-plugins.git",
+    "directory": "packages/dsh-newbe-my-favorites"
+  },
+  "homepage": "https://github.com/qiqiangvae/dsh-newbe-plugins/tree/main/packages/dsh-newbe-my-favorites#readme",
+  "bugs": {
+    "url": "https://github.com/qiqiangvae/dsh-newbe-plugins/issues"
   },
   "type": "module",
   "main": "lib/index.js",
@@ -37,12 +42,13 @@
   },
   "scripts": {
     "build": "node build.mjs",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "check": "tsc -p tsconfig.json --noEmit && node --check lib/index.js && node --check lib/typert.host.js && node --check lib/client.js"
   },
   "dependencies": {
     "@deepseek-ai/dsh-home-paths": "^0.1.2-rc.1",
     "react": "18.3.1",
-    "zod": "^4.4.3"
+    "zod": "4.4.3"
   },
   "devDependencies": {
     "@types/node": "^22.20.1",

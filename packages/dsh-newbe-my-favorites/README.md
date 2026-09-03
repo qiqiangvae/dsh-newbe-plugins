@@ -60,7 +60,7 @@ pnpm run build
 
 构建后的入口为：
 
-- `lib/index.js`：Host 侧收藏存储服务（持久化到 `$DSH_HOME/storages/dsh-my-favorites.json`，并暴露 `myFavorites` RPC 服务）；
+- `lib/index.js`：Host 侧收藏存储服务（持久化到 `$DSH_HOME/storages/dsh-newbe-my-favorites.json`，并暴露 `myFavorites` RPC 服务）；
 - `lib/typert.host.js`：Host 面 Typert 清单（`./typert`，由 DSH 的 typert-loader 自动注册）；
 - `lib/client.js`：DSH Web 客户端 UI 扩展（经 `remote.myFavorites.*` 读写收藏数据）。
 
@@ -69,23 +69,25 @@ pnpm run build
 DSH 通过 `dsh plugin` 子命令管理 profile 插件（等价于在 profile 目录内执行 `pnpm`）。安装本插件：
 
 ```bash
-# 从 GitHub 安装（推荐；可加 #tag/分支 锁定版本）
-dsh plugin --profile web add github:qiqiangvae/dsh-my-favorites
+# 从合集仓库 GitHub 安装（子目录；可加 #commit 锁定版本）
+dsh plugin --profile web add github:qiqiangvae/dsh-newbe-plugins#path:packages/dsh-newbe-my-favorites
 
 # 本机/开发：从本地路径软链接安装
-dsh plugin --profile web add link:/path/to/dsh-my-favorites
+dsh plugin --profile web add "link:$(pwd)/packages/dsh-newbe-my-favorites"
 
 # 从 npm 安装
-dsh plugin --profile web add dsh-my-favorites
+dsh plugin --profile web add dsh-newbe-my-favorites
 ```
 
 将 `<profile>` 换成你的目标 profile（如 `web`、`desktop`、`tui`）。
 
-> **必须**同时把 `dsh-my-favorites` 列入该 profile `package.json` 的 `dsh.profile.bundles` 数组；只加入 `dependencies` 不会启用插件。安装后重启 DSH（或重新加载 profile）即可生效。
+> 从旧名 `dsh-my-favorites` 迁移：插件已随 newbe 合集改名。老用户先 `dsh plugin --profile web remove dsh-my-favorites`，再用上方命令安装新名；历史收藏数据会在首次启动时自动从旧存储文件 `dsh-my-favorites.json` 迁移到 `dsh-newbe-my-favorites.json`。
+
+> **必须**同时把 `dsh-newbe-my-favorites` 列入该 profile `package.json` 的 `dsh.profile.bundles` 数组；只加入 `dependencies` 不会启用插件。安装后重启 DSH（或重新加载 profile）即可生效。
 
 ## 数据与限制
 
-- 收藏数据保存在本机 `$DSH_HOME/storages/dsh-my-favorites.json`（默认 `~/.dsh/storages/dsh-my-favorites.json`）中，**不写入 `settings.yaml`**，不跨设备同步，也不提供导入/导出。
+- 收藏数据保存在本机 `$DSH_HOME/storages/dsh-newbe-my-favorites.json`（默认 `~/.dsh/storages/dsh-newbe-my-favorites.json`）中，**不写入 `settings.yaml`**，不跨设备同步，也不提供导入/导出。
 - 会话收藏保存的是当前 DSH 实例内的会话 ID，因此不适合跨机器、跨 DSH 数据目录迁移。
 - 远程浏览器连接不具备宿主 RPC 写入权限时，收藏设置不会持久化。
 - 若已收藏的会话被删除或当前实例不再能识别该 ID，切换会话会失败；请从收藏列表移除该条目。

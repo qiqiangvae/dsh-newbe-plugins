@@ -40,9 +40,9 @@ await build({
     'scheduler',
   ],
   banner: {
-    js: "window.__ModuleLoader__.load({ id: 'dsh-my-favorites', factory: (require) => { var module = { exports: {} }; var exports = module.exports;",
+    js: "window.__ModuleLoader__.load({ id: 'dsh-newbe-my-favorites', factory: (require) => { var module = { exports: {} }; var exports = module.exports;",
   },
   footer: { js: 'return module.exports; } });' },
 });
 
-console.log('[dsh-my-favorites build] done: lib/index.js, lib/typert.host.js, lib/client.js');
+console.log('[dsh-newbe-my-favorites build] done: lib/index.js, lib/typert.host.js, lib/client.js');

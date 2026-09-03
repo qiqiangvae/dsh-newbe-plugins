@@ -20,7 +20,7 @@ export const urlFavoriteSchema = z.object({
 
 export const switcherModeSchema = z.union([z.literal('favorites'), z.literal('recent')]);
 
-/** 收藏持久化状态（~/.dsh/storages/dsh-my-favorites.json 的完整内容）。 */
+/** 收藏持久化状态（~/.dsh/storages/dsh-newbe-my-favorites.json 的完整内容）。 */
 export const favoritesStateSchema = z.object({
   sessions: z.array(sessionFavoriteSchema),
   urls: z.array(urlFavoriteSchema),
