@@ -2,6 +2,14 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.5.4] - 2026-09-03
+
+### Fixed
+
+- 适配 DSH `v0.1.2-rc.1`，修复宿主启动崩溃（`Cannot find package '@deepseek-ai/dsh-home-paths'`）：`@deepseek-ai/dsh-home-paths` 现已发布到公共 npm，重新把它声明为 `dependencies`（`^0.1.2-rc.1`），宿主编译产物 `lib/index.js` 经普通 Node ESM 解析加载即可找到该包。
+- 移除 `dsh.client.inject` 中两个已收编为 Web 外壳「基线静态模块」的包（`@deepseek-ai/dsh-client-store`、`@deepseek-ai/dsh-client-ui-primitives`）：它们在 `v0.1.2-rc.1` 中不再是独立包行，仍声明在 `inject` 里会导致模块图/插件组合解析失效。
+- `dsh.client.inject` 中插件设置标签页依赖由 `@deepseek-ai/dsh-client-ui-settings` 改为 `@deepseek-ai/dsh-client-ui-settings-plugins`（`v0.1.2-rc.1` 中 `settings.plugins.tab` 槽位改由该包声明）。
+
 ## [0.5.3] - 2026-08-29
 
 ### Fixed

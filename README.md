@@ -4,9 +4,11 @@
 
 ## 兼容性
 
-- 本插件要求 **DSH ≥ `v0.1.2-alpha.1`**。
-- **不兼容 DSH `v0.1.1-rc.2` 及更早版本**：v0.1.2-alpha.1 存在破坏性更新，`@deepseek-ai/dsh-client-runtime` 已被移除，`createSnapshotStore` 迁入新私有包 `@deepseek-ai/dsh-client-store`，插件客户端已按新包名导出适配。
-- `@deepseek-ai/dsh-client-*` 与 `dsh-home-paths` 均为 DSH 私有包、未发布到公共 npm，运行时由 DSH 自身编译产物解析；插件不把它们声明为可安装依赖（`dependencies`/`peerDependencies` 均不写入），因此 `dsh plugin add` 走公共 registry 也能正常安装。请使用对应版本的 DSH Desktop 安装本插件。
+- 本插件要求 **DSH ≥ `v0.1.2-rc.1`**，并已针对 `v0.1.2-rc.1` 适配。
+- **不兼容 DSH `v0.1.2-alpha.1` 及更早版本**：`v0.1.2-rc.1` 存在破坏性更新——
+  - `@deepseek-ai/dsh-client-store` 与 `@deepseek-ai/dsh-client-ui-primitives` 不再是独立发布的 npm 包，而是由 Web 外壳以「基线静态模块」（`PLATFORM_MODULES`）注入浏览器模块表；插件 `dsh.client.inject` 已移除对这两个包的包级依赖。
+  - 插件设置标签页 `settings.plugins.tab` 改由 `@deepseek-ai/dsh-client-ui-settings-plugins` 声明，`dsh.client.inject` 相应更新。
+- `@deepseek-ai/dsh-home-paths` 已发布到公共 npm（`0.1.2-rc.1`），插件把它声明为 `dependencies`，宿主编译产物经普通 Node ESM 解析加载；其余 `@deepseek-ai/dsh-client-*` 基线模块由 DSH 宿主在运行时注入，不写入 `dependencies`/`peerDependencies`。请使用对应版本的 DSH Desktop 安装本插件。
 
 ## 功能
 
