@@ -26,7 +26,17 @@ def main():
         b = p.chromium.launch(headless=True, args=["--no-sandbox"])
         pg = b.new_page(viewport={"width": 1440, "height": 900})
         pg.on("pageerror", lambda e: errors.append("pageerror: " + str(e)))
-        pg.on("console", lambda m: errors.append("console: " + m.text) if m.type == "error" else None)
+        # Console noise from unrelated profile plugins (e.g. their own API
+        # endpoints 404ing) must not fail this plugin's run; only record
+        # console errors that concern this plugin or are not resource-404s.
+        def on_console(m):
+            if m.type != "error":
+                return
+            text = m.text or ""
+            if "Failed to load resource" in text and "response-window" not in text:
+                return
+            errors.append("console: " + text)
+        pg.on("console", on_console)
         pg.goto(args.url, wait_until="domcontentloaded", timeout=30000)
         pg.wait_for_timeout(3500)
 

@@ -1,6 +1,6 @@
 {
-  "name": "dsh-plugin-response-window",
-  "version": "0.1.0",
+  "name": "dsh-newbe-response-window",
+  "version": "0.2.0",
   "description": "DeepSeek Harness (DSH) web plugin: per-turn response window. Each turn's tool calls collapse into ONE always-expanded bounded slide (configurable N-line window, inner scroll, nothing hidden), and long assistant markdown gets a bounded scroll window too — Grok-build style, keeps every intermediate response visible inside a finite window.",
   "type": "module",
   "main": "lib/index.js",
@@ -14,19 +14,13 @@
       "patch": "./cordis.patch.yml"
     },
     "client": {
-      "platform": "web",
-      "inject": [
-        "@deepseek-ai/dsh-client-runtime",
-        "@deepseek-ai/dsh-client-ui-conversation",
-        "@deepseek-ai/dsh-client-ui-slots"
-      ]
+      "platform": "web"
     }
   },
   "files": [
     "lib/index.js",
     "lib/client.js",
     "cordis.patch.yml",
-    "dsh.plugin.json",
     "README.md",
     "LICENSE"
   ],
@@ -42,11 +36,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/heiheiha798/dsh-plugin-response-window.git"
+    "url": "git+https://github.com/qiqiangvae/dsh-newbe-plugins.git"
   },
-  "homepage": "https://github.com/heiheiha798/dsh-plugin-response-window#readme",
+  "homepage": "https://github.com/qiqiangvae/dsh-newbe-plugins#readme",
   "bugs": {
-    "url": "https://github.com/heiheiha798/dsh-plugin-response-window/issues"
+    "url": "https://github.com/qiqiangvae/dsh-newbe-plugins/issues"
   },
   "keywords": [
     "dsh-plugin",

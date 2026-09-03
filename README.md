@@ -1,7 +1,8 @@
-# dsh-plugin-response-window
+# dsh-newbe-response-window
 
 DeepSeek Harness (DSH) Web 插件：把一轮里的 think（推理）和工具调用放进**有限高度的可滚动窗口**（默认 10 行），以**阶段性文字回复为界分段**，每个分段一个 **slide**；文字回复保持原生完整显示、不做限高。中间过程**始终可见**（只是不撑爆页面）——Grok Build 风格。
 
+> 已验证 DSH 版本：**0.1.2-alpha.5**（2026-09）。
 > 与「全部折叠成 summary」类插件（如 `dsh-tool-summary`）不同：本插件**不隐藏**任何内容。think 与工具调用一条条列在 slide 里，每段都能展开翻到底；文字回复完全原生展示。
 > 只包 bash + think：阶段性/最终文字 response **不**加限高、**不**加「展开全部/收起」按钮。
 
@@ -26,20 +27,20 @@ DeepSeek Harness (DSH) Web 插件：把一轮里的 think（推理）和工具�
 ## 安装
 
 ```bash
-dsh plugin --profile web add github:heiheiha798/dsh-plugin-response-window
+dsh plugin --profile web add github:qiqiangvae/dsh-newbe-plugins
 ```
 
 或本地 link 方式（开发调试）：
 
 ```bash
-git clone https://github.com/heiheiha798/dsh-plugin-response-window.git
-cd dsh-plugin-response-window
+git clone https://github.com/qiqiangvae/dsh-newbe-plugins.git
+cd dsh-newbe-plugins
 dsh plugin --profile web add "link:$(pwd)"
 ```
 
 装完重启 `dsh web`（或等 profile HMR）生效。
 
-卸载：`dsh plugin --profile web remove dsh-plugin-response-window`
+卸载：`dsh plugin --profile web remove dsh-newbe-response-window`
 
 ## 配置
 
@@ -57,14 +58,15 @@ dsh plugin --profile web add "link:$(pwd)"
 插件在 Web UI 的 **Settings → General** 里注册了一项 **「响应窗口大小（行数）」**：
 
 - `−` / 数值输入 / `+`：调整 `lines`（0–200，`0` = 不限高，默认 10）
-- **即时生效**：改动后已渲染的 slide 高度立刻变化（经宿主 settings namespace `dsh-plugin-response-window` 持久化）
+- **即时生效**：改动后已渲染的 slide 高度立刻变化（经宿主 settings namespace `dsh-newbe-response-window` 持久化）
 
 ## 实现说明（为什么安全）
 
-- 工具调用 slide 通过 `conversation.chat.node`（`tool-call` key，`priority: -100`）的 **slot shadow** 在 React 层实现：每轮第一个 tool-call 节点渲染整个 slide，同轮其余 tool-call 节点渲染空，任何渲染异常自动 abdicate 回内置渲染。
+- 工具调用 slide 通过 `conversation.chat.node`（`tool-call` key，`priority: -100`）的 **slot shadow** 在 React 层实现：每轮第一个 tool-call 节点渲染整个 slide，同轮其余 tool-call 节点渲染空，任何渲染异常由 slot 运行时的 entry boundary **自动 abdicate** 回内置渲染。
 - **绝不移走 React 拥有的 `[data-chat-anchor-key]` 行节点**。实测：把行移进自定义容器后，一旦 DSH 后续移除该行（会话切换/编辑/压缩），React 会调用 `parent.removeChild(row)` 抛 `NotFoundError`，整个会话树被卸载——因此本插件只用「slot shadow + 类/CSS」两种方式，对 React 行结构零改动。
 - 原生 Think 行隐藏与 slide 内的 think 同步：只对「该段内有 slide」的原生 `data-variant="think"` 行加 `display:none`（DOM 类/CSS，无重挂、无删除），其余（无工具调用的纯 Think 段）保持原生显示。
-- 插件只读 session 快照（`useSession`），不写快照、不调宿主 API。
+- 插件只读会话快照，不写快照、不调宿主 API。0.1.2-alpha 起快照从 slot 标准 prop **`useChat`** 读取（`{ locations.getTurn(turn), nodes.get(key) }` 形状），不再走 `useSession` 的 `chat` 字段；「幽灵行」判定通过 DOM 行上的 `data-chat-flow-key` 与该快照对号，不再嗅探 markdown CSS 类名（新版 CSS Module 类名已不含 `_markdown`）。
+- 浏览器半依赖 `@deepseek-ai/dsh-client-store`（`createSnapshotStore`，shell 内置 seed module），替代旧版的 `@deepseek-ai/dsh-client-runtime`（该包在新 alpha 已移除）。旧版 `dsh.plugin.json` 清单在新 alpha 不再被读取，已删除。
 
 ## 开发 / 测试
 
@@ -82,7 +84,7 @@ python3 test/e2e.py --url http://127.0.0.1:3639 --session "架构重构不顺原
 ```
 
 - 宿主半：`lib/index.js`（注册 settings namespace，依赖 `@deepseek-ai/schemastery`）
-- 浏览器半：`lib/client.js`（`window.__ModuleLoader__.load`，依赖 web 运行时注入的 `react`、slots 与 settings scope）
+- 浏览器半：`lib/client.js`（`window.__ModuleLoader__.load`，require `react` 与 shell seed 的 `@deepseek-ai/dsh-client-store`）
 
 ## License
 
