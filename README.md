@@ -15,19 +15,19 @@
 每个插件从 monorepo 的对应子目录独立安装（`#path:` 语法）：
 
 ```bash
-# response-window
+# response-window（Git 子目录）
 dsh plugin --profile web add github:qiqiangvae/dsh-newbe-plugins#path:packages/dsh-newbe-response-window
+# response-window（npm）
+dsh plugin --profile web add dsh-newbe-response-window
 
-# input-enhancer（Git）
+# input-enhancer（Git 子目录）
 dsh plugin --profile web add github:qiqiangvae/dsh-newbe-plugins#path:packages/dsh-newbe-input-enhancer
-
-# input-enhancer（npm，发布后）
+# input-enhancer（npm）
 dsh plugin --profile web add dsh-newbe-input-enhancer
 
-# my-favorites（Git）
+# my-favorites（Git 子目录）
 dsh plugin --profile web add github:qiqiangvae/dsh-newbe-plugins#path:packages/dsh-newbe-my-favorites
-
-# my-favorites（npm，发布后）
+# my-favorites（npm）
 dsh plugin --profile web add dsh-newbe-my-favorites
 ```
 
