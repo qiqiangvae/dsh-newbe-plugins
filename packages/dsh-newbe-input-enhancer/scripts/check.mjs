@@ -10,7 +10,7 @@ for (const [name, content, required] of [
   ['Client', client, "document.addEventListener('keydown', onKeyDown, true)"],
   ['Client', client, 'conversation.input.right'],
   ['Client', client, 'data-composer-card'],
-  ['Client', client, 'data-dsh-input-enhancer'],
+  ['Client', client, 'data-dsh-newbe-input-enhancer'],
   ['Client', client, 'data-dsh-char-count'],
   ['Client', client, 'data-dsh-long-text'],
   ['Client', client, 'LONG_TEXT_THRESHOLD'],
@@ -19,7 +19,7 @@ for (const [name, content, required] of [
   ['Client', client, 'isSuggestionMenuOpen'],
   ['Client', client, 'tinyStore'],
   ['Client', client, 'createLockFeature'],
-  ['Client', client, 'dsh-input-enhancer-char-count'],
+  ['Client', client, 'dsh-newbe-input-enhancer-char-count'],
   ['Client', client, 'event.stopImmediatePropagation'],
   ['Client', client, 'event.isComposing || event.keyCode === 229'],
   ['Client', client, 'event.altKey !== true'],
@@ -30,7 +30,7 @@ for (const [name, content, required] of [
   ['Client', client, 'createStageFeature'],
   ['Client', client, 'STAGE_SHORTCUT_ENABLED'],
   ['Client', client, "code === 'KeyK'"],
-  ['Client', client, 'dsh-input-enhancer-stage'],
+  ['Client', client, 'dsh-newbe-input-enhancer-stage'],
   ['Client', client, 'StageIcon'],
   // DSH 0.1.2-alpha.1 composer is a Lexical contenteditable host, not a
   // <textarea>; the guard must detect it and read the draft from the input
@@ -48,8 +48,8 @@ if (client.includes('settingsScope') || client.includes('settings-not-exposed'))
   throw new Error('Client bundle unexpectedly depends on the Host settings API')
 }
 
-if (client.includes('dsh-enter-lock') || host.includes('dsh-enter-lock')) {
-  throw new Error('Stale pre-rename fragment "dsh-enter-lock" still present in a bundle')
+if (client.includes('dsh-input-enhancer') || host.includes('dsh-input-enhancer')) {
+  throw new Error('Stale pre-rename fragment "dsh-input-enhancer" still present in a bundle')
 }
 
-console.log('dsh-input-enhancer bundle artifacts passed structural checks.')
+console.log('dsh-newbe-input-enhancer bundle artifacts passed structural checks.')

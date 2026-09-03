@@ -1,7 +1,7 @@
-export const name = 'dsh-input-enhancer'
+export const name = 'dsh-newbe-input-enhancer'
 
 /**
- * Host half of dsh-input-enhancer.
+ * Host half of dsh-newbe-input-enhancer.
  *
  * This bundle is intentionally dependency-free on the Host side. The lock
  * state is kept in browser memory, scoped per session, and the Enter guard is

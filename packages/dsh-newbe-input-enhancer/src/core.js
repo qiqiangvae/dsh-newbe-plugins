@@ -1,5 +1,5 @@
 /**
- * dsh-input-enhancer — pure logic core (no DOM / React / Cordis dependency).
+ * dsh-newbe-input-enhancer — pure logic core (no DOM / React / Cordis dependency).
  *
  * The testable seam for the composer-lock triple-tap gesture and the draft-slot
  * swap. `src/client.js` stays thin glue: it owns timing (setTimeout) and DOM
@@ -25,7 +25,7 @@
  *    non-zero length back to zero. The composer never stays locked when the
  *    text has been cleared.
  *
- * @module dsh-input-enhancer/core
+ * @module dsh-newbe-input-enhancer/core
  */
 
 /**

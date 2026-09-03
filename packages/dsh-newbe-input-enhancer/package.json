@@ -1,5 +1,5 @@
 {
-  "name": "dsh-input-enhancer",
+  "name": "dsh-newbe-input-enhancer",
   "version": "1.1.0",
   "description": "DeepSeek Harness plugin that enhances the web chat composer: lock Enter-send to prevent accidental sends. IME-safe and per-session.",
   "type": "module",
@@ -53,10 +53,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/qiqiangvae/dsh-input-enhancer.git"
+    "url": "git+https://github.com/qiqiangvae/dsh-newbe-plugins.git",
+    "directory": "packages/dsh-newbe-input-enhancer"
   },
   "bugs": {
-    "url": "https://github.com/qiqiangvae/dsh-input-enhancer/issues"
+    "url": "https://github.com/qiqiangvae/dsh-newbe-plugins/issues"
   },
-  "homepage": "https://github.com/qiqiangvae/dsh-input-enhancer#readme"
+  "homepage": "https://github.com/qiqiangvae/dsh-newbe-plugins/tree/main/packages/dsh-newbe-input-enhancer#readme"
 }

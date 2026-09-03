@@ -1,4 +1,4 @@
-# dsh-input-enhancer bundle patch.
+# dsh-newbe-input-enhancer bundle patch.
 #
 # Installing this package into a profile with:
 #
@@ -10,5 +10,5 @@
 # `dsh.client` declaration in package.json; the Host half is a dependency-free
 # no-op because all state and interception live in the Web client.
 - insert:
-    - id: dsh-input-enhancer
-      name: dsh-input-enhancer
+    - id: dsh-newbe-input-enhancer
+      name: dsh-newbe-input-enhancer

@@ -1,4 +1,4 @@
-# dsh-input-enhancer
+# dsh-newbe-input-enhancer
 
 中文 | [English](README.en.md)
 
@@ -87,52 +87,53 @@ agent 还在思考/执行时，你往往想先把「下一轮要说的话」打�
 ### 方式一：从 npm 安装
 
 ```sh
-dsh plugin --profile web add dsh-input-enhancer
+dsh plugin --profile web add dsh-newbe-input-enhancer
 ```
 
 建议锁定到具体版本以保证可重复安装：
 
 ```sh
-dsh plugin --profile web add 'dsh-input-enhancer@1.1.0'
+dsh plugin --profile web add 'dsh-newbe-input-enhancer@1.1.0'
 ```
 
-### 方式二：从本仓库 GitHub 安装
+### 方式二：从合集仓库 GitHub 安装（子目录）
 
 ```sh
-dsh plugin --profile web add github:qiqiangvae/dsh-input-enhancer
+dsh plugin --profile web add github:qiqiangvae/dsh-newbe-plugins#path:packages/dsh-newbe-input-enhancer
 ```
 
 也可以显式使用 Git URL：
 
 ```sh
-dsh plugin --profile web add https://github.com/qiqiangvae/dsh-input-enhancer.git
+dsh plugin --profile web add https://github.com/qiqiangvae/dsh-newbe-plugins.git#path:packages/dsh-newbe-input-enhancer
 ```
 
-建议锁定到某个 commit 以保证可重复安装：
+建议锁定到某个 commit 以保证可重复安装（`&path:` 同时锁定分支与子目录）：
 
 ```sh
-dsh plugin --profile web add 'github:qiqiangvae/dsh-input-enhancer#<commit-sha>'
+dsh plugin --profile web add 'github:qiqiangvae/dsh-newbe-plugins#<commit-sha>&path:packages/dsh-newbe-input-enhancer'
 ```
 
 ### 方式三：从本地目录安装
 
 ```sh
-git clone https://github.com/qiqiangvae/dsh-input-enhancer.git
-dsh plugin --profile web add ./dsh-input-enhancer
+git clone https://github.com/qiqiangvae/dsh-newbe-plugins.git
+cd dsh-newbe-plugins
+dsh plugin --profile web add ./packages/dsh-newbe-input-enhancer
 ```
 
 ### 验证安装
 
 ```sh
-dsh --profile web --dump-config | grep dsh-input-enhancer
+dsh --profile web --dump-config | grep dsh-newbe-input-enhancer
 ```
 
 应能看到类似输出：
 
 ```yaml
-# == dsh-input-enhancer
-- id: dsh-input-enhancer
-  name: dsh-input-enhancer
+# == dsh-newbe-input-enhancer
+- id: dsh-newbe-input-enhancer
+  name: dsh-newbe-input-enhancer
 ```
 
 安装完成后重启 `dsh web` 并刷新页面。
@@ -191,7 +192,7 @@ dsh --profile web --dump-config | grep dsh-input-enhancer
 1. 确认插件已挂载：
 
    ```sh
-   dsh --profile web --dump-config | grep dsh-input-enhancer
+   dsh --profile web --dump-config | grep dsh-newbe-input-enhancer
    ```
 
 2. 重启 `dsh web` 并强制刷新页面（`Ctrl+F5`）。
@@ -212,12 +213,12 @@ dsh --profile web --dump-config | grep dsh-input-enhancer
 ## 卸载
 
 ```sh
-dsh plugin --profile web remove dsh-input-enhancer
+dsh plugin --profile web remove dsh-newbe-input-enhancer
 ```
 
 ## 开发与构建
 
-安装本仓库不需要构建：`lib/` 已提交预构建产物，且没有 `prepare` / `postinstall` 脚本。
+安装本插件不需要构建：`lib/` 已提交预构建产物，且没有 `prepare` / `postinstall` 脚本。
 
 如需修改源码后重新生成构建产物：
 
@@ -229,7 +230,7 @@ npm run check   # 结构检查
 ## 目录结构
 
 ```text
-dsh-input-enhancer/
+dsh-newbe-input-enhancer/
 ├── package.json          # dsh.bundle + dsh.client 插件声明
 ├── cordis.patch.yml      # profile bundle patch
 ├── src/
@@ -244,13 +245,17 @@ dsh-input-enhancer/
 └── LICENSE
 ```
 
-## 更新说明（从 dsh-enter-lock fork 而来）
+## 更新说明（从 dsh-enter-lock / dsh-input-enhancer 更名而来）
 
-本插件由 `dsh-enter-lock` 更名并增强而来。若你之前安装了旧名插件，请先卸载再安装本插件：
+本插件由 `dsh-enter-lock` 更名并增强而来，现随 newbe 合集迁入 monorepo，包名从 `dsh-input-enhancer` 改为 `dsh-newbe-input-enhancer`。若你之前安装过旧名插件，请先卸载再装本插件：
 
 ```sh
+# 旧名 dsh-input-enhancer（原独立仓库 / npm 包）
+dsh plugin --profile web remove dsh-input-enhancer
+# 更早的旧名 dsh-enter-lock
 dsh plugin --profile web remove dsh-enter-lock
-dsh plugin --profile web add github:qiqiangvae/dsh-input-enhancer
+# 安装新名（npm）
+dsh plugin --profile web add dsh-newbe-input-enhancer
 ```
 
 相较 `dsh-enter-lock`，本插件新增：

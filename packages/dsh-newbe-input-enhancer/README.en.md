@@ -1,4 +1,4 @@
-# dsh-input-enhancer
+# dsh-newbe-input-enhancer
 
 [中文](README.md) | English
 
@@ -95,44 +95,45 @@ While the agent is still thinking or executing, you'll often want to type the ne
 ### Install from npm
 
 ```sh
-dsh plugin --profile web add dsh-input-enhancer
+dsh plugin --profile web add dsh-newbe-input-enhancer
 ```
 
 For reproducible installs, pin to a specific version:
 
 ```sh
-dsh plugin --profile web add 'dsh-input-enhancer@1.1.0'
+dsh plugin --profile web add 'dsh-newbe-input-enhancer@1.1.0'
 ```
 
-### Install from this GitHub repository
+### Install from the monorepo (subdirectory)
 
 ```sh
-dsh plugin --profile web add github:qiqiangvae/dsh-input-enhancer
+dsh plugin --profile web add github:qiqiangvae/dsh-newbe-plugins#path:packages/dsh-newbe-input-enhancer
 ```
 
 Or use the explicit Git URL:
 
 ```sh
-dsh plugin --profile web add https://github.com/qiqiangvae/dsh-input-enhancer.git
+dsh plugin --profile web add https://github.com/qiqiangvae/dsh-newbe-plugins.git#path:packages/dsh-newbe-input-enhancer
 ```
 
-For reproducible installs, pin a commit:
+For reproducible installs, pin a commit (`&path:` also pins the subdirectory):
 
 ```sh
-dsh plugin --profile web add 'github:qiqiangvae/dsh-input-enhancer#<commit-sha>'
+dsh plugin --profile web add 'github:qiqiangvae/dsh-newbe-plugins#<commit-sha>&path:packages/dsh-newbe-input-enhancer'
 ```
 
 ### Install from a local directory
 
 ```sh
-git clone https://github.com/qiqiangvae/dsh-input-enhancer.git
-dsh plugin --profile web add ./dsh-input-enhancer
+git clone https://github.com/qiqiangvae/dsh-newbe-plugins.git
+cd dsh-newbe-plugins
+dsh plugin --profile web add ./packages/dsh-newbe-input-enhancer
 ```
 
 ### Verify
 
 ```sh
-dsh --profile web --dump-config | grep dsh-input-enhancer
+dsh --profile web --dump-config | grep dsh-newbe-input-enhancer
 ```
 
 Then restart `dsh web` and refresh the page.
@@ -190,7 +191,7 @@ The plugin is zero-configuration. It requires no API key, no settings fields, an
 1. Verify that the plugin is mounted:
 
    ```sh
-   dsh --profile web --dump-config | grep dsh-input-enhancer
+   dsh --profile web --dump-config | grep dsh-newbe-input-enhancer
    ```
 
 2. Restart `dsh web` and force-refresh the page (`Ctrl+F5`).
@@ -211,12 +212,12 @@ The plugin is zero-configuration. It requires no API key, no settings fields, an
 ## Uninstall
 
 ```sh
-dsh plugin --profile web remove dsh-input-enhancer
+dsh plugin --profile web remove dsh-newbe-input-enhancer
 ```
 
 ## Development and build
 
-No build step is required to install this repository: `lib/` contains committed prebuilt artifacts and the package has no `prepare` / `postinstall` scripts.
+No build step is required to install this package: `lib/` contains committed prebuilt artifacts and the package has no `prepare` / `postinstall` scripts.
 
 After changing the source, regenerate the artifacts with:
 
@@ -228,7 +229,7 @@ npm run check   # structural checks
 ## Project layout
 
 ```text
-dsh-input-enhancer/
+dsh-newbe-input-enhancer/
 ├── package.json          # dsh.bundle + dsh.client plugin manifest
 ├── cordis.patch.yml      # profile bundle patch
 ├── src/
@@ -243,13 +244,17 @@ dsh-input-enhancer/
 └── LICENSE
 ```
 
-## Migration from dsh-enter-lock
+## Migration from dsh-enter-lock / dsh-input-enhancer
 
-This plugin was renamed and enhanced from `dsh-enter-lock`. If you previously installed the old name, uninstall it first, then install this plugin:
+This plugin was renamed and enhanced from `dsh-enter-lock`, then moved into the newbe monorepo with the package name `dsh-input-enhancer` → `dsh-newbe-input-enhancer`. If you previously installed an old name, uninstall it first, then install this plugin:
 
 ```sh
+# old name dsh-input-enhancer (standalone repo / npm)
+dsh plugin --profile web remove dsh-input-enhancer
+# even older name dsh-enter-lock
 dsh plugin --profile web remove dsh-enter-lock
-dsh plugin --profile web add github:qiqiangvae/dsh-input-enhancer
+# install the new name (npm)
+dsh plugin --profile web add dsh-newbe-input-enhancer
 ```
 
 Compared with `dsh-enter-lock`, this plugin adds:

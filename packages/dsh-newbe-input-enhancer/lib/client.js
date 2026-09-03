@@ -1,5 +1,5 @@
 window.__ModuleLoader__.load({
-  id: 'dsh-input-enhancer',
+  id: 'dsh-newbe-input-enhancer',
   factory: (require) => {
     var module = { exports: {} }
     var exports = module.exports
@@ -70,8 +70,8 @@ window.__ModuleLoader__.load({
      * Constants & dictionaries
      * ======================================================================= */
 
-    var NS = 'dsh-input-enhancer'
-    var STYLE_ID = 'dsh-input-enhancer-style'
+    var NS = 'dsh-newbe-input-enhancer'
+    var STYLE_ID = 'dsh-newbe-input-enhancer-style'
 
     /**
      * Host (DSH core) DOM contract — internal, undocumented selectors this
@@ -366,9 +366,9 @@ window.__ModuleLoader__.load({
       if (!(target instanceof Element)) return undefined
       var card = target.closest(SEL.composerCard)
       if (card === null) return undefined
-      var toggle = card.querySelector('[data-dsh-input-enhancer]')
+      var toggle = card.querySelector('[data-dsh-newbe-input-enhancer]')
       if (toggle === null) return undefined
-      return toggle.getAttribute('data-dsh-input-enhancer-session')
+      return toggle.getAttribute('data-dsh-newbe-input-enhancer-session')
     }
 
     /* =========================================================================
@@ -600,8 +600,8 @@ window.__ModuleLoader__.load({
               }
             }
           },
-          'data-dsh-input-enhancer': '',
-          'data-dsh-input-enhancer-session': sessionId,
+          'data-dsh-newbe-input-enhancer': '',
+          'data-dsh-newbe-input-enhancer-session': sessionId,
           'aria-pressed': locked,
           'data-dsh-tap-flash': tapping > 0 ? String(tapping) : undefined,
           'aria-label': label,
@@ -682,7 +682,7 @@ window.__ModuleLoader__.load({
             return function () {
               document.removeEventListener('keydown', onKeyDown, true)
             }
-          }, 'dsh-input-enhancer: capture composer keyboard')
+          }, 'dsh-newbe-input-enhancer: capture composer keyboard')
         },
       }
     }
@@ -836,7 +836,7 @@ window.__ModuleLoader__.load({
             return function () {
               document.removeEventListener('keydown', onKeyDown, true)
             }
-          }, 'dsh-input-enhancer: capture composer stage keyboard')
+          }, 'dsh-newbe-input-enhancer: capture composer stage keyboard')
         },
       }
     }
@@ -871,39 +871,39 @@ window.__ModuleLoader__.load({
       style.setAttribute('data-plugin', NS)
       style.textContent = [
         // ---- lock button --------------------------------------------------
-        '[data-dsh-input-enhancer]{',
+        '[data-dsh-newbe-input-enhancer]{',
         'box-sizing:border-box;width:28px;height:28px;padding:0;border:1px solid var(--dsw-alias-border-l2);border-radius:50%;',
         'display:inline-flex;align-items:center;justify-content:center;flex:none;cursor:pointer;',
         'color:var(--dsw-alias-label-secondary);background:transparent;',
         '}',
-        '[data-dsh-input-enhancer]:hover{',
+        '[data-dsh-newbe-input-enhancer]:hover{',
         'color:var(--dsw-alias-label-primary);background:var(--dsw-alias-interactive-bg-hover);',
         '}',
-        '[data-dsh-input-enhancer][aria-pressed="true"]{',
+        '[data-dsh-newbe-input-enhancer][aria-pressed="true"]{',
         'color:#fff;',
         'background:var(--dsw-alias-state-error-primary);',
         'border:1px solid var(--dsw-alias-state-error-primary);',
         '}',
-        '[data-dsh-input-enhancer][aria-pressed="true"]:hover{',
+        '[data-dsh-newbe-input-enhancer][aria-pressed="true"]:hover{',
         'color:#fff;',
         'background:var(--dsw-alias-state-error-secondary);',
         'border:1px solid var(--dsw-alias-state-error-secondary);',
         '}',
-        '[data-dsh-input-enhancer]:focus-visible{',
+        '[data-dsh-newbe-input-enhancer]:focus-visible{',
         'outline:2px solid var(--dsw-alias-state-business-primary);outline-offset:2px;',
         '}',
         // Graded flash pulse on each Enter tap: tap 1 is a gentle pulse,
         // tap 2 is a larger pulse with a stronger halo, hinting "one more to
         // unlock and send". During taps the lock icon is replaced by the
         // count digit ("1" / "2").
-        '[data-dsh-input-enhancer][data-dsh-tap-flash]{',
+        '[data-dsh-newbe-input-enhancer][data-dsh-tap-flash]{',
         'font-size:13px;font-weight:600;',
         '}',
-        '[data-dsh-input-enhancer][data-dsh-tap-flash="1"]{',
+        '[data-dsh-newbe-input-enhancer][data-dsh-tap-flash="1"]{',
         'animation:dsh-enter-tap-flash-1 .35s ease-in-out;',
         'box-shadow:0 0 0 2px var(--dsw-alias-state-warning-primary);',
         '}',
-        '[data-dsh-input-enhancer][data-dsh-tap-flash="2"]{',
+        '[data-dsh-newbe-input-enhancer][data-dsh-tap-flash="2"]{',
         'animation:dsh-enter-tap-flash-2 .35s ease-in-out;',
         'box-shadow:0 0 0 4px var(--dsw-alias-state-warning-primary);',
         '}',
@@ -1013,11 +1013,11 @@ window.__ModuleLoader__.load({
 
       ctx.effect(function () {
         return ctx.locale.register(NS, { zh: zh, en: en })
-      }, 'dsh-input-enhancer: dictionaries')
+      }, 'dsh-newbe-input-enhancer: dictionaries')
 
       ctx.effect(function () {
         return adoptStyles()
-      }, 'dsh-input-enhancer: styles')
+      }, 'dsh-newbe-input-enhancer: styles')
 
       lockFeature.mountEffects(ctx)
       stageFeature.mountEffects(ctx)
@@ -1027,7 +1027,7 @@ window.__ModuleLoader__.load({
       ctx.slots.inject('conversation.input.right', function () {
         return ctx.slots.register({
           name: 'conversation.input.right',
-          id: 'dsh-input-enhancer-stage',
+          id: 'dsh-newbe-input-enhancer-stage',
           order: 10,
           locale: NS,
           inject: function (sessionId) {
@@ -1039,7 +1039,7 @@ window.__ModuleLoader__.load({
       ctx.slots.inject('conversation.input.right', function () {
         return ctx.slots.register({
           name: 'conversation.input.right',
-          id: 'dsh-input-enhancer',
+          id: 'dsh-newbe-input-enhancer',
           order: 20,
           locale: NS,
           inject: function (sessionId) {
@@ -1051,7 +1051,7 @@ window.__ModuleLoader__.load({
       ctx.slots.inject('conversation.input.right', function () {
         return ctx.slots.register({
           name: 'conversation.input.right',
-          id: 'dsh-input-enhancer-char-count',
+          id: 'dsh-newbe-input-enhancer-char-count',
           order: 30,
           locale: NS,
           inject: function () {
@@ -1061,7 +1061,7 @@ window.__ModuleLoader__.load({
       })
     }
 
-    module.exports = { name: 'dsh-input-enhancer', inject: inject, apply: apply }
+    module.exports = { name: 'dsh-newbe-input-enhancer', inject: inject, apply: apply }
     return module.exports
   },
 })
