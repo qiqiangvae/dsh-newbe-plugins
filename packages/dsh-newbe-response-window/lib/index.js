@@ -10,7 +10,12 @@
 //   collapsed         start slides collapsed instead of always-expanded
 //   showReadOnly      include read-only tools in the slide list
 //   minCollapseRows   min tool-call count for auto-collapse (collapsed mode)
-//
+//   liveStreamThink   how a streaming think block is shown:
+//                     'off' — always folded into a one-line summary
+//                     'in'  — auto-expand inside the slide, live scroll
+//                     'out' — stream outside the slide (native row), then
+//                             fold into the slide once settled (default 'out')
+
 // `settingsNamespace()` is just a validated string (kebab-case pattern); the
 // namespace below already matches, so we pass the raw string and avoid an extra
 // host dependency.
@@ -29,6 +34,7 @@ export const Config = z.object({
   collapsed: z.boolean().default(false),
   showReadOnly: z.boolean().default(true),
   minCollapseRows: z.natural().min(1).max(50).default(3),
+  liveStreamThink: z.string().default('out'),
 })
 
 /**

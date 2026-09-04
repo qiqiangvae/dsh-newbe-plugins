@@ -19,6 +19,11 @@
 #   minCollapseRows   only auto-collapse a finished slide when it has at least
 #                     this many tool calls (default 3; only used with
 #                     collapsed=true).
+#   liveStreamThink   how a streaming think block is shown (default 'out'):
+#                     'off' — always folded into a one-line summary
+#                     'in'  — auto-expand inside the slide, live scroll
+#                     'out' — stream outside the slide (native position),
+#                             then fold into the slide once settled
 - insert:
     - id: dsh-newbe-response-window
       name: 'dsh-newbe-response-window'
@@ -27,3 +32,4 @@
         collapsed: false
         showReadOnly: true
         minCollapseRows: 3
+        liveStreamThink: 'out'

@@ -61,16 +61,27 @@ window.__ModuleLoader__.load({
     var createSnapshotStore = storeLib.createSnapshotStore
 
     // ---- config -----------------------------------------------------------
+    // liveStreamThink mode: 'off' (always folded) | 'in' (auto-expand the row
+    // inside the slide while streaming) | 'out' (stream outside the slide in
+    // the native position, fold into the slide when settled).
     var DEFAULTS = {
       lines: 10,
       collapsed: false,
       showReadOnly: true,
       minCollapseRows: 3,
+      liveStreamThink: 'out',
     }
     function clampInt(value, min, max, fallback) {
       var n = Number(value)
       if (!Number.isFinite(n)) return fallback
       return Math.min(max, Math.max(min, Math.round(n)))
+    }
+    function normalizeLiveStreamThink(value, fallback) {
+      if (value === 'off' || value === 'in' || value === 'out') return value
+      // Legacy boolean row config: true meant in-box live streaming.
+      if (value === true) return 'in'
+      if (value === false) return 'off'
+      return fallback
     }
     function readConfig(cfg) {
       cfg = cfg || {}
@@ -79,19 +90,22 @@ window.__ModuleLoader__.load({
         collapsed: cfg.collapsed === true,
         showReadOnly: cfg.showReadOnly !== false,
         minCollapseRows: clampInt(cfg.minCollapseRows, 1, 50, DEFAULTS.minCollapseRows),
+        liveStreamThink: normalizeLiveStreamThink(cfg.liveStreamThink, DEFAULTS.liveStreamThink),
       }
     }
 
     // ---- live settings state ----------------------------------------------
-    // `lines` is user-adjustable from Settings; the rest come from row config.
+    // `lines` and `liveStreamThink` are user-adjustable from Settings; the
+    // rest come from row config.
     var linesStore = null
+    var liveStreamThinkStore = null
     var settingsScope = null
     var NS = 'dsh-newbe-response-window'
     function clampLines(value) { return clampInt(value, 0, 200, DEFAULTS.lines) }
 
     /** Minimal observable-value hook over a SnapshotStore (plain React). */
-    function useStoreValue(store) {
-      var pair = React.useState(function () { return store === null ? DEFAULTS.lines : store.getSnapshot() })
+    function useStoreValue(store, fallback) {
+      var pair = React.useState(function () { return store === null ? fallback : store.getSnapshot() })
       var value = pair[0]
       var setValue = pair[1]
       React.useEffect(function () {
@@ -105,7 +119,7 @@ window.__ModuleLoader__.load({
 
     /** Live window size in lines (follows the Settings store). */
     function useLiveLines() {
-      return useStoreValue(linesStore)
+      return useStoreValue(linesStore, DEFAULTS.lines)
     }
 
     // ---- shared style injection ------------------------------------------
@@ -195,7 +209,7 @@ window.__ModuleLoader__.load({
         '.drw-think-name { color: var(--dsw-alias-label-secondary, #bbb); font-size: 11px; font-weight: 600; letter-spacing: 0.04em; flex: none; }',
         '.drw-think-summary { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--dsw-alias-label-tertiary, #999); font-size: 12.5px; flex: 1 1 auto; }',
         '.drw-think-toggle { color: var(--dsw-alias-label-tertiary, #888); font-size: 10px; flex: none; }',
-        '.drw-think-body { margin: 0; padding: 6px 8px; color: var(--dsw-alias-label-primary, #eee); font: var(--dsw-font-markdown-code-block-small, 12px/1.5 ui-monospace, monospace); white-space: pre-wrap; word-break: break-word; max-height: 240px; overflow-y: auto; }',
+        '.drw-think-body { margin: 0; padding: 6px 8px; color: var(--dsw-alias-label-primary, #eee); font: var(--dsw-font-markdown-code-block-small, 12px/1.5 ui-monospace, monospace); white-space: pre-wrap; word-break: break-word; max-height: 96px; overflow-y: auto; }',
         /* Hide the native Think row once it's inside a slide (DOM + CSS only) */
         '[data-variant="think"][data-drw-hidethink="1"] { display: none !important; }',
         /* Settings row: response window size */
@@ -213,6 +227,10 @@ window.__ModuleLoader__.load({
         '}',
         '.drw-set-btn:hover { background: var(--dsw-alias-interactive-bg-hover, rgba(128,128,128,0.16)); }',
         '.drw-set-btn:disabled { opacity: 0.4; cursor: default; }',
+        '.drw-set-btn.drw-set-on {',
+        '  border-color: var(--dsw-alias-state-business-primary, var(--dsw-alias-brand, #3dbbf5));',
+        '  color: var(--dsw-alias-state-business-primary, var(--dsw-alias-brand, #3dbbf5));',
+        '}',
         '.drw-set-input {',
         '  width: 56px; height: 28px; text-align: center;',
         '  border: 1px solid var(--dsw-alias-border-l2, var(--dsw-alias-border-strong, rgba(128,128,128,0.35)));',
@@ -343,16 +361,36 @@ window.__ModuleLoader__.load({
     // ---- one think (reasoning) row inside the slide -------------------------
     // A compact single-line row, collapsible to the full reasoning text — the
     // same look and feel as a tool-call row (think and tool calls are both
-    // "implementation" and should read the same inside the window).
+    // "implementation" and should read the same inside the window). While the
+    // block is still streaming the row auto-expands and the body pins to the
+    // latest line; when it settles the row folds back to its one-line summary.
+    // The head stays a static first-line summary the whole time, so the only
+    // moving part during a stream is the expanding body — one visual focus.
     function ThinkRow(props) {
       var text = props.text
       var index = props.index
+      var streaming = props.streaming === true
       var openState = React.useState(false)
       var open = openState[0]
       var setOpen = openState[1]
+      var bodyRef = React.useRef(null)
       var firstLine = text.split('\n')[0].trim() || text.trim()
       var summary = firstLine.length > 120 ? firstLine.slice(0, 117) + '…' : firstLine
-      return React.createElement('div', { className: 'drw-think', 'data-open': open ? '1' : undefined },
+      // Live streaming: auto-expand while streaming, fold back once settled.
+      React.useEffect(function () {
+        if (streaming) setOpen(true)
+        else setOpen(false)
+      }, [streaming])
+      // While streaming, keep the body pinned to the latest line.
+      React.useEffect(function () {
+        if (!open || !bodyRef.current) return
+        if (streaming) bodyRef.current.scrollTop = bodyRef.current.scrollHeight
+      })
+      return React.createElement('div', {
+        className: 'drw-think',
+        'data-open': open ? '1' : undefined,
+        'data-streaming': streaming ? '1' : undefined,
+      },
         React.createElement('div', {
           className: 'drw-think-head', role: 'button', tabIndex: 0,
           'aria-expanded': open || undefined,
@@ -364,7 +402,7 @@ window.__ModuleLoader__.load({
           React.createElement('span', { className: 'drw-think-toggle', 'aria-hidden': true }, open ? '\u25BE' : '\u25B8'),
         ),
         open
-          ? React.createElement('pre', { className: 'drw-think-body' }, text)
+          ? React.createElement('pre', { ref: bodyRef, className: 'drw-think-body' }, text)
           : null,
       )
     }
@@ -382,6 +420,7 @@ window.__ModuleLoader__.load({
       var openFile = props.openFile
       var inspectCall = props.inspectCall
       var cfg = props.config
+      var streamingThink = props.streamingThink || null
       var lines = useLiveLines() // live window size from Settings
       var toolItems = items.filter(function (it) { return it.kind === 'tool' })
       var reasoningCount = items.reduce(function (acc, it) { return it.kind === 'think' ? acc + 1 : acc }, 0)
@@ -393,10 +432,27 @@ window.__ModuleLoader__.load({
       var setOpen = openState[1]
       var bodyRef = React.useRef(null)
       var running = stats.running > 0
-      // Auto-follow to the bottom while calls are still running.
+      // Streaming detection depends on the mode:
+      //   'in'  — a think block inside the box is still streaming (the row
+      //           auto-expands and the slide is forced open so the live
+      //           reasoning stays readable);
+      //   'out' — the live tail is streaming OUTSIDE the slide (native row)
+      //           and folds in when settled; the slide is forced open so the
+      //           fold-in is visible.
+      // In both cases streaming overrides `collapsed`, then the user's
+      // collapsed setting is restored (Q7).
+      var mode = cfg.liveStreamThink
+      var streaming = mode === 'in'
+        ? items.some(function (it) { return it.kind === 'think' && it.streaming === true })
+        : mode === 'out'
+          ? streamingThink !== null
+          : false
+      var effectiveOpen = open || streaming
+      // Auto-follow to the bottom while calls are still running or a think is
+      // still streaming.
       React.useEffect(function () {
-        if (!open || !bodyRef.current) return
-        if (running) bodyRef.current.scrollTop = bodyRef.current.scrollHeight
+        if (!effectiveOpen || !bodyRef.current) return
+        if (running || streaming) bodyRef.current.scrollTop = bodyRef.current.scrollHeight
       })
       var list = items
       if (!cfg.showReadOnly) {
@@ -405,10 +461,10 @@ window.__ModuleLoader__.load({
         })
       }
       var thinkSeen = 0
-      return React.createElement('div', { className: 'drw-slide', 'data-running': running ? '1' : undefined },
+      return React.createElement('div', { className: 'drw-slide', 'data-running': running || streaming ? '1' : undefined },
         React.createElement('div', {
           className: 'drw-head', role: 'button', tabIndex: 0,
-          'aria-expanded': open || undefined,
+          'aria-expanded': effectiveOpen || undefined,
           onClick: function () { setOpen(!open) },
           onKeyDown: function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen(!open) } },
         },
@@ -416,6 +472,9 @@ window.__ModuleLoader__.load({
             stats.total + ' 个工具调用'
               + (reasoningCount > 0 ? ' · ' + reasoningCount + ' Think' : '')
           ),
+          streaming
+            ? React.createElement('span', { className: 'drw-head-badge', 'data-state': 'running' }, '思考中')
+            : null,
           running
             ? React.createElement('span', { className: 'drw-head-badge', 'data-state': 'running' }, '进行中')
             : null,
@@ -425,18 +484,23 @@ window.__ModuleLoader__.load({
           !cfg.showReadOnly && stats.readOnly > 0
             ? React.createElement('span', { className: 'drw-head-badge' }, '隐藏只读 ' + stats.readOnly)
             : null,
-          React.createElement('span', { className: 'drw-head-toggle' }, open ? '收起 ▴' : '展开 ▾'),
+          React.createElement('span', { className: 'drw-head-toggle' }, effectiveOpen ? '收起 ▴' : '展开 ▾'),
         ),
         React.createElement('div', {
           ref: bodyRef,
-          className: 'drw-body' + (open ? '' : ' drw-collapsed'),
-          style: open && lines > 0 ? { maxHeight: (lines * 1.55) + 'em' } : undefined,
+          className: 'drw-body' + (effectiveOpen ? '' : ' drw-collapsed'),
+          style: effectiveOpen && lines > 0 ? { maxHeight: (lines * 1.55) + 'em' } : undefined,
         },
           list.map(function (it) {
             if (it.kind === 'think') {
               var tid = thinkSeen
               thinkSeen += 1
-              return React.createElement(ThinkRow, { key: 'think-' + tid, text: it.text, index: tid })
+              return React.createElement(ThinkRow, {
+                key: 'think-' + tid,
+                text: it.text,
+                index: tid,
+                streaming: it.streaming === true,
+              })
             }
             return React.createElement(SimpleToolRow, {
               key: it.node.key,
@@ -469,12 +533,13 @@ window.__ModuleLoader__.load({
       var current = null
       function ensure() {
         if (current === null) {
-          current = { items: [], tools: [], startKey: null }
+          current = { items: [], tools: [], startKey: null, streamingThink: null }
           segments.push(current)
         }
         return current
       }
       function closeSegment() { current = null }
+      var mode = currentConfig.liveStreamThink
       for (var i = 0; i < order.length; i++) {
         var n = chat.nodes.get(order[i])
         if (n === undefined) continue
@@ -482,13 +547,29 @@ window.__ModuleLoader__.load({
         if (n.kind === 'assistant-step') {
           var blocks = n.data && Array.isArray(n.data.blocks) ? n.data.blocks : []
           var staged = hasVisibleTextBlock(blocks)
-          // The reasoning of this step belongs to the chunk leading up to the
-          // staged response (i.e. the segment that ends here), and it keeps its
-          // exact output position among the tools.
+          // While a step is running, its LAST reasoning block is the live
+          // streaming tail — the exact rule the native ReasoningRow uses
+          // (`running: streaming && i === last`).
+          //   mode 'out': the tail streams OUTSIDE the slide (native row) and
+          //               folds in once settled — recorded as streamingThink.
+          //   mode 'in' : the tail stays INSIDE the box, tagged `streaming` so
+          //               the row auto-expands and shows live progress.
+          //   mode 'off': no streaming behavior, always folded.
+          var stepRunning = !!n.data && n.data.status === 'running'
+          var lastIdx = blocks.length - 1
           for (var b = 0; b < blocks.length; b++) {
             var block = blocks[b]
             if (block && block.kind === 'reasoning' && typeof block.text === 'string' && block.text.trim() !== '') {
-              ensure().items.push({ kind: 'think', text: block.text })
+              if (mode === 'out' && stepRunning && b === lastIdx) {
+                ensure().streamingThink = { text: block.text, nodeKey: n.key }
+              } else {
+                ensure().items.push({
+                  kind: 'think',
+                  text: block.text,
+                  nodeKey: n.key,
+                  streaming: mode === 'in' && stepRunning && b === lastIdx,
+                })
+              }
             }
           }
           if (staged) closeSegment()
@@ -554,6 +635,7 @@ window.__ModuleLoader__.load({
           cwd: cwd,
           openFile: openFile,
           inspectCall: inspectCall,
+          streamingThink: seg.streamingThink || null,
           config: currentConfig,
         })
       } catch (e) {
@@ -658,7 +740,15 @@ window.__ModuleLoader__.load({
           if (isSegmentBoundary(next)) break
           if (next.querySelector && next.querySelector('.drw-slide')) { hasSlide = true; break }
         }
-        if (hasSlide) think.dataset.drwHidethink = '1'
+        if (hasSlide) {
+          // In 'out' mode the streaming think tail lives OUTSIDE the box
+          // (native row) until it settles: keep it visible while
+          // `data-streaming` is present, then fold it in (hide) the moment the
+          // stream is gone. In 'in'/'off' modes the native row is always
+          // hidden — the box renders the same content.
+          var streamingOut = currentConfig.liveStreamThink === 'out' && !!think.closest('[data-streaming]')
+          if (!streamingOut) think.dataset.drwHidethink = '1'
+        }
         else if (think.dataset.drwHidethink) delete think.dataset.drwHidethink
       }
     }
@@ -711,34 +801,64 @@ window.__ModuleLoader__.load({
     }
 
     // ---- Settings row: response window size ---------------------------------
+    var STREAM_MODES = [
+      { value: 'off', label: '关闭' },
+      { value: 'in', label: '盒内' },
+      { value: 'out', label: '出盒' },
+    ]
     function ResponseWindowSettingsRow(props) {
       var useLines = props.useLines
       var setLines = props.setLines
+      var useLiveStreamThink = props.useLiveStreamThink
+      var setLiveStreamThink = props.setLiveStreamThink
       var lines = (typeof useLines === 'function' ? useLines(function (s) { return s }) : null) ?? currentConfig.lines
       var value = clampLines(lines)
       var step = function (delta) {
         setLines(value + delta)
       }
-      return React.createElement('div', { className: 'drw-set-row' },
-        React.createElement('div', { className: 'drw-set-text' },
-          React.createElement('div', { className: 'drw-set-title' }, '响应窗口大小（行数）'),
-          React.createElement('div', { className: 'drw-set-desc' }, '每个响应 slide 的限高滚动窗口。默认 10 行，0 = 不限高，改动即时生效。'),
+      var liveStreamThink = (typeof useLiveStreamThink === 'function' ? useLiveStreamThink(function (s) { return s }) : null) ?? currentConfig.liveStreamThink
+      var pickMode = function (mode) {
+        if (typeof setLiveStreamThink === 'function') setLiveStreamThink(mode)
+      }
+      return React.createElement(React.Fragment, null,
+        React.createElement('div', { className: 'drw-set-row' },
+          React.createElement('div', { className: 'drw-set-text' },
+            React.createElement('div', { className: 'drw-set-title' }, '响应窗口大小（行数）'),
+            React.createElement('div', { className: 'drw-set-desc' }, '每个响应 slide 的限高滚动窗口。默认 10 行，0 = 不限高，改动即时生效。'),
+          ),
+          React.createElement('div', { className: 'drw-set-control' },
+            React.createElement('button', {
+              type: 'button', className: 'drw-set-btn', 'aria-label': '减小窗口',
+              disabled: value <= 0,
+              onClick: function () { step(-1) },
+            }, '−'),
+            React.createElement('input', {
+              type: 'number', className: 'drw-set-input', min: 0, max: 200, step: 1, value: String(value),
+              onChange: function (e) { setLines(e.target.value) },
+            }),
+            React.createElement('button', {
+              type: 'button', className: 'drw-set-btn', 'aria-label': '增大窗口',
+              disabled: value >= 200,
+              onClick: function () { step(1) },
+            }, '+'),
+          ),
         ),
-        React.createElement('div', { className: 'drw-set-control' },
-          React.createElement('button', {
-            type: 'button', className: 'drw-set-btn', 'aria-label': '减小窗口',
-            disabled: value <= 0,
-            onClick: function () { step(-1) },
-          }, '−'),
-          React.createElement('input', {
-            type: 'number', className: 'drw-set-input', min: 0, max: 200, step: 1, value: String(value),
-            onChange: function (e) { setLines(e.target.value) },
-          }),
-          React.createElement('button', {
-            type: 'button', className: 'drw-set-btn', 'aria-label': '增大窗口',
-            disabled: value >= 200,
-            onClick: function () { step(1) },
-          }, '+'),
+        React.createElement('div', { className: 'drw-set-row' },
+          React.createElement('div', { className: 'drw-set-text' },
+            React.createElement('div', { className: 'drw-set-title' }, '流式思考显示'),
+            React.createElement('div', { className: 'drw-set-desc' }, '出盒：思考在 slide 外实时显示，结束后收进 slide 折叠；盒内：在 slide 内自动展开实时滚动；关闭：think 全程保持折叠。'),
+          ),
+          React.createElement('div', { className: 'drw-set-control' },
+            STREAM_MODES.map(function (m) {
+              return React.createElement('button', {
+                key: m.value,
+                type: 'button',
+                className: 'drw-set-btn' + (liveStreamThink === m.value ? ' drw-set-on' : ''),
+                'aria-pressed': liveStreamThink === m.value,
+                onClick: function () { pickMode(m.value) },
+              }, m.label)
+            }),
+          ),
         ),
       )
     }
@@ -754,6 +874,7 @@ window.__ModuleLoader__.load({
       // Durable settings binding: the host half registered the `dsh-newbe-response-window`
       // namespace; the browser scope mirrors it and persists user overrides.
       linesStore = createSnapshotStore(currentConfig.lines)
+      liveStreamThinkStore = createSnapshotStore(currentConfig.liveStreamThink)
       var scopeService = null
       try { scopeService = ctx.get('settingsScope') } catch (e) { scopeService = null }
       if (scopeService && typeof scopeService.bind === 'function') {
@@ -771,6 +892,15 @@ window.__ModuleLoader__.load({
             if (value && typeof value.lines === 'number') {
               var n = clampLines(value.lines)
               if (linesStore !== null && linesStore.getSnapshot() !== n) linesStore.set(n)
+            }
+            // liveStreamThink is stored as 'off' | 'in' | 'out'; tolerate
+            // legacy boolean rows (true → 'in', false → 'off').
+            if (value && value.liveStreamThink !== undefined) {
+              var v = normalizeLiveStreamThink(value.liveStreamThink, currentConfig.liveStreamThink)
+              if (liveStreamThinkStore !== null && liveStreamThinkStore.getSnapshot() !== v) {
+                liveStreamThinkStore.set(v)
+                currentConfig.liveStreamThink = v
+              }
             }
           } catch (e) {}
         }
@@ -796,7 +926,8 @@ window.__ModuleLoader__.load({
         }, TextWindowDock)
       })
 
-      // Settings → General row for the window size (live, persisted).
+      // Settings → General rows (window size + live-stream think, both live
+      // and persisted).
       ctx.slots.inject('settings.general.item', function () {
         return ctx.slots.register({
           name: 'settings.general.item',
@@ -804,12 +935,20 @@ window.__ModuleLoader__.load({
           order: 60,
           inject: function () {
             return {
-              hooks: { lines: linesStore },
+              hooks: { lines: linesStore, liveStreamThink: liveStreamThinkStore },
               setLines: function (value) {
                 var n = clampLines(value)
                 if (linesStore !== null) linesStore.set(n)
                 if (settingsScope !== null) {
                   settingsScope.set('lines', n).catch(function () {})
+                }
+              },
+              setLiveStreamThink: function (value) {
+                var v = normalizeLiveStreamThink(value, currentConfig.liveStreamThink)
+                if (liveStreamThinkStore !== null) liveStreamThinkStore.set(v)
+                currentConfig.liveStreamThink = v
+                if (settingsScope !== null) {
+                  settingsScope.set('liveStreamThink', v).catch(function () {})
                 }
               },
             }

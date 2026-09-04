@@ -1,7 +1,7 @@
 {
   "name": "dsh-newbe-response-window",
-  "version": "0.2.0",
-  "description": "DeepSeek Harness (DSH) web plugin: per-turn response window. Each turn's tool calls collapse into ONE always-expanded bounded slide (configurable N-line window, inner scroll, nothing hidden), and long assistant markdown gets a bounded scroll window too — Grok-build style, keeps every intermediate response visible inside a finite window.",
+  "version": "0.3.0",
+  "description": "DeepSeek Harness (DSH) web plugin: per-turn response window. Each turn's tool calls collapse into ONE always-expanded bounded slide (configurable N-line window, inner scroll, nothing hidden), and long assistant markdown gets a bounded scroll window too — Grok-build style, keeps every intermediate response visible inside a finite window. Streaming think blocks can live-stream outside the slide and fold in when settled (or auto-expand inside), switchable via Settings.",
   "type": "module",
   "main": "lib/index.js",
   "exports": {

@@ -16,6 +16,10 @@ DeepSeek Harness (DSH) Web 插件：把一轮里的 think（推理）和工具�
   - 主体：`max-height: N 行`（默认 10）的**内部滚动区**
     - **think 与工具调用严格按真实输出顺序交错排列**（不做「think 全在上 / bash 全在下」的强行分区）
     - 每段 think 一行（Think + 单行摘要 + 展开箭头），默认折叠，点击展开完整推理（内部限高滚动）；展开文字与工具输出同字号（同一 mono 字体）
+    - **think 流式显示三种模式**（`liveStreamThink`，默认 `'out'`）：
+      - `'out'`（默认）：正在流式的 think 在 **slide 外**（原生位置）实时显示，流式结束后**收进 slide 折叠**成单行摘要
+      - `'in'`：流式 think 在 **slide 内**自动展开、正文实时滚动，结束后自动收起为单行摘要
+      - `'off'`：think 全程折叠为单行摘要，不做流式展开
     - 每条工具调用一行（状态点 + 工具名 + 单行摘要），点击展开参数/输出（输出再限高一档，内部滚动）
   - 执行中自动跟随底部
 - **原生 Think 行从消息流中隐藏**（该段已并入 slide，避免重复显示），与 slide 内展示共用同一份内容
@@ -62,13 +66,15 @@ dsh plugin --profile web add "link:$(pwd)/packages/dsh-newbe-response-window"
 | `collapsed` | `false` | 每轮 slide 是否默认收起成一行 bar。默认 `false`：始终展开、内容可见 |
 | `showReadOnly` | `true` | 是否在 slide 里列出 read/grep/web_search 等只读调用（默认全列出，不藏） |
 | `minCollapseRows` | `3` | 仅 `collapsed: true` 时生效：少于该数量的轮次不收起 |
+| `liveStreamThink` | `'out'` | 流式 think 的显示模式：`'out'` 盒外流式结束后进盒折叠 / `'in'` 盒内自动展开 / `'off'` 全程折叠 |
 
 ### 设置页（Settings → General）
 
-插件在 Web UI 的 **Settings → General** 里注册了一项 **「响应窗口大小（行数）」**：
+插件在 Web UI 的 **Settings → General** 里注册了两项：
 
-- `−` / 数值输入 / `+`：调整 `lines`（0–200，`0` = 不限高，默认 10）
-- **即时生效**：改动后已渲染的 slide 高度立刻变化（经宿主 settings namespace `dsh-newbe-response-window` 持久化）
+- **「响应窗口大小（行数）」**：`−` / 数值输入 / `+` 调整 `lines`（0–200，`0` = 不限高，默认 10）
+- **「流式思考显示」**：三选一（关闭 / 盒内 / 出盒），对应 `liveStreamThink`（默认出盒）
+- 均**即时生效**：改动后已渲染的 slide 立刻变化（经宿主 settings namespace `dsh-newbe-response-window` 持久化）
 
 ## 实现说明（为什么安全）
 

@@ -6,7 +6,7 @@
 
 | 插件 | 目录 | 说明 | 版本 |
 | --- | --- | --- | --- |
-| [dsh-newbe-response-window](./packages/dsh-newbe-response-window) | `packages/dsh-newbe-response-window` | 每轮响应窗口：把 think/工具调用收进有限高度的可滚动 slide，文字回复原生展示 | 0.2.0 |
+| [dsh-newbe-response-window](./packages/dsh-newbe-response-window) | `packages/dsh-newbe-response-window` | 每轮响应窗口：把 think/工具调用收进有限高度的可滚动 slide，文字回复原生展示；流式 think 支持出盒/盒内/关闭三模式 | 0.3.0 |
 | [dsh-newbe-input-enhancer](./packages/dsh-newbe-input-enhancer) | `packages/dsh-newbe-input-enhancer` | 增强输入框：Enter 锁定防误发、三击发送、字数统计、长文本提醒、草稿交换 | 1.1.0 |
 | [dsh-newbe-my-favorites](./packages/dsh-newbe-my-favorites) | `packages/dsh-newbe-my-favorites` | 会话与网址的本机快捷收藏（标题栏星标 + 侧栏收藏入口 + 快捷切换） | 0.5.4 |
 
