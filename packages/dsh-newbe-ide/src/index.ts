@@ -8,9 +8,13 @@
  */
 import { dshHomePath } from '@deepseek-ai/dsh-home-paths';
 import { createConfigStore } from './store.js';
+import { createRunRegistry, type RunRead, type RunSnapshot, type RunSpec } from './runtime.js';
 import type { IdeLoad, IdeProjectView, IdeState } from './schema.js';
 
 export { createConfigStore, defaultState } from './store.js';
+export { cleanLine, maskSecrets, splitLines } from './lines.js';
+export { createRunRegistry } from './runtime.js';
+export type { RunRead, RunSnapshot, RunStatus } from './runtime.js';
 
 /** 持久化文件：$DSH_HOME/storages/dsh-newbe-ide.json。 */
 export const STORAGE_PATH = dshHomePath('storages', 'dsh-newbe-ide.json');
@@ -34,7 +38,30 @@ function listProjects(ctx: any): IdeProjectView[] {
 
 export function apply(ctx: any): void {
   const store = createConfigStore(STORAGE_PATH);
+  const registry = createRunRegistry(() => ctx.get('shell'));
   console.log(`[dsh-newbe-ide] 存储文件：${STORAGE_PATH}`);
+
+  // 定时把在跑进程的输出读进缓冲：客户端轮询只是取，不负责采集，避免读得太慢丢输出。
+  ctx.effect(() => {
+    const timer = setInterval(() => registry.pump(), 250);
+    return () => {
+      clearInterval(timer);
+      registry.dispose();
+    };
+  }, 'dsh-newbe-ide: run pump');
+
+  /** 运行键：一条启动配置 = 一个受管进程。 */
+  const runKey = (target: { workspaceId: string; configId: string }) => `${target.workspaceId}/${target.configId}`;
+
+  /** 从持久化配置里取出要跑的命令；找不到就把原因说清楚，而不是抛栈。 */
+  function specFor(target: { workspaceId: string; configId: string }): RunSpec {
+    const state = store.getState();
+    const project = state.projects.find((p) => p.workspaceId === target.workspaceId);
+    if (project === undefined) throw new Error('这个项目不在面板配置里');
+    const config = project.configs.find((c) => c.id === target.configId);
+    if (config === undefined) throw new Error('找不到这条启动配置');
+    return { command: config.command, cwd: config.cwd !== '' ? config.cwd : project.path, envs: config.envs };
+  }
 
   const service = {
     load(): IdeLoad {
@@ -42,6 +69,18 @@ export function apply(ctx: any): void {
     },
     submit(next: unknown): Promise<IdeState> {
       return store.submit(next);
+    },
+    start(target: { workspaceId: string; configId: string }): RunSnapshot {
+      return registry.start(runKey(target), specFor(target));
+    },
+    stop(target: { workspaceId: string; configId: string }): RunSnapshot {
+      return registry.stop(runKey(target));
+    },
+    read(request: { workspaceId: string; configId: string; from: number }): RunRead {
+      return registry.read(runKey(request), request.from);
+    },
+    runs(): RunSnapshot[] {
+      return registry.snapshots();
     },
   };
 

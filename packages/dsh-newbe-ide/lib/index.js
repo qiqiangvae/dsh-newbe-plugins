@@ -14560,6 +14560,34 @@ var ideLoadSchema = external_exports.object({
   projects: external_exports.array(ideProjectViewSchema),
   warning: external_exports.string()
 });
+var runTargetSchema = external_exports.object({
+  workspaceId: external_exports.string(),
+  configId: external_exports.string()
+});
+var runReadRequestSchema = external_exports.object({
+  workspaceId: external_exports.string(),
+  configId: external_exports.string(),
+  from: external_exports.number()
+});
+var runStatusSchema = external_exports.enum(["idle", "running", "exited", "stopped", "failed"]);
+var runSnapshotSchema = external_exports.object({
+  key: external_exports.string(),
+  status: runStatusSchema,
+  exitCode: external_exports.number().nullable(),
+  error: external_exports.string(),
+  lossy: external_exports.boolean()
+});
+var runReadSchema = external_exports.object({
+  key: external_exports.string(),
+  status: runStatusSchema,
+  exitCode: external_exports.number().nullable(),
+  error: external_exports.string(),
+  lossy: external_exports.boolean(),
+  lines: external_exports.array(external_exports.string()),
+  next: external_exports.number(),
+  dropped: external_exports.boolean()
+});
+var runSnapshotListSchema = external_exports.array(runSnapshotSchema);
 
 // src/store.ts
 function defaultState() {
@@ -14650,6 +14678,171 @@ function createConfigStore(file2) {
   };
 }
 
+// src/lines.ts
+var ANSI = /\u001b\[[0-9;?]*[A-Za-z]/g;
+function cleanLine(line) {
+  const stripped = line.replace(ANSI, "");
+  const carriage = stripped.lastIndexOf("\r");
+  return carriage >= 0 ? stripped.slice(carriage + 1) : stripped;
+}
+function splitLines(pending, chunk) {
+  const parts = (pending + chunk).split("\n");
+  const rest = parts.pop() ?? "";
+  return { lines: parts.map(cleanLine), pending: rest };
+}
+function maskSecrets(line, secrets) {
+  let masked = line;
+  for (const secret of secrets) {
+    if (secret === "" || !masked.includes(secret)) continue;
+    masked = masked.split(secret).join("****");
+  }
+  return masked;
+}
+
+// src/runtime.ts
+var DEFAULT_MAX_LINES = 5e3;
+var SECRET_NAME = /KEY|SECRET|TOKEN|PASSWORD/i;
+function createRunRegistry(provideShell, maxLines = DEFAULT_MAX_LINES) {
+  const runs = /* @__PURE__ */ new Map();
+  function record2(key) {
+    const existing = runs.get(key);
+    if (existing !== void 0) return existing;
+    const fresh = {
+      key,
+      status: "idle",
+      exitCode: null,
+      error: "",
+      lossy: false,
+      lines: [],
+      base: 0,
+      pending: "",
+      secrets: [],
+      proc: null
+    };
+    runs.set(key, fresh);
+    return fresh;
+  }
+  function pushLine(run, line) {
+    run.lines.push(line);
+    if (run.lines.length <= maxLines) return;
+    const drop = run.lines.length - maxLines;
+    run.lines.splice(0, drop);
+    run.base += drop;
+  }
+  function drain(run) {
+    const proc = run.proc;
+    if (proc === null) return;
+    let output;
+    try {
+      output = proc.readOutput();
+    } catch {
+      return;
+    }
+    if (output !== void 0) {
+      if (typeof output.delta === "string" && output.delta.length > 0) {
+        const split = splitLines(run.pending, output.delta);
+        run.pending = split.pending;
+        for (const line of split.lines) pushLine(run, maskSecrets(line, run.secrets));
+      }
+      if (output.lossy === true) run.lossy = true;
+    }
+    if (proc.status === "running") {
+      run.status = "running";
+      return;
+    }
+    if (run.pending !== "") {
+      pushLine(run, maskSecrets(cleanLine(run.pending), run.secrets));
+      run.pending = "";
+    }
+    run.exitCode = proc.exitCode ?? null;
+    if (proc.status === "killed") run.status = "stopped";
+    else run.status = run.exitCode === 0 ? "exited" : "failed";
+  }
+  function snapshotOf(run) {
+    return { key: run.key, status: run.status, exitCode: run.exitCode, error: run.error, lossy: run.lossy };
+  }
+  return {
+    start(key, spec) {
+      const shell = provideShell();
+      const run = record2(key);
+      if (run.status === "running") throw new Error("\u8BE5\u542F\u52A8\u914D\u7F6E\u5DF2\u5728\u8FD0\u884C");
+      if (shell === void 0) throw new Error("shell \u670D\u52A1\u4E0D\u53EF\u7528\uFF0C\u65E0\u6CD5\u542F\u52A8\u8FDB\u7A0B");
+      if (spec.command.trim() === "") throw new Error("\u542F\u52A8\u547D\u4EE4\u4E3A\u7A7A\uFF0C\u5148\u5728\u300C\u2699 \u542F\u52A8\u914D\u7F6E\u300D\u91CC\u586B\u597D");
+      run.lines = [];
+      run.base = 0;
+      run.pending = "";
+      run.lossy = false;
+      run.exitCode = null;
+      run.error = "";
+      run.secrets = spec.envs.filter((e) => SECRET_NAME.test(e.name) && e.value !== "").map((e) => e.value);
+      const env = {};
+      for (const entry of spec.envs) if (entry.name !== "") env[entry.name] = entry.value;
+      try {
+        const resolved = shell.resolve({ command: spec.command, workdir: spec.cwd, env });
+        run.proc = shell.start(resolved);
+        run.status = "running";
+      } catch (error51) {
+        run.proc = null;
+        run.status = "failed";
+        run.error = String(error51?.message ?? error51);
+        throw new Error(run.error);
+      }
+      return snapshotOf(run);
+    },
+    stop(key) {
+      const run = record2(key);
+      if (run.proc !== null && run.status === "running") {
+        try {
+          run.proc.kill();
+        } catch {
+        }
+        drain(run);
+        if (run.status === "running") run.status = "stopped";
+      }
+      return snapshotOf(run);
+    },
+    read(key, from) {
+      const run = record2(key);
+      drain(run);
+      const offset = Number.isFinite(from) ? Math.max(0, from) : 0;
+      const start = Math.max(0, Math.min(run.lines.length, offset - run.base));
+      return {
+        ...snapshotOf(run),
+        lines: run.lines.slice(start),
+        next: run.base + run.lines.length,
+        dropped: offset < run.base
+      };
+    },
+    snapshot(key) {
+      const run = record2(key);
+      drain(run);
+      return snapshotOf(run);
+    },
+    snapshots() {
+      const out = [];
+      for (const run of runs.values()) {
+        drain(run);
+        out.push(snapshotOf(run));
+      }
+      return out;
+    },
+    pump() {
+      for (const run of runs.values()) drain(run);
+    },
+    dispose() {
+      for (const run of runs.values()) {
+        drain(run);
+        if (run.proc === null || run.status !== "running") continue;
+        try {
+          run.proc.kill();
+        } catch {
+        }
+        run.status = "stopped";
+      }
+    }
+  };
+}
+
 // src/index.ts
 var STORAGE_PATH = dshHomePath("storages", "dsh-newbe-ide.json");
 var name = "dsh-newbe-ide";
@@ -14668,13 +14861,42 @@ function listProjects(ctx) {
 }
 function apply(ctx) {
   const store = createConfigStore(STORAGE_PATH);
+  const registry2 = createRunRegistry(() => ctx.get("shell"));
   console.log(`[dsh-newbe-ide] \u5B58\u50A8\u6587\u4EF6\uFF1A${STORAGE_PATH}`);
+  ctx.effect(() => {
+    const timer = setInterval(() => registry2.pump(), 250);
+    return () => {
+      clearInterval(timer);
+      registry2.dispose();
+    };
+  }, "dsh-newbe-ide: run pump");
+  const runKey = (target) => `${target.workspaceId}/${target.configId}`;
+  function specFor(target) {
+    const state = store.getState();
+    const project = state.projects.find((p) => p.workspaceId === target.workspaceId);
+    if (project === void 0) throw new Error("\u8FD9\u4E2A\u9879\u76EE\u4E0D\u5728\u9762\u677F\u914D\u7F6E\u91CC");
+    const config2 = project.configs.find((c) => c.id === target.configId);
+    if (config2 === void 0) throw new Error("\u627E\u4E0D\u5230\u8FD9\u6761\u542F\u52A8\u914D\u7F6E");
+    return { command: config2.command, cwd: config2.cwd !== "" ? config2.cwd : project.path, envs: config2.envs };
+  }
   const service = {
     load() {
       return { config: store.getState(), projects: listProjects(ctx), warning: store.warning };
     },
     submit(next) {
       return store.submit(next);
+    },
+    start(target) {
+      return registry2.start(runKey(target), specFor(target));
+    },
+    stop(target) {
+      return registry2.stop(runKey(target));
+    },
+    read(request) {
+      return registry2.read(runKey(request), request.from);
+    },
+    runs() {
+      return registry2.snapshots();
     }
   };
   Object.defineProperty(service, "typertRemote", {
@@ -14688,7 +14910,11 @@ function apply(ctx) {
 export {
   STORAGE_PATH,
   apply,
+  cleanLine,
   createConfigStore,
+  createRunRegistry,
   defaultState,
-  name
+  maskSecrets,
+  name,
+  splitLines
 };

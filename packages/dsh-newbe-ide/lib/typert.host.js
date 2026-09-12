@@ -14552,6 +14552,34 @@ var ideLoadSchema = external_exports.object({
   projects: external_exports.array(ideProjectViewSchema),
   warning: external_exports.string()
 });
+var runTargetSchema = external_exports.object({
+  workspaceId: external_exports.string(),
+  configId: external_exports.string()
+});
+var runReadRequestSchema = external_exports.object({
+  workspaceId: external_exports.string(),
+  configId: external_exports.string(),
+  from: external_exports.number()
+});
+var runStatusSchema = external_exports.enum(["idle", "running", "exited", "stopped", "failed"]);
+var runSnapshotSchema = external_exports.object({
+  key: external_exports.string(),
+  status: runStatusSchema,
+  exitCode: external_exports.number().nullable(),
+  error: external_exports.string(),
+  lossy: external_exports.boolean()
+});
+var runReadSchema = external_exports.object({
+  key: external_exports.string(),
+  status: runStatusSchema,
+  exitCode: external_exports.number().nullable(),
+  error: external_exports.string(),
+  lossy: external_exports.boolean(),
+  lines: external_exports.array(external_exports.string()),
+  next: external_exports.number(),
+  dropped: external_exports.boolean()
+});
+var runSnapshotListSchema = external_exports.array(runSnapshotSchema);
 
 // src/typert.ts
 var stateCodec = {
@@ -14579,6 +14607,42 @@ var TYPERT = {
       result: loadCodec
     },
     {
+      id: "dsh-newbe-ide#ideConfig/start",
+      service: "ideConfig",
+      namespace: "ideConfig",
+      method: "start",
+      invocation: { kind: "direct" },
+      parameters: [{ name: "target", wire: "target", source: "json", codec: { mode: "strict", typeSymbol: "dsh-newbe-ide#RunTarget", schema: runTargetSchema } }],
+      result: { mode: "strict", typeSymbol: "dsh-newbe-ide#RunSnapshot", schema: runSnapshotSchema }
+    },
+    {
+      id: "dsh-newbe-ide#ideConfig/stop",
+      service: "ideConfig",
+      namespace: "ideConfig",
+      method: "stop",
+      invocation: { kind: "direct" },
+      parameters: [{ name: "target", wire: "target", source: "json", codec: { mode: "strict", typeSymbol: "dsh-newbe-ide#RunTarget", schema: runTargetSchema } }],
+      result: { mode: "strict", typeSymbol: "dsh-newbe-ide#RunSnapshot", schema: runSnapshotSchema }
+    },
+    {
+      id: "dsh-newbe-ide#ideConfig/read",
+      service: "ideConfig",
+      namespace: "ideConfig",
+      method: "read",
+      invocation: { kind: "direct" },
+      parameters: [{ name: "request", wire: "request", source: "json", codec: { mode: "strict", typeSymbol: "dsh-newbe-ide#RunReadRequest", schema: runReadRequestSchema } }],
+      result: { mode: "strict", typeSymbol: "dsh-newbe-ide#RunRead", schema: runReadSchema }
+    },
+    {
+      id: "dsh-newbe-ide#ideConfig/runs",
+      service: "ideConfig",
+      namespace: "ideConfig",
+      method: "runs",
+      invocation: { kind: "direct" },
+      parameters: [],
+      result: { mode: "strict", typeSymbol: "dsh-newbe-ide#RunSnapshotList", schema: runSnapshotListSchema }
+    },
+    {
       id: "dsh-newbe-ide#ideConfig/submit",
       service: "ideConfig",
       namespace: "ideConfig",
@@ -14600,7 +14664,11 @@ var TYPERT = {
         exportName: "ideConfig",
         members: [
           { kind: "method", name: "load", signature: "load(): IdeLoad" },
-          { kind: "method", name: "submit", signature: "submit(next: IdeState): Promise<IdeState>" }
+          { kind: "method", name: "submit", signature: "submit(next: IdeState): Promise<IdeState>" },
+          { kind: "method", name: "start", signature: "start(target: RunTarget): RunSnapshot" },
+          { kind: "method", name: "stop", signature: "stop(target: RunTarget): RunSnapshot" },
+          { kind: "method", name: "read", signature: "read(request: RunReadRequest): RunRead" },
+          { kind: "method", name: "runs", signature: "runs(): RunSnapshot[]" }
         ],
         types: []
       }

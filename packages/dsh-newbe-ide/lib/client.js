@@ -14576,6 +14576,34 @@ var ideLoadSchema = external_exports.object({
   projects: external_exports.array(ideProjectViewSchema),
   warning: external_exports.string()
 });
+var runTargetSchema = external_exports.object({
+  workspaceId: external_exports.string(),
+  configId: external_exports.string()
+});
+var runReadRequestSchema = external_exports.object({
+  workspaceId: external_exports.string(),
+  configId: external_exports.string(),
+  from: external_exports.number()
+});
+var runStatusSchema = external_exports.enum(["idle", "running", "exited", "stopped", "failed"]);
+var runSnapshotSchema = external_exports.object({
+  key: external_exports.string(),
+  status: runStatusSchema,
+  exitCode: external_exports.number().nullable(),
+  error: external_exports.string(),
+  lossy: external_exports.boolean()
+});
+var runReadSchema = external_exports.object({
+  key: external_exports.string(),
+  status: runStatusSchema,
+  exitCode: external_exports.number().nullable(),
+  error: external_exports.string(),
+  lossy: external_exports.boolean(),
+  lines: external_exports.array(external_exports.string()),
+  next: external_exports.number(),
+  dropped: external_exports.boolean()
+});
+var runSnapshotListSchema = external_exports.array(runSnapshotSchema);
 
 // src/client.tsx
 var import_jsx_runtime = require("react/jsx-runtime");
@@ -14595,6 +14623,42 @@ var REMOTE_CONTRIBUTION = {
       result: { mode: "strict", typeSymbol: "dsh-newbe-ide#IdeLoad", schema: ideLoadSchema }
     },
     {
+      id: "dsh-newbe-ide#ideConfig/start",
+      service: "ideConfig",
+      namespace: "ideConfig",
+      method: "start",
+      invocation: { kind: "direct" },
+      parameters: [{ name: "target", wire: "target", source: "json", codec: { mode: "strict", typeSymbol: "dsh-newbe-ide#RunTarget", schema: runTargetSchema } }],
+      result: { mode: "strict", typeSymbol: "dsh-newbe-ide#RunSnapshot", schema: runSnapshotSchema }
+    },
+    {
+      id: "dsh-newbe-ide#ideConfig/stop",
+      service: "ideConfig",
+      namespace: "ideConfig",
+      method: "stop",
+      invocation: { kind: "direct" },
+      parameters: [{ name: "target", wire: "target", source: "json", codec: { mode: "strict", typeSymbol: "dsh-newbe-ide#RunTarget", schema: runTargetSchema } }],
+      result: { mode: "strict", typeSymbol: "dsh-newbe-ide#RunSnapshot", schema: runSnapshotSchema }
+    },
+    {
+      id: "dsh-newbe-ide#ideConfig/read",
+      service: "ideConfig",
+      namespace: "ideConfig",
+      method: "read",
+      invocation: { kind: "direct" },
+      parameters: [{ name: "request", wire: "request", source: "json", codec: { mode: "strict", typeSymbol: "dsh-newbe-ide#RunReadRequest", schema: runReadRequestSchema } }],
+      result: { mode: "strict", typeSymbol: "dsh-newbe-ide#RunRead", schema: runReadSchema }
+    },
+    {
+      id: "dsh-newbe-ide#ideConfig/runs",
+      service: "ideConfig",
+      namespace: "ideConfig",
+      method: "runs",
+      invocation: { kind: "direct" },
+      parameters: [],
+      result: { mode: "strict", typeSymbol: "dsh-newbe-ide#RunSnapshotList", schema: runSnapshotListSchema }
+    },
+    {
       id: "dsh-newbe-ide#ideConfig/submit",
       service: "ideConfig",
       namespace: "ideConfig",
@@ -14612,6 +14676,7 @@ function envelopeValue(result) {
   const message = result?.error?.message;
   throw new Error(message !== void 0 && message !== "" ? message : "IDE \u9762\u677F\u8C03\u7528\u5931\u8D25");
 }
+var SECRET_NAME = /KEY|SECRET|TOKEN|PASSWORD/i;
 var STYLE_ID = "dsh-newbe-ide";
 function ensureStyles() {
   if (document.querySelector(`style[data-plugin="${STYLE_ID}"]`) !== null) return () => {
@@ -14655,6 +14720,8 @@ function ensureStyles() {
 .ide-note{font-size:11px;color:var(--dsw-alias-label-secondary,#697586)}
 .ide-warn{border:1px dashed var(--dsw-alias-state-warn-primary,#e7a100);color:var(--dsw-alias-state-warn-primary,#e7a100);border-radius:8px;padding:7px 10px;font-size:12px}
 .ide-err{color:var(--dsw-alias-state-error-primary,#d83931);font-size:12px}
+.ide-logbox{display:flex;flex-direction:column;gap:4px;flex:1;min-height:0}
+.ide-log{flex:1;min-height:160px;max-height:54vh;overflow:auto;background:rgba(128,128,128,.10);border:1px solid var(--dsw-alias-border-l2,#d9dce1);border-radius:9px;padding:8px 10px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;line-height:1.5;white-space:pre-wrap;word-break:break-all}
 `;
   document.head.appendChild(style);
   return () => {
@@ -14722,13 +14789,7 @@ function Panel({ api, ctx }) {
       return false;
     }
   }, [api, reload]);
-  if (config2 === null) {
-    return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-root", children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-body", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-note", children: "\u6B63\u5728\u52A0\u8F7D\u542F\u52A8\u914D\u7F6E\u2026" }),
-      error51 !== "" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-err", children: error51 }) : null
-    ] }) });
-  }
-  const cfg = config2;
+  const cfg = config2 ?? { projects: [], activeWorkspaceId: "", showOverview: false };
   const registryKnown = projects.length > 0;
   const isRegistered = (workspaceId) => projects.some((w) => w.workspaceId === workspaceId);
   const registered = registryKnown ? cfg.projects.filter((p) => isRegistered(p.workspaceId)) : cfg.projects;
@@ -14738,6 +14799,47 @@ function Panel({ api, ctx }) {
   const activeConfig = active?.configs.find((c) => c.id === activeConfigId);
   const draft = activeConfig !== void 0 ? drafts[activeConfig.id] ?? activeConfig : void 0;
   const available = projects.filter((p) => !cfg.projects.some((entry) => entry.workspaceId === p.workspaceId));
+  const runKey = active !== void 0 && activeConfig !== void 0 ? `${active.workspaceId}/${activeConfig.id}` : "";
+  const [runs, setRuns] = (0, import_react.useState)({});
+  const [logLines, setLogLines] = (0, import_react.useState)([]);
+  const offsetRef = (0, import_react.useRef)(0);
+  const logRef = (0, import_react.useRef)(null);
+  (0, import_react.useEffect)(() => {
+    offsetRef.current = 0;
+    setLogLines([]);
+  }, [runKey]);
+  (0, import_react.useEffect)(() => {
+    if (api === void 0 || runKey === "" || active === void 0 || activeConfig === void 0) return;
+    const target = { workspaceId: active.workspaceId, configId: activeConfig.id };
+    let stopped = false;
+    const tick = async () => {
+      try {
+        const list = envelopeValue(await api.runs());
+        const map2 = {};
+        for (const item of list) map2[item.key] = item;
+        if (!stopped) setRuns(map2);
+        const chunk = envelopeValue(await api.read({ ...target, from: offsetRef.current }));
+        if (stopped) return;
+        offsetRef.current = chunk.next;
+        if (chunk.lines.length > 0) setLogLines((prev) => [...prev, ...chunk.lines].slice(-4e3));
+      } catch (e) {
+        if (!stopped) setError(String(e?.message ?? e));
+      }
+    };
+    void tick();
+    const timer = window.setInterval(() => {
+      void tick();
+    }, 800);
+    return () => {
+      stopped = true;
+      window.clearInterval(timer);
+    };
+  }, [api, runKey, active, activeConfig]);
+  (0, import_react.useEffect)(() => {
+    const el = logRef.current;
+    if (el === null) return;
+    if (el.scrollHeight - el.scrollTop - el.clientHeight < 80) el.scrollTop = el.scrollHeight;
+  }, [logLines]);
   const selectProject = (workspaceId) => {
     setActiveProjectId(workspaceId);
     setEditing(false);
@@ -14799,10 +14901,39 @@ function Panel({ api, ctx }) {
       });
     }
   };
+  const runState = runKey !== "" ? runs[runKey] : void 0;
+  const runText = runState === void 0 || runState.status === "idle" ? "\u672A\u542F\u52A8" : runState.status === "running" ? "\u8FD0\u884C\u4E2D" : runState.status === "stopped" ? "\u5DF2\u505C\u6B62" : runState.status === "exited" ? `\u5DF2\u9000\u51FA\uFF08${runState.exitCode ?? "?"}\uFF09` : `\u542F\u52A8\u5931\u8D25\uFF1A${runState.error}`;
+  const runAction = async (action) => {
+    if (api === void 0 || active === void 0 || activeConfig === void 0) return;
+    setError("");
+    setFlash("");
+    try {
+      const target = { workspaceId: active.workspaceId, configId: activeConfig.id };
+      if (action === "start") {
+        offsetRef.current = 0;
+        setLogLines([]);
+      }
+      const snap = envelopeValue(action === "start" ? await api.start(target) : await api.stop(target));
+      setRuns((prev) => ({ ...prev, [snap.key]: snap }));
+    } catch (e) {
+      setError(String(e?.message ?? e));
+    }
+  };
+  const restartRun = async () => {
+    await runAction("stop");
+    await runAction("start");
+  };
   const setDraft = (patch) => {
     if (draft === void 0) return;
     setDrafts((prev) => ({ ...prev, [draft.id]: { ...draft, ...patch } }));
   };
+  if (config2 === null) {
+    return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-root", children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-body", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-note", children: "\u6B63\u5728\u52A0\u8F7D\u542F\u52A8\u914D\u7F6E\u2026" }),
+      api === void 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-warn", children: "remote.ideConfig \u4E0D\u53EF\u7528\uFF0C\u9762\u677F\u65E0\u6CD5\u8BFB\u5199\u542F\u52A8\u914D\u7F6E" }) : null,
+      error51 !== "" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-err", children: error51 }) : null
+    ] }) });
+  }
   return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-root", children: [
     /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-tabrow", children: [
       registered.map((p) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
@@ -14896,6 +15027,26 @@ function Panel({ api, ctx }) {
               children: "\u2699 \u542F\u52A8\u914D\u7F6E"
             }
           ),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+            "button",
+            {
+              type: "button",
+              className: "ide-btn",
+              "data-kind": "primary",
+              disabled: activeConfig === void 0 || runState?.status === "running",
+              onClick: () => {
+                void runAction("start");
+              },
+              children: "\u542F\u52A8"
+            }
+          ),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-btn", disabled: runState?.status !== "running", onClick: () => {
+            void runAction("stop");
+          }, children: "\u505C\u6B62" }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-btn", disabled: runState?.status !== "running", onClick: () => {
+            void restartRun();
+          }, children: "\u91CD\u542F" }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-note", children: runText }),
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-note", children: flash })
         ] }),
         editing && draft !== void 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-cfg", children: [
@@ -14941,6 +15092,8 @@ function Panel({ api, ctx }) {
                   "input",
                   {
                     className: "ide-field ide-mono",
+                    type: SECRET_NAME.test(env.name) ? "password" : "text",
+                    title: SECRET_NAME.test(env.name) ? "\u5BC6\u94A5\u7C7B\u53D8\u91CF\u5728\u754C\u9762\u4E0A\u63A9\u7801\u663E\u793A" : void 0,
                     value: env.value,
                     placeholder: "value",
                     onChange: (e) => setDraft({ envs: draft.envs.map((x, i) => i === index ? { ...x, value: e.target.value } : x) })
@@ -14952,7 +15105,16 @@ function Panel({ api, ctx }) {
             ] })
           ] }),
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-note", children: "\u6301\u4E45\u5316\u5230 ~/.dsh/storages/dsh-newbe-ide.json\uFF08\u6743\u9650 0600\uFF0C\u4E0D\u5728\u9879\u76EE\u76EE\u5F55\u91CC\u3001\u4E0D\u4F1A\u88AB git \u63D0\u4EA4\uFF09" })
-        ] }) : null
+        ] }) : null,
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-logbox", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-log", ref: logRef, children: logLines.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-note", children: runState?.status === "running" ? "\u7B49\u5F85\u8F93\u51FA\u2026" : "\u70B9\u300C\u542F\u52A8\u300D\u8FD0\u884C\u8FD9\u6761\u542F\u52A8\u914D\u7F6E" }) : logLines.map((line, index) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { children: line }, index)) }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-note", children: [
+            "\u5DF2\u7F13\u5B58 ",
+            logLines.length,
+            " \u884C",
+            runState?.lossy === true ? "\uFF08\u8F93\u51FA\u8FC7\u5FEB\uFF0C\u5BBF\u4E3B\u4FA7\u6709\u622A\u65AD\uFF09" : ""
+          ] })
+        ] })
       ] })
     ] })
   ] });

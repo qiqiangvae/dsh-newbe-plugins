@@ -51,9 +51,51 @@ export const ideLoadSchema = z.object({
   warning: z.string(),
 });
 
+/** 一条启动配置的定位（项目 + 配置 id）。 */
+export const runTargetSchema = z.object({
+  workspaceId: z.string(),
+  configId: z.string(),
+});
+
+/** 读日志的请求：从哪个偏移开始。 */
+export const runReadRequestSchema = z.object({
+  workspaceId: z.string(),
+  configId: z.string(),
+  from: z.number(),
+});
+
+export const runStatusSchema = z.enum(['idle', 'running', 'exited', 'stopped', 'failed']);
+
+/** 运行态快照：不含日志正文。 */
+export const runSnapshotSchema = z.object({
+  key: z.string(),
+  status: runStatusSchema,
+  exitCode: z.number().nullable(),
+  error: z.string(),
+  lossy: z.boolean(),
+});
+
+/** 增量日志：lines 是这次新增的行，next 是下次请求的偏移。 */
+export const runReadSchema = z.object({
+  key: z.string(),
+  status: runStatusSchema,
+  exitCode: z.number().nullable(),
+  error: z.string(),
+  lossy: z.boolean(),
+  lines: z.array(z.string()),
+  next: z.number(),
+  dropped: z.boolean(),
+});
+
+export const runSnapshotListSchema = z.array(runSnapshotSchema);
+
 export type EnvVar = z.infer<typeof envVarSchema>;
 export type LaunchConfig = z.infer<typeof launchConfigSchema>;
 export type ProjectEntry = z.infer<typeof projectEntrySchema>;
 export type IdeState = z.infer<typeof ideStateSchema>;
 export type IdeProjectView = z.infer<typeof ideProjectViewSchema>;
 export type IdeLoad = z.infer<typeof ideLoadSchema>;
+export type RunTarget = z.infer<typeof runTargetSchema>;
+export type RunStatus = z.infer<typeof runStatusSchema>;
+export type RunSnapshot = z.infer<typeof runSnapshotSchema>;
+export type RunRead = z.infer<typeof runReadSchema>;

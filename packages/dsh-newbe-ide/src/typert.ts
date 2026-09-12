@@ -3,7 +3,7 @@
  * 手写清单，结构与 @deepseek-ai/dsh-typert-generator 产物一致：
  * `./typert` 导出 TYPERT，invocations 的 codec 必须是 zod v4 实例。
  */
-import { ideLoadSchema, ideStateSchema } from './schema.js';
+import { ideLoadSchema, ideStateSchema, runReadRequestSchema, runReadSchema, runSnapshotListSchema, runSnapshotSchema, runTargetSchema } from './schema.js';
 
 const stateCodec = {
   mode: 'strict' as const,
@@ -32,6 +32,42 @@ export const TYPERT = {
       result: loadCodec,
     },
     {
+      id: 'dsh-newbe-ide#ideConfig/start',
+      service: 'ideConfig',
+      namespace: 'ideConfig',
+      method: 'start',
+      invocation: { kind: 'direct' },
+      parameters: [{ name: 'target', wire: 'target', source: 'json', codec: { mode: 'strict' as const, typeSymbol: 'dsh-newbe-ide#RunTarget', schema: runTargetSchema } }],
+      result: { mode: 'strict' as const, typeSymbol: 'dsh-newbe-ide#RunSnapshot', schema: runSnapshotSchema },
+    },
+    {
+      id: 'dsh-newbe-ide#ideConfig/stop',
+      service: 'ideConfig',
+      namespace: 'ideConfig',
+      method: 'stop',
+      invocation: { kind: 'direct' },
+      parameters: [{ name: 'target', wire: 'target', source: 'json', codec: { mode: 'strict' as const, typeSymbol: 'dsh-newbe-ide#RunTarget', schema: runTargetSchema } }],
+      result: { mode: 'strict' as const, typeSymbol: 'dsh-newbe-ide#RunSnapshot', schema: runSnapshotSchema },
+    },
+    {
+      id: 'dsh-newbe-ide#ideConfig/read',
+      service: 'ideConfig',
+      namespace: 'ideConfig',
+      method: 'read',
+      invocation: { kind: 'direct' },
+      parameters: [{ name: 'request', wire: 'request', source: 'json', codec: { mode: 'strict' as const, typeSymbol: 'dsh-newbe-ide#RunReadRequest', schema: runReadRequestSchema } }],
+      result: { mode: 'strict' as const, typeSymbol: 'dsh-newbe-ide#RunRead', schema: runReadSchema },
+    },
+    {
+      id: 'dsh-newbe-ide#ideConfig/runs',
+      service: 'ideConfig',
+      namespace: 'ideConfig',
+      method: 'runs',
+      invocation: { kind: 'direct' },
+      parameters: [],
+      result: { mode: 'strict' as const, typeSymbol: 'dsh-newbe-ide#RunSnapshotList', schema: runSnapshotListSchema },
+    },
+    {
       id: 'dsh-newbe-ide#ideConfig/submit',
       service: 'ideConfig',
       namespace: 'ideConfig',
@@ -54,6 +90,10 @@ export const TYPERT = {
         members: [
           { kind: 'method', name: 'load', signature: 'load(): IdeLoad' },
           { kind: 'method', name: 'submit', signature: 'submit(next: IdeState): Promise<IdeState>' },
+          { kind: 'method', name: 'start', signature: 'start(target: RunTarget): RunSnapshot' },
+          { kind: 'method', name: 'stop', signature: 'stop(target: RunTarget): RunSnapshot' },
+          { kind: 'method', name: 'read', signature: 'read(request: RunReadRequest): RunRead' },
+          { kind: 'method', name: 'runs', signature: 'runs(): RunSnapshot[]' },
         ],
         types: [],
       },

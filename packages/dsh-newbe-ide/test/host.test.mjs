@@ -22,6 +22,13 @@ function makeCtx(workspaces) {
     ctx: {
       get: (name) => (name === 'workspaceRegistry' && workspaces !== null ? { list: () => workspaces } : undefined),
       provide: (key, value) => { provided[key] = value; },
+      // 真 ctx 的 effect 会保留回调返回的清理函数；这里执行后立刻释放，
+      // 既覆盖了 pump 定时器的启动/清理路径，又不会让定时器吊住测试进程。
+      effect: (fn) => {
+        const disposer = fn();
+        if (typeof disposer === 'function') disposer();
+        return disposer;
+      },
     },
   };
 }
