@@ -8,10 +8,12 @@
  *    包括名称、启动命令、工作目录、环境变量。配置存宿主侧
  *    `$DSH_HOME/storages/dsh-newbe-ide.json`，不进 settings.yaml。
  */
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   defaultState,
   ideLoadSchema,
+  logHistoryRequestSchema,
+  logHistorySchema,
   pickActiveConfig,
   ideStateSchema,
   runKeyOf,
@@ -25,11 +27,13 @@ import {
   type IdeState,
   type LaunchConfig,
   type ProjectEntry,
+  type LogHistory,
   type RunRead,
   type RunSnapshot,
   type RunTarget,
 } from './schema.js';
 import { isSecretName } from './lines.js';
+import { DEFAULT_LEVELS, compileMatcher, filterLines, type RunLevel } from './filter.js';
 
 export const NS = 'dsh-newbe-ide';
 const VIEW_ID = 'dsh-newbe-ide';
@@ -38,6 +42,10 @@ const VIEW_ORDER = 30;
 const SETTINGS_TAB_ORDER = 30;
 /** 面板本地的日志保留上限；超出会提示"早期日志已被丢弃"。 */
 const LOG_LIMIT = 4000;
+/** 单帧最多渲染多少行：过滤是全量的，渲染要封顶，否则长日志会卡。 */
+const RENDER_LIMIT = 2000;
+/** 补历史时最多捞多少行。 */
+const HISTORY_LINES = 2000;
 const POLL_MS = 800;
 /** 每 N 次轮询顺带重读一次配置，让设置页里的改动近乎即时地反映到视图。 */
 const CONFIG_REFRESH_EVERY = 3;
@@ -50,6 +58,7 @@ type RemoteIde = {
   stop(target: RunTarget): Promise<RemoteEnvelope<unknown>>;
   read(request: RunTarget & { from: number }): Promise<RemoteEnvelope<unknown>>;
   runs(): Promise<RemoteEnvelope<unknown>>;
+  history(request: RunTarget & { tail: number }): Promise<RemoteEnvelope<unknown>>;
 };
 
 /** 客户端 Remote contribution：与宿主 ./typert 清单的端点逐一对应。 */
@@ -100,6 +109,15 @@ const REMOTE_CONTRIBUTION = {
       invocation: { kind: 'direct' as const },
       parameters: [],
       result: { mode: 'strict' as const, typeSymbol: 'dsh-newbe-ide#RunSnapshotList', schema: runSnapshotListSchema },
+    },
+    {
+      id: 'dsh-newbe-ide#ideConfig/history',
+      service: 'ideConfig',
+      namespace: 'ideConfig',
+      method: 'history',
+      invocation: { kind: 'direct' as const },
+      parameters: [{ name: 'request', wire: 'request', source: 'json' as const, codec: { mode: 'strict' as const, typeSymbol: 'dsh-newbe-ide#LogHistoryRequest', schema: logHistoryRequestSchema } }],
+      result: { mode: 'strict' as const, typeSymbol: 'dsh-newbe-ide#LogHistory', schema: logHistorySchema },
     },
     {
       id: 'dsh-newbe-ide#ideConfig/submit',
@@ -171,6 +189,12 @@ function ensureStyles(): () => void {
 .ide-envs td{padding:3px 4px;vertical-align:middle}
 .ide-envs input{width:100%}
 .ide-toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.ide-filterbar{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.ide-filterbar .ide-field{padding:3px 8px;min-width:180px}
+.ide-hit{background:rgba(255,196,0,.18)}
+.ide-lv-ERROR{color:var(--dsw-alias-state-error-primary,#d83931)}
+.ide-lv-WARN{color:var(--dsw-alias-state-warn-primary,#e7a100)}
+.ide-lv-DEBUG,.ide-lv-OTHER{color:var(--dsw-alias-label-secondary,#697586)}
 /* IDE 视图占满面板：本视图在场时收起底部的消息输入框。
    DSH 没有"按视图隐藏输入框"的 API（conversation.composer 链的 select 只能拿到
    sessionId/session/pendingInteraction，看不到当前视图），因此与 dsh-context 同法：
@@ -240,8 +264,15 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
   const [logLines, setLogLines] = useState<string[]>([]);
   const [truncated, setTruncated] = useState(false);
   const [error, setError] = useState('');
+  const [filterQ, setFilterQ] = useState('');
+  const [filterRegex, setFilterRegex] = useState(false);
+  const [onlyMatch, setOnlyMatch] = useState(false);
+  const [levels, setLevels] = useState<Record<RunLevel, boolean>>({ ...DEFAULT_LEVELS });
+  const [fromHistory, setFromHistory] = useState(false);
+  const [historyPath, setHistoryPath] = useState('');
   const offsetRef = useRef(0);
   const logRef = useRef<HTMLDivElement | null>(null);
+  const historyTriedRef = useRef(false);
   /** 是否贴底：由 scroll 事件维护。追加后量高度会把"一次涌入多行"误判成用户上滚。 */
   const pinnedRef = useRef(true);
   /** 运行代次：重启后自增，用来丢弃上一代进程还在飞的读取结果。 */
@@ -258,6 +289,12 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
     : '';
   const runState = runKey !== '' ? runs[runKey] : undefined;
   const runText = describeRun(runState);
+  const matcher = useMemo(() => compileMatcher({ q: filterQ, regex: filterRegex }), [filterQ, filterRegex]);
+  const filtered = useMemo(
+    () => filterLines(logLines, { matcher, onlyMatch, levels }),
+    [logLines, matcher, onlyMatch, levels],
+  );
+  const shown = filtered.length > RENDER_LIMIT ? filtered.slice(filtered.length - RENDER_LIMIT) : filtered;
 
   const applyLoad = useCallback((load: IdeLoad) => {
     setConfig(load.config);
@@ -288,6 +325,8 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
     offsetRef.current = 0;
     genRef.current += 1;
     pinnedRef.current = true;
+    historyTriedRef.current = false;
+    setFromHistory(false);
     setTruncated(false);
     setLogLines([]);
   }, [runKey]);
@@ -322,6 +361,17 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
             setTruncated(true);
             return merged.slice(merged.length - LOG_LIMIT);
           });
+        } else if (!historyTriedRef.current) {
+          // 本次进程没有输出 → 把上次运行落盘的尾巴捞回来（DSH 重启后仍能看上次为什么挂的）。
+          historyTriedRef.current = true;
+          const history = envelopeValue(await api.history({ ...target, tail: HISTORY_LINES }), '读取历史日志') as LogHistory;
+          if (stopped || genRef.current !== gen) return;
+          if (history.lines.length > 0) {
+            setLogLines(history.lines);
+            setHistoryPath(history.path);
+            setFromHistory(true);
+            if (history.truncated) setTruncated(true);
+          }
         }
       } catch (e) {
         if (!stopped && genRef.current === gen) setError(String((e as Error)?.message ?? e));
@@ -359,6 +409,8 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
         genRef.current += 1; // 让上一代在飞的读取结果失效
         offsetRef.current = 0;
         pinnedRef.current = true;
+        historyTriedRef.current = true; // 新进程的输出从零开始，不再补历史
+        setFromHistory(false);
         setTruncated(false);
         setLogLines([]);
       }
@@ -460,6 +512,29 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
                   <span className="ide-cmd">{activeConfig.command === '' ? '（未设置）' : activeConfig.command}</span>
                 </div>
 
+                <div className="ide-filterbar">
+                  <input
+                    className="ide-field ide-mono"
+                    placeholder="过滤关键字"
+                    value={filterQ}
+                    onChange={(e) => setFilterQ(e.target.value)}
+                  />
+                  <button type="button" className="ide-chip" data-sel={filterRegex} onClick={() => setFilterRegex((v) => !v)}>正则</button>
+                  <button type="button" className="ide-chip" data-sel={onlyMatch} onClick={() => setOnlyMatch((v) => !v)}>仅看匹配</button>
+                  <span style={{ flex: 1 }} />
+                  {(['ERROR', 'WARN', 'INFO', 'DEBUG', 'OTHER'] as RunLevel[]).map((lv) => (
+                    <button
+                      key={lv}
+                      type="button"
+                      className="ide-chip"
+                      data-sel={levels[lv]}
+                      onClick={() => setLevels((prev) => ({ ...prev, [lv]: !prev[lv] }))}
+                    >
+                      {lv}
+                    </button>
+                  ))}
+                </div>
+
                 <div className="ide-logbox">
                   <div
                     className="ide-log"
@@ -469,13 +544,22 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
                       pinnedRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
                     }}
                   >
-                    {logLines.length === 0
-                      ? <span className="ide-note">{runState?.status === 'running' ? '等待输出…' : '点「启动」运行这条启动配置'}</span>
-                      : logLines.map((line, index) => <div key={index}>{line}</div>)}
+                    {shown.length === 0
+                      ? (
+                        <span className="ide-note">
+                          {logLines.length > 0
+                            ? '没有匹配的日志'
+                            : runState?.status === 'running' ? '等待输出…' : '点「启动」运行这条启动配置'}
+                        </span>
+                      )
+                      : shown.map((row, index) => (
+                        <div key={index} className={(row.hit ? 'ide-hit ' : '') + 'ide-lv-' + row.level}>{row.line}</div>
+                      ))}
                   </div>
                   <div className="ide-note">
-                    已缓存 {logLines.length} 行
-                    {runState?.lossy === true || truncated ? '（输出过快或过长，早期日志已被丢弃）' : ''}
+                    显示 {shown.length} / 共 {filtered.length} 行（缓存 {logLines.length} 行）
+                    {fromHistory ? <span title={historyPath}>（含上次运行的输出）</span> : null}
+                    {runState?.lossy === true || truncated ? '（输出过快或过长，早期部分已丢弃）' : ''}
                   </div>
                 </div>
               </>

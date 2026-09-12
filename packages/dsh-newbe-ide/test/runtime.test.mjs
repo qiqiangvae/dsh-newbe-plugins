@@ -128,7 +128,7 @@ test('密钥值在日志里被掩码', () => {
 
 test('超过上限从头部丢弃，并标记 dropped', () => {
   const shell = makeShell();
-  const runs = createRunRegistry(() => shell, 3);
+  const runs = createRunRegistry(() => shell, { maxLines: 3 });
   runs.start('w/c', SPEC);
   shell.started[0].proc.emit('1\n2\n3\n4\n5\n');
   const all = runs.read('w/c', 0);

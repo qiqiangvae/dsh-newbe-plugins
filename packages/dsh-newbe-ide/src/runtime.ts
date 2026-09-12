@@ -5,6 +5,7 @@
  * 因此可以用假 shell 完整验证；真实进程组回收另有实测覆盖。
  */
 import { cleanLine, isSecretName, maskSecrets, splitLines } from './lines.js';
+import type { LogSink } from './logsink.js';
 import type { RunRead, RunSnapshot, RunStatus } from './schema.js';
 
 export interface ShellOutputDelta {
@@ -58,12 +59,22 @@ interface RunRecord {
   proc: ShellProcessLike | null;
   /** 是我们主动停的，还是进程自己没起来就死了——决定 killed 该记「已停止」还是「启动失败」。 */
   stopRequested: boolean;
+  /** 本轮待落盘的行：一次 drain 批一次写，别一行一次 fsync。 */
+  pendingAppend: string[];
 }
 
 /** shell 服务可能后到（cordis 服务可增可减），因此用取值函数而不是实例。 */
 export type ShellProvider = () => ShellServiceLike | undefined;
 
-export function createRunRegistry(provideShell: ShellProvider, maxLines: number = DEFAULT_MAX_LINES): RunRegistry {
+export interface RunRegistryOptions {
+  maxLines?: number;
+  /** 落盘去处；不传就只在内存里留（测试与无盘环境）。 */
+  sink?: LogSink;
+}
+
+export function createRunRegistry(provideShell: ShellProvider, options: RunRegistryOptions = {}): RunRegistry {
+  const maxLines = options.maxLines ?? DEFAULT_MAX_LINES;
+  const sink = options.sink;
   const runs = new Map<string, RunRecord>();
 
   function record(key: string): RunRecord {
@@ -71,10 +82,27 @@ export function createRunRegistry(provideShell: ShellProvider, maxLines: number 
     if (existing !== undefined) return existing;
     const fresh: RunRecord = {
       key, status: 'idle', exitCode: null, error: '', lossy: false,
-      lines: [], base: 0, pending: '', secrets: [], proc: null, stopRequested: false,
+      lines: [], base: 0, pending: '', secrets: [], proc: null, stopRequested: false, pendingAppend: [],
     };
     runs.set(key, fresh);
     return fresh;
+  }
+
+  /** 入环形缓冲，同时排队落盘（落盘失败不影响内存日志）。 */
+  function emit(run: RunRecord, line: string): void {
+    pushLine(run, line);
+    run.pendingAppend.push(line);
+  }
+
+  function flushAppend(run: RunRecord): void {
+    if (run.pendingAppend.length === 0) return;
+    const batch = run.pendingAppend;
+    run.pendingAppend = [];
+    try {
+      sink?.append(run.key, batch);
+    } catch {
+      /* 磁盘写不进去也不能让日志流断掉 */
+    }
   }
 
   function pushLine(run: RunRecord, line: string): void {
@@ -98,7 +126,7 @@ export function createRunRegistry(provideShell: ShellProvider, maxLines: number 
       if (typeof output.delta === 'string' && output.delta.length > 0) {
         const split = splitLines(run.pending, output.delta);
         run.pending = split.pending;
-        for (const line of split.lines) pushLine(run, maskSecrets(line, run.secrets));
+        for (const line of split.lines) emit(run, maskSecrets(line, run.secrets));
       }
       if (output.lossy === true) run.lossy = true;
     }
@@ -106,19 +134,20 @@ export function createRunRegistry(provideShell: ShellProvider, maxLines: number 
     // 每轮泵把它收成一行（只保留最后一次覆写），面板因此每轮最多多出一行。
     if (run.pending.includes('\r')) {
       const progress = cleanLine(run.pending);
-      if (progress !== '') pushLine(run, maskSecrets(progress, run.secrets));
+      if (progress !== '') emit(run, maskSecrets(progress, run.secrets));
       run.pending = '';
     } else if (run.pending.length > MAX_PENDING_CHARS) {
-      pushLine(run, maskSecrets(run.pending.slice(0, MAX_PENDING_CHARS) + ' …（超长行已截断）', run.secrets));
+      emit(run, maskSecrets(run.pending.slice(0, MAX_PENDING_CHARS) + ' …（超长行已截断）', run.secrets));
       run.pending = '';
     }
     if (proc.status === 'running') {
       run.status = 'running';
+      flushAppend(run);
       return;
     }
     // 进程已结束：把最后半行补成一行，再落状态。
     if (run.pending !== '') {
-      pushLine(run, maskSecrets(cleanLine(run.pending), run.secrets));
+      emit(run, maskSecrets(cleanLine(run.pending), run.secrets));
       run.pending = '';
     }
     run.exitCode = proc.exitCode ?? null;
@@ -134,6 +163,7 @@ export function createRunRegistry(provideShell: ShellProvider, maxLines: number 
       // 自然退出：非 0 退出码不是"启动失败"，退出码本身已经说明问题（如 127 = 命令不存在）。
       run.status = 'exited';
     }
+    flushAppend(run);
   }
 
   /**

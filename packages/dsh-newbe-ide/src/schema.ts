@@ -89,6 +89,20 @@ export const runReadSchema = z.object({
 
 export const runSnapshotListSchema = z.array(runSnapshotSchema);
 
+/** 读历史日志的请求：要最后多少行。 */
+export const logHistoryRequestSchema = z.object({
+  workspaceId: z.string(),
+  configId: z.string(),
+  tail: z.number(),
+});
+
+/** 历史日志（来自落盘文件，跨 DSH 重启可取）。 */
+export const logHistorySchema = z.object({
+  lines: z.array(z.string()),
+  truncated: z.boolean(),
+  path: z.string(),
+});
+
 /** 空配置：存储层与客户端面板共用的同一个值（宿主与浏览器都从这里取，避免两处各写一份）。 */
 export function defaultState(): IdeState {
   return { projects: [], activeWorkspaceId: '', showOverview: false };
@@ -122,3 +136,5 @@ export type RunSnapshot = z.infer<typeof runSnapshotSchema>;
 export type RunRead = z.infer<typeof runReadSchema>;
 export type RunReadRequest = z.infer<typeof runReadRequestSchema>;
 export type RunSnapshotList = z.infer<typeof runSnapshotListSchema>;
+export type LogHistoryRequest = z.infer<typeof logHistoryRequestSchema>;
+export type LogHistory = z.infer<typeof logHistorySchema>;

@@ -14604,6 +14604,16 @@ var runReadSchema = external_exports.object({
   dropped: external_exports.boolean()
 });
 var runSnapshotListSchema = external_exports.array(runSnapshotSchema);
+var logHistoryRequestSchema = external_exports.object({
+  workspaceId: external_exports.string(),
+  configId: external_exports.string(),
+  tail: external_exports.number()
+});
+var logHistorySchema = external_exports.object({
+  lines: external_exports.array(external_exports.string()),
+  truncated: external_exports.boolean(),
+  path: external_exports.string()
+});
 function defaultState() {
   return { projects: [], activeWorkspaceId: "", showOverview: false };
 }
@@ -14623,6 +14633,47 @@ function isSecretName(name) {
   return SECRET_NAME.test(name);
 }
 
+// src/filter.ts
+var DEFAULT_LEVELS = {
+  ERROR: true,
+  WARN: true,
+  INFO: true,
+  DEBUG: false,
+  OTHER: true
+};
+var LEVEL_PATTERN = /(TRACE|DEBUG|INFO|WARN|ERROR|FATAL)/;
+function levelOf(line) {
+  const found = LEVEL_PATTERN.exec(line);
+  if (found === null) return "OTHER";
+  if (found[1] === "FATAL") return "ERROR";
+  if (found[1] === "TRACE") return "DEBUG";
+  return found[1];
+}
+function compileMatcher(spec) {
+  const q = spec.q.trim();
+  if (q === "") return null;
+  if (spec.regex) {
+    try {
+      const re = new RegExp(q, "i");
+      return { test: (line) => re.test(line), literal: false };
+    } catch {
+    }
+  }
+  const lowered = q.toLowerCase();
+  return { test: (line) => line.toLowerCase().includes(lowered), literal: true };
+}
+function filterLines(lines, state) {
+  const out = [];
+  for (const line of lines) {
+    const level = levelOf(line);
+    if (state.levels[level] !== true) continue;
+    const hit = state.matcher !== null && state.matcher.test(line);
+    if (state.onlyMatch && state.matcher !== null && !hit) continue;
+    out.push({ line, level, hit });
+  }
+  return out;
+}
+
 // src/client.tsx
 var import_jsx_runtime = require("react/jsx-runtime");
 var NS = "dsh-newbe-ide";
@@ -14630,6 +14681,8 @@ var VIEW_ID = "dsh-newbe-ide";
 var VIEW_ORDER = 30;
 var SETTINGS_TAB_ORDER = 30;
 var LOG_LIMIT = 4e3;
+var RENDER_LIMIT = 2e3;
+var HISTORY_LINES = 2e3;
 var POLL_MS = 800;
 var CONFIG_REFRESH_EVERY = 3;
 var REMOTE_CONTRIBUTION = {
@@ -14679,6 +14732,15 @@ var REMOTE_CONTRIBUTION = {
       invocation: { kind: "direct" },
       parameters: [],
       result: { mode: "strict", typeSymbol: "dsh-newbe-ide#RunSnapshotList", schema: runSnapshotListSchema }
+    },
+    {
+      id: "dsh-newbe-ide#ideConfig/history",
+      service: "ideConfig",
+      namespace: "ideConfig",
+      method: "history",
+      invocation: { kind: "direct" },
+      parameters: [{ name: "request", wire: "request", source: "json", codec: { mode: "strict", typeSymbol: "dsh-newbe-ide#LogHistoryRequest", schema: logHistoryRequestSchema } }],
+      result: { mode: "strict", typeSymbol: "dsh-newbe-ide#LogHistory", schema: logHistorySchema }
     },
     {
       id: "dsh-newbe-ide#ideConfig/submit",
@@ -14748,6 +14810,12 @@ function ensureStyles() {
 .ide-envs td{padding:3px 4px;vertical-align:middle}
 .ide-envs input{width:100%}
 .ide-toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.ide-filterbar{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.ide-filterbar .ide-field{padding:3px 8px;min-width:180px}
+.ide-hit{background:rgba(255,196,0,.18)}
+.ide-lv-ERROR{color:var(--dsw-alias-state-error-primary,#d83931)}
+.ide-lv-WARN{color:var(--dsw-alias-state-warn-primary,#e7a100)}
+.ide-lv-DEBUG,.ide-lv-OTHER{color:var(--dsw-alias-label-secondary,#697586)}
 /* IDE \u89C6\u56FE\u5360\u6EE1\u9762\u677F\uFF1A\u672C\u89C6\u56FE\u5728\u573A\u65F6\u6536\u8D77\u5E95\u90E8\u7684\u6D88\u606F\u8F93\u5165\u6846\u3002
    DSH \u6CA1\u6709"\u6309\u89C6\u56FE\u9690\u85CF\u8F93\u5165\u6846"\u7684 API\uFF08conversation.composer \u94FE\u7684 select \u53EA\u80FD\u62FF\u5230
    sessionId/session/pendingInteraction\uFF0C\u770B\u4E0D\u5230\u5F53\u524D\u89C6\u56FE\uFF09\uFF0C\u56E0\u6B64\u4E0E dsh-context \u540C\u6CD5\uFF1A
@@ -14802,8 +14870,15 @@ function IdeView({ api, ctx }) {
   const [logLines, setLogLines] = (0, import_react.useState)([]);
   const [truncated, setTruncated] = (0, import_react.useState)(false);
   const [error51, setError] = (0, import_react.useState)("");
+  const [filterQ, setFilterQ] = (0, import_react.useState)("");
+  const [filterRegex, setFilterRegex] = (0, import_react.useState)(false);
+  const [onlyMatch, setOnlyMatch] = (0, import_react.useState)(false);
+  const [levels, setLevels] = (0, import_react.useState)({ ...DEFAULT_LEVELS });
+  const [fromHistory, setFromHistory] = (0, import_react.useState)(false);
+  const [historyPath, setHistoryPath] = (0, import_react.useState)("");
   const offsetRef = (0, import_react.useRef)(0);
   const logRef = (0, import_react.useRef)(null);
+  const historyTriedRef = (0, import_react.useRef)(false);
   const pinnedRef = (0, import_react.useRef)(true);
   const genRef = (0, import_react.useRef)(0);
   const tickRef = (0, import_react.useRef)(0);
@@ -14814,6 +14889,12 @@ function IdeView({ api, ctx }) {
   const runKey = active !== void 0 && activeConfig !== void 0 ? runKeyOf({ workspaceId: active.workspaceId, configId: activeConfig.id }) : "";
   const runState = runKey !== "" ? runs[runKey] : void 0;
   const runText = describeRun(runState);
+  const matcher = (0, import_react.useMemo)(() => compileMatcher({ q: filterQ, regex: filterRegex }), [filterQ, filterRegex]);
+  const filtered = (0, import_react.useMemo)(
+    () => filterLines(logLines, { matcher, onlyMatch, levels }),
+    [logLines, matcher, onlyMatch, levels]
+  );
+  const shown = filtered.length > RENDER_LIMIT ? filtered.slice(filtered.length - RENDER_LIMIT) : filtered;
   const applyLoad = (0, import_react.useCallback)((load) => {
     setConfig(load.config);
     setProjects(load.projects);
@@ -14840,6 +14921,8 @@ function IdeView({ api, ctx }) {
     offsetRef.current = 0;
     genRef.current += 1;
     pinnedRef.current = true;
+    historyTriedRef.current = false;
+    setFromHistory(false);
     setTruncated(false);
     setLogLines([]);
   }, [runKey]);
@@ -14874,6 +14957,16 @@ function IdeView({ api, ctx }) {
             setTruncated(true);
             return merged.slice(merged.length - LOG_LIMIT);
           });
+        } else if (!historyTriedRef.current) {
+          historyTriedRef.current = true;
+          const history = envelopeValue(await api.history({ ...target, tail: HISTORY_LINES }), "\u8BFB\u53D6\u5386\u53F2\u65E5\u5FD7");
+          if (stopped || genRef.current !== gen) return;
+          if (history.lines.length > 0) {
+            setLogLines(history.lines);
+            setHistoryPath(history.path);
+            setFromHistory(true);
+            if (history.truncated) setTruncated(true);
+          }
         }
       } catch (e) {
         if (!stopped && genRef.current === gen) setError(String(e?.message ?? e));
@@ -14909,6 +15002,8 @@ function IdeView({ api, ctx }) {
         genRef.current += 1;
         offsetRef.current = 0;
         pinnedRef.current = true;
+        historyTriedRef.current = true;
+        setFromHistory(false);
         setTruncated(false);
         setLogLines([]);
       }
@@ -15004,6 +15099,31 @@ function IdeView({ api, ctx }) {
             /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-label", children: "\u542F\u52A8\u547D\u4EE4" }),
             /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-cmd", children: activeConfig.command === "" ? "\uFF08\u672A\u8BBE\u7F6E\uFF09" : activeConfig.command })
           ] }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-filterbar", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+              "input",
+              {
+                className: "ide-field ide-mono",
+                placeholder: "\u8FC7\u6EE4\u5173\u952E\u5B57",
+                value: filterQ,
+                onChange: (e) => setFilterQ(e.target.value)
+              }
+            ),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-chip", "data-sel": filterRegex, onClick: () => setFilterRegex((v) => !v), children: "\u6B63\u5219" }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-chip", "data-sel": onlyMatch, onClick: () => setOnlyMatch((v) => !v), children: "\u4EC5\u770B\u5339\u914D" }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { flex: 1 } }),
+            ["ERROR", "WARN", "INFO", "DEBUG", "OTHER"].map((lv) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+              "button",
+              {
+                type: "button",
+                className: "ide-chip",
+                "data-sel": levels[lv],
+                onClick: () => setLevels((prev) => ({ ...prev, [lv]: !prev[lv] })),
+                children: lv
+              },
+              lv
+            ))
+          ] }),
           /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-logbox", children: [
             /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
               "div",
@@ -15014,14 +15134,19 @@ function IdeView({ api, ctx }) {
                   const el = event.currentTarget;
                   pinnedRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
                 },
-                children: logLines.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-note", children: runState?.status === "running" ? "\u7B49\u5F85\u8F93\u51FA\u2026" : "\u70B9\u300C\u542F\u52A8\u300D\u8FD0\u884C\u8FD9\u6761\u542F\u52A8\u914D\u7F6E" }) : logLines.map((line, index) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { children: line }, index))
+                children: shown.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-note", children: logLines.length > 0 ? "\u6CA1\u6709\u5339\u914D\u7684\u65E5\u5FD7" : runState?.status === "running" ? "\u7B49\u5F85\u8F93\u51FA\u2026" : "\u70B9\u300C\u542F\u52A8\u300D\u8FD0\u884C\u8FD9\u6761\u542F\u52A8\u914D\u7F6E" }) : shown.map((row, index) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: (row.hit ? "ide-hit " : "") + "ide-lv-" + row.level, children: row.line }, index))
               }
             ),
             /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-note", children: [
-              "\u5DF2\u7F13\u5B58 ",
+              "\u663E\u793A ",
+              shown.length,
+              " / \u5171 ",
+              filtered.length,
+              " \u884C\uFF08\u7F13\u5B58 ",
               logLines.length,
-              " \u884C",
-              runState?.lossy === true || truncated ? "\uFF08\u8F93\u51FA\u8FC7\u5FEB\u6216\u8FC7\u957F\uFF0C\u65E9\u671F\u65E5\u5FD7\u5DF2\u88AB\u4E22\u5F03\uFF09" : ""
+              " \u884C\uFF09",
+              fromHistory ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { title: historyPath, children: "\uFF08\u542B\u4E0A\u6B21\u8FD0\u884C\u7684\u8F93\u51FA\uFF09" }) : null,
+              runState?.lossy === true || truncated ? "\uFF08\u8F93\u51FA\u8FC7\u5FEB\u6216\u8FC7\u957F\uFF0C\u65E9\u671F\u90E8\u5206\u5DF2\u4E22\u5F03\uFF09" : ""
             ] })
           ] })
         ] })

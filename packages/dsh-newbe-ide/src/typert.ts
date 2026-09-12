@@ -3,7 +3,7 @@
  * 手写清单，结构与 @deepseek-ai/dsh-typert-generator 产物一致：
  * `./typert` 导出 TYPERT，invocations 的 codec 必须是 zod v4 实例。
  */
-import { ideLoadSchema, ideStateSchema, runReadRequestSchema, runReadSchema, runSnapshotListSchema, runSnapshotSchema, runTargetSchema } from './schema.js';
+import { ideLoadSchema, ideStateSchema, logHistoryRequestSchema, logHistorySchema, runReadRequestSchema, runReadSchema, runSnapshotListSchema, runSnapshotSchema, runTargetSchema } from './schema.js';
 
 const stateCodec = {
   mode: 'strict' as const,
@@ -39,6 +39,18 @@ const readCodec = {
   mode: 'strict' as const,
   typeSymbol: 'dsh-newbe-ide#RunRead',
   schema: runReadSchema,
+};
+
+const historyRequestCodec = {
+  mode: 'strict' as const,
+  typeSymbol: 'dsh-newbe-ide#LogHistoryRequest',
+  schema: logHistoryRequestSchema,
+};
+
+const historyCodec = {
+  mode: 'strict' as const,
+  typeSymbol: 'dsh-newbe-ide#LogHistory',
+  schema: logHistorySchema,
 };
 
 const snapshotListCodec = {
@@ -98,6 +110,15 @@ export const TYPERT = {
       result: snapshotListCodec,
     },
     {
+      id: 'dsh-newbe-ide#ideConfig/history',
+      service: 'ideConfig',
+      namespace: 'ideConfig',
+      method: 'history',
+      invocation: { kind: 'direct' },
+      parameters: [{ name: 'request', wire: 'request', source: 'json', codec: historyRequestCodec }],
+      result: historyCodec,
+    },
+    {
       id: 'dsh-newbe-ide#ideConfig/submit',
       service: 'ideConfig',
       namespace: 'ideConfig',
@@ -124,6 +145,7 @@ export const TYPERT = {
           { kind: 'method', name: 'stop', signature: 'stop(target: RunTarget): RunSnapshot' },
           { kind: 'method', name: 'read', signature: 'read(request: RunReadRequest): RunRead' },
           { kind: 'method', name: 'runs', signature: 'runs(): RunSnapshot[]' },
+          { kind: 'method', name: 'history', signature: 'history(request: LogHistoryRequest): LogHistory' },
         ],
         types: [],
       },

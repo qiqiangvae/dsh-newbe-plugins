@@ -14580,6 +14580,16 @@ var runReadSchema = external_exports.object({
   dropped: external_exports.boolean()
 });
 var runSnapshotListSchema = external_exports.array(runSnapshotSchema);
+var logHistoryRequestSchema = external_exports.object({
+  workspaceId: external_exports.string(),
+  configId: external_exports.string(),
+  tail: external_exports.number()
+});
+var logHistorySchema = external_exports.object({
+  lines: external_exports.array(external_exports.string()),
+  truncated: external_exports.boolean(),
+  path: external_exports.string()
+});
 
 // src/typert.ts
 var stateCodec = {
@@ -14611,6 +14621,16 @@ var readCodec = {
   mode: "strict",
   typeSymbol: "dsh-newbe-ide#RunRead",
   schema: runReadSchema
+};
+var historyRequestCodec = {
+  mode: "strict",
+  typeSymbol: "dsh-newbe-ide#LogHistoryRequest",
+  schema: logHistoryRequestSchema
+};
+var historyCodec = {
+  mode: "strict",
+  typeSymbol: "dsh-newbe-ide#LogHistory",
+  schema: logHistorySchema
 };
 var snapshotListCodec = {
   mode: "strict",
@@ -14668,6 +14688,15 @@ var TYPERT = {
       result: snapshotListCodec
     },
     {
+      id: "dsh-newbe-ide#ideConfig/history",
+      service: "ideConfig",
+      namespace: "ideConfig",
+      method: "history",
+      invocation: { kind: "direct" },
+      parameters: [{ name: "request", wire: "request", source: "json", codec: historyRequestCodec }],
+      result: historyCodec
+    },
+    {
       id: "dsh-newbe-ide#ideConfig/submit",
       service: "ideConfig",
       namespace: "ideConfig",
@@ -14693,7 +14722,8 @@ var TYPERT = {
           { kind: "method", name: "start", signature: "start(target: RunTarget): RunSnapshot" },
           { kind: "method", name: "stop", signature: "stop(target: RunTarget): RunSnapshot" },
           { kind: "method", name: "read", signature: "read(request: RunReadRequest): RunRead" },
-          { kind: "method", name: "runs", signature: "runs(): RunSnapshot[]" }
+          { kind: "method", name: "runs", signature: "runs(): RunSnapshot[]" },
+          { kind: "method", name: "history", signature: "history(request: LogHistoryRequest): LogHistory" }
         ],
         types: []
       }

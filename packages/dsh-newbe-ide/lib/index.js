@@ -5,6 +5,7 @@ var __export = (target, all) => {
 };
 
 // src/index.ts
+import { dirname as dirname2, join as join3 } from "node:path";
 import { dshHomePath } from "@deepseek-ai/dsh-home-paths";
 
 // src/store.ts
@@ -14588,6 +14589,16 @@ var runReadSchema = external_exports.object({
   dropped: external_exports.boolean()
 });
 var runSnapshotListSchema = external_exports.array(runSnapshotSchema);
+var logHistoryRequestSchema = external_exports.object({
+  workspaceId: external_exports.string(),
+  configId: external_exports.string(),
+  tail: external_exports.number()
+});
+var logHistorySchema = external_exports.object({
+  lines: external_exports.array(external_exports.string()),
+  truncated: external_exports.boolean(),
+  path: external_exports.string()
+});
 function defaultState() {
   return { projects: [], activeWorkspaceId: "", showOverview: false };
 }
@@ -14717,7 +14728,9 @@ function isSecretName(name2) {
 // src/runtime.ts
 var DEFAULT_MAX_LINES = 5e3;
 var MAX_PENDING_CHARS = 65536;
-function createRunRegistry(provideShell, maxLines = DEFAULT_MAX_LINES) {
+function createRunRegistry(provideShell, options = {}) {
+  const maxLines = options.maxLines ?? DEFAULT_MAX_LINES;
+  const sink = options.sink;
   const runs = /* @__PURE__ */ new Map();
   function record2(key) {
     const existing = runs.get(key);
@@ -14733,10 +14746,24 @@ function createRunRegistry(provideShell, maxLines = DEFAULT_MAX_LINES) {
       pending: "",
       secrets: [],
       proc: null,
-      stopRequested: false
+      stopRequested: false,
+      pendingAppend: []
     };
     runs.set(key, fresh);
     return fresh;
+  }
+  function emit(run, line) {
+    pushLine(run, line);
+    run.pendingAppend.push(line);
+  }
+  function flushAppend(run) {
+    if (run.pendingAppend.length === 0) return;
+    const batch = run.pendingAppend;
+    run.pendingAppend = [];
+    try {
+      sink?.append(run.key, batch);
+    } catch {
+    }
   }
   function pushLine(run, line) {
     run.lines.push(line);
@@ -14758,24 +14785,25 @@ function createRunRegistry(provideShell, maxLines = DEFAULT_MAX_LINES) {
       if (typeof output.delta === "string" && output.delta.length > 0) {
         const split = splitLines(run.pending, output.delta);
         run.pending = split.pending;
-        for (const line of split.lines) pushLine(run, maskSecrets(line, run.secrets));
+        for (const line of split.lines) emit(run, maskSecrets(line, run.secrets));
       }
       if (output.lossy === true) run.lossy = true;
     }
     if (run.pending.includes("\r")) {
       const progress = cleanLine(run.pending);
-      if (progress !== "") pushLine(run, maskSecrets(progress, run.secrets));
+      if (progress !== "") emit(run, maskSecrets(progress, run.secrets));
       run.pending = "";
     } else if (run.pending.length > MAX_PENDING_CHARS) {
-      pushLine(run, maskSecrets(run.pending.slice(0, MAX_PENDING_CHARS) + " \u2026\uFF08\u8D85\u957F\u884C\u5DF2\u622A\u65AD\uFF09", run.secrets));
+      emit(run, maskSecrets(run.pending.slice(0, MAX_PENDING_CHARS) + " \u2026\uFF08\u8D85\u957F\u884C\u5DF2\u622A\u65AD\uFF09", run.secrets));
       run.pending = "";
     }
     if (proc.status === "running") {
       run.status = "running";
+      flushAppend(run);
       return;
     }
     if (run.pending !== "") {
-      pushLine(run, maskSecrets(cleanLine(run.pending), run.secrets));
+      emit(run, maskSecrets(cleanLine(run.pending), run.secrets));
       run.pending = "";
     }
     run.exitCode = proc.exitCode ?? null;
@@ -14789,6 +14817,7 @@ function createRunRegistry(provideShell, maxLines = DEFAULT_MAX_LINES) {
     } else {
       run.status = "exited";
     }
+    flushAppend(run);
   }
   function killIfRunning(run) {
     drain(run);
@@ -14874,6 +14903,116 @@ function createRunRegistry(provideShell, maxLines = DEFAULT_MAX_LINES) {
   };
 }
 
+// src/logsink.ts
+import { appendFileSync, openSync as openSync2, closeSync as closeSync2, existsSync, mkdirSync as mkdirSync2, readSync, renameSync as renameSync2, rmSync as rmSync2, statSync } from "node:fs";
+import { join as join2 } from "node:path";
+var DEFAULT_MAX_BYTES = 8 * 1024 * 1024;
+var DEFAULT_TAIL_BYTES = 512 * 1024;
+function fileName(key) {
+  return key.replace(/[^A-Za-z0-9._-]/g, "_") + ".log";
+}
+function createFileLogSink(dir, options = {}) {
+  const maxBytes = options.maxBytes ?? DEFAULT_MAX_BYTES;
+  const tailBytes = options.tailBytes ?? DEFAULT_TAIL_BYTES;
+  const sizes = /* @__PURE__ */ new Map();
+  const pathOf = (key) => join2(dir, fileName(key));
+  function sizeOf(file2) {
+    try {
+      return statSync(file2).size;
+    } catch {
+      return 0;
+    }
+  }
+  return {
+    path: pathOf,
+    append(key, lines) {
+      if (lines.length === 0) return;
+      const file2 = pathOf(key);
+      mkdirSync2(dir, { recursive: true, mode: 448 });
+      const text = lines.join("\n") + "\n";
+      const known = sizes.get(file2);
+      const current = known ?? sizeOf(file2);
+      if (current + Buffer.byteLength(text) > maxBytes) {
+        try {
+          rmSync2(file2 + ".1", { force: true });
+          renameSync2(file2, file2 + ".1");
+        } catch {
+        }
+        sizes.set(file2, 0);
+        appendFileSync(file2, text, { mode: 384 });
+        sizes.set(file2, Buffer.byteLength(text));
+        return;
+      }
+      appendFileSync(file2, text, { mode: 384 });
+      sizes.set(file2, current + Buffer.byteLength(text));
+    },
+    tail(key, maxLines) {
+      const file2 = pathOf(key);
+      if (!existsSync(file2)) return { lines: [], truncated: false };
+      const size = sizeOf(file2);
+      const start = Math.max(0, size - tailBytes);
+      const length = size - start;
+      if (length <= 0) return { lines: [], truncated: false };
+      const fd = openSync2(file2, "r");
+      let text;
+      try {
+        const buffer = Buffer.alloc(length);
+        readSync(fd, buffer, 0, length, start);
+        text = buffer.toString("utf8");
+      } finally {
+        closeSync2(fd);
+      }
+      const parts = text.split("\n");
+      if (start > 0) parts.shift();
+      if (parts.length > 0 && parts[parts.length - 1] === "") parts.pop();
+      const truncated = parts.length > maxLines || start > 0;
+      const lines = parts.length > maxLines ? parts.slice(parts.length - maxLines) : parts;
+      return { lines, truncated };
+    }
+  };
+}
+
+// src/filter.ts
+var DEFAULT_LEVELS = {
+  ERROR: true,
+  WARN: true,
+  INFO: true,
+  DEBUG: false,
+  OTHER: true
+};
+var LEVEL_PATTERN = /(TRACE|DEBUG|INFO|WARN|ERROR|FATAL)/;
+function levelOf(line) {
+  const found = LEVEL_PATTERN.exec(line);
+  if (found === null) return "OTHER";
+  if (found[1] === "FATAL") return "ERROR";
+  if (found[1] === "TRACE") return "DEBUG";
+  return found[1];
+}
+function compileMatcher(spec) {
+  const q = spec.q.trim();
+  if (q === "") return null;
+  if (spec.regex) {
+    try {
+      const re = new RegExp(q, "i");
+      return { test: (line) => re.test(line), literal: false };
+    } catch {
+    }
+  }
+  const lowered = q.toLowerCase();
+  return { test: (line) => line.toLowerCase().includes(lowered), literal: true };
+}
+function filterLines(lines, state) {
+  const out = [];
+  for (const line of lines) {
+    const level = levelOf(line);
+    if (state.levels[level] !== true) continue;
+    const hit = state.matcher !== null && state.matcher.test(line);
+    if (state.onlyMatch && state.matcher !== null && !hit) continue;
+    out.push({ line, level, hit });
+  }
+  return out;
+}
+
 // src/index.ts
 var STORAGE_PATH = dshHomePath("storages", "dsh-newbe-ide.json");
 var name = "dsh-newbe-ide";
@@ -14892,7 +15031,8 @@ function listProjects(ctx) {
 }
 function apply(ctx) {
   const store = createConfigStore(STORAGE_PATH);
-  const registry2 = createRunRegistry(() => ctx.get("shell"));
+  const sink = createFileLogSink(join3(dirname2(STORAGE_PATH), "dsh-newbe-ide", "logs"));
+  const registry2 = createRunRegistry(() => ctx.get("shell"), { sink });
   console.log(`[dsh-newbe-ide] \u5B58\u50A8\u6587\u4EF6\uFF1A${STORAGE_PATH}`);
   ctx.effect(() => {
     const timer = setInterval(() => registry2.pump(), 250);
@@ -14927,6 +15067,12 @@ function apply(ctx) {
     },
     runs() {
       return registry2.snapshots();
+    },
+    history(request) {
+      const key = runKeyOf(request);
+      const tail = Number.isFinite(request.tail) && request.tail > 0 ? Math.floor(request.tail) : 2e3;
+      const result = sink.tail(key, tail);
+      return { lines: result.lines, truncated: result.truncated, path: sink.path(key) };
     }
   };
   Object.defineProperty(service, "typertRemote", {
@@ -14938,13 +15084,18 @@ function apply(ctx) {
   ctx.provide("ideConfig", service);
 }
 export {
+  DEFAULT_LEVELS,
   STORAGE_PATH,
   apply,
   cleanLine,
+  compileMatcher,
   createConfigStore,
+  createFileLogSink,
   createRunRegistry,
   defaultState,
+  filterLines,
   isSecretName,
+  levelOf,
   maskSecrets,
   name,
   pickActiveConfig,

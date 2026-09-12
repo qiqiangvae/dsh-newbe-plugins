@@ -15,14 +15,37 @@ process.env.DSH_HOME = home;
 
 const mod = await import('../lib/index.js');
 
-function makeCtx(workspaces) {
+function makeShell() {
+  const started = [];
+  return {
+    started,
+    resolve: (request) => request,
+    start(spec) {
+      let delta = '';
+      const proc = {
+        status: 'running',
+        exitCode: null,
+        done: new Promise(() => {}),
+        readOutput() { const d = delta; delta = ''; return { delta: d, lossy: false }; },
+        kill() { return true; },
+        emit(text) { delta += text; },
+      };
+      started.push({ spec, proc });
+      return proc;
+    },
+  };
+}
+
+function makeCtx(workspaces, shell) {
   const provided = {};
   const effects = [];
   return {
     provided,
     effects,
     ctx: {
-      get: (name) => (name === 'workspaceRegistry' && workspaces !== null ? { list: () => workspaces } : undefined),
+      get: (name) => (name === 'workspaceRegistry' && workspaces !== null
+        ? { list: () => workspaces }
+        : name === 'shell' ? shell : undefined),
       provide: (key, value) => { provided[key] = value; },
       // 真 ctx 的 effect 会保留回调返回的清理函数；这里执行后立刻释放，
       // 覆盖 effect 的注册与清理路径，又不会让定时器吊住测试进程。
@@ -93,4 +116,32 @@ test('submit 落盘后 load 能读回，文件权限 0600', async () => {
   assert.deepEqual(service.load().config, saved);
   assert.equal(statSync(mod.STORAGE_PATH).mode & 0o777, 0o600);
   assert.ok(mod.STORAGE_PATH.startsWith(home), '存储路径应当落在 DSH_HOME 内');
+});
+
+test('history 读回落盘的日志：进程输出 → 落盘 → 重启后再看', async () => {
+  const shell = makeShell();
+  const { ctx, provided } = makeCtx(null, shell);
+  mod.apply(ctx);
+  const service = provided.ideConfig;
+  await service.submit({
+    projects: [{
+      workspaceId: 'w1', path: '/tmp/p', title: 'p', activeConfigId: 'c1',
+      configs: [{ id: 'c1', name: 'A', command: 'echo hi', cwd: '/tmp/p', envs: [] }],
+    }],
+    activeWorkspaceId: 'w1',
+    showOverview: false,
+  });
+  service.start({ workspaceId: 'w1', configId: 'c1' });
+  shell.started[0].proc.emit('hello\nworld\n');
+  service.runs(); // 一次 drain：入内存缓冲并落盘
+
+  const history = service.history({ workspaceId: 'w1', configId: 'c1', tail: 100 });
+  assert.deepEqual([...history.lines], ['hello', 'world']);
+  assert.ok(history.path.endsWith('.log'));
+  assert.ok(history.path.startsWith(home), '日志应落在 DSH_HOME 内：' + history.path);
+  assert.ok(history.path.includes('dsh-newbe-ide'), '日志应落在插件自己的目录下');
+
+  // 新建一份注册表（模拟 DSH 重启：内存缓冲没了）仍能读回同一份历史
+  const fresh = mod.createFileLogSink(join(home, 'storages', 'dsh-newbe-ide', 'logs'));
+  assert.deepEqual([...fresh.tail('w1/c1', 100).lines], ['hello', 'world']);
 });

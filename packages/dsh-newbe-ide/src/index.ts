@@ -6,14 +6,20 @@
  *
  * 这一版只做"存得住、读得回"：不启动任何进程，进程与日志见后续票。
  */
+import { dirname, join } from 'node:path';
 import { dshHomePath } from '@deepseek-ai/dsh-home-paths';
 import { createConfigStore } from './store.js';
 import { createRunRegistry, type RunSpec } from './runtime.js';
-import { runKeyOf, type IdeLoad, type IdeProjectView, type IdeState, type RunRead, type RunSnapshot } from './schema.js';
+import { createFileLogSink } from './logsink.js';
+import { runKeyOf, type IdeLoad, type IdeProjectView, type IdeState, type LogHistory, type RunRead, type RunSnapshot } from './schema.js';
 
 export { createConfigStore } from './store.js';
 export { defaultState, pickActiveConfig, runKeyOf } from './schema.js';
 export { cleanLine, isSecretName, maskSecrets, splitLines } from './lines.js';
+export { DEFAULT_LEVELS, compileMatcher, filterLines, levelOf } from './filter.js';
+export { createFileLogSink } from './logsink.js';
+export type { LogSink, TailResult } from './logsink.js';
+export type { FilteredLine, FilterState, Matcher, MatcherSpec, RunLevel } from './filter.js';
 export { createRunRegistry } from './runtime.js';
 export type { RunRead, RunSnapshot, RunStatus } from './schema.js';
 
@@ -39,7 +45,9 @@ function listProjects(ctx: any): IdeProjectView[] {
 
 export function apply(ctx: any): void {
   const store = createConfigStore(STORAGE_PATH);
-  const registry = createRunRegistry(() => ctx.get('shell'));
+  // 日志落盘：$DSH_HOME/storages/dsh-newbe-ide/logs/<键>.log（保留一代 .1）
+  const sink = createFileLogSink(join(dirname(STORAGE_PATH), 'dsh-newbe-ide', 'logs'));
+  const registry = createRunRegistry(() => ctx.get('shell'), { sink });
   console.log(`[dsh-newbe-ide] 存储文件：${STORAGE_PATH}`);
 
   // 定时把在跑进程的输出读进缓冲：客户端轮询只是取，不负责采集，避免读得太慢丢输出。
@@ -79,6 +87,12 @@ export function apply(ctx: any): void {
     },
     runs(): RunSnapshot[] {
       return registry.snapshots();
+    },
+    history(request: { workspaceId: string; configId: string; tail: number }): LogHistory {
+      const key = runKeyOf(request);
+      const tail = Number.isFinite(request.tail) && request.tail > 0 ? Math.floor(request.tail) : 2000;
+      const result = sink.tail(key, tail);
+      return { lines: result.lines, truncated: result.truncated, path: sink.path(key) };
     },
   };
 
