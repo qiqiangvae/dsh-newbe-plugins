@@ -40,7 +40,6 @@ export const NS = 'dsh-newbe-ide';
 const VIEW_ID = 'dsh-newbe-ide';
 /** 会话视图顺序：对话 0 / 轨迹 10 / 上下文 20 / IDE 30。 */
 const VIEW_ORDER = 30;
-const SETTINGS_TAB_ORDER = 30;
 /** 面板本地的日志保留上限；超出会提示"早期日志已被丢弃"。 */
 const LOG_LIMIT = 4000;
 /** 单帧最多渲染多少行：过滤是全量的，渲染要封顶，否则长日志会卡。 */
@@ -270,6 +269,9 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
   const [levels, setLevels] = useState<Record<RunLevel, boolean>>({ ...DEFAULT_LEVELS });
   const [fromHistory, setFromHistory] = useState(false);
   const [historyPath, setHistoryPath] = useState('');
+  const [editing, setEditing] = useState(false);
+  const [drafts, setDrafts] = useState<Record<string, LaunchConfig>>({});
+  const [flash, setFlash] = useState('');
   const offsetRef = useRef(0);
   const logRef = useRef<HTMLDivElement | null>(null);
   const historyTriedRef = useRef(false);
@@ -398,7 +400,33 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
     el.scrollTop = el.scrollHeight;
   }, [logLines]);
 
-  // 选中项是视图状态，不落盘：视图从不写配置，只有设置页写。
+  /**
+   * 写入配置：先本地生效（乐观），再落盘并以宿主返回的状态为准。
+   * 落盘失败必须回到磁盘真实状态——否则面板会显示从未写成的配置，后续提交还会基于它继续写。
+   */
+  const commit = useCallback(async (next: IdeState, showFlash: boolean): Promise<boolean> => {
+    if (api === undefined) {
+      setError('remote.ideConfig 不可用，改动未保存');
+      return false;
+    }
+    setConfig(next);
+    try {
+      setConfig(envelopeValue(await api.submit(next), '保存启动配置') as IdeState);
+      setError('');
+      setWarning('');
+      if (showFlash) {
+        setFlash('已保存 ✓');
+        window.setTimeout(() => setFlash(''), 1600);
+      }
+      return true;
+    } catch (e) {
+      setError(String((e as Error)?.message ?? e));
+      await reload();
+      return false;
+    }
+  }, [api, reload]);
+
+  // 选中项是视图状态，不落盘。
   // 两个面都整份写盘的话，并发保存会互相覆盖；保持"单写者"就没有这个窗口。
   const selectProject = (workspaceId: string) => {
     setActiveProjectId(workspaceId);
@@ -407,6 +435,63 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
   const selectConfig = (configId: string) => {
     if (active === undefined) return;
     setActiveConfigIds((prev) => ({ ...prev, [active.workspaceId]: configId }));
+  };
+
+  const available = projects.filter((p) => !cfg.projects.some((entry) => entry.workspaceId === p.workspaceId));
+
+  const addProject = (workspaceId: string) => {
+    const source = projects.find((p) => p.workspaceId === workspaceId);
+    if (source === undefined) return;
+    const entry: ProjectEntry = { workspaceId: source.workspaceId, path: source.path, title: source.title, configs: [], activeConfigId: '' };
+    setActiveProjectId(source.workspaceId);
+    void commit({ ...cfg, activeWorkspaceId: source.workspaceId, projects: [...cfg.projects, entry] }, false);
+  };
+
+  const removeProject = (workspaceId: string) => {
+    const next: IdeState = { ...cfg, projects: cfg.projects.filter((p) => p.workspaceId !== workspaceId) };
+    setActiveProjectId(next.projects[0]?.workspaceId ?? '');
+    void commit(next, false);
+  };
+
+  const addConfig = (project: ProjectEntry) => {
+    const fresh: LaunchConfig = {
+      id: `c${crypto.randomUUID()}`,
+      name: `启动配置 ${project.configs.length + 1}`,
+      command: '',
+      cwd: project.path,
+      envs: [],
+    };
+    setDrafts((prev) => ({ ...prev, [fresh.id]: fresh }));
+    setActiveConfigIds((prev) => ({ ...prev, [project.workspaceId]: fresh.id }));
+    void commit(patchProject(cfg, project.workspaceId, (p) => ({
+      ...p,
+      configs: [...p.configs, fresh],
+      activeConfigId: p.activeConfigId === '' ? fresh.id : p.activeConfigId,
+    })), false);
+  };
+
+  const removeConfig = (project: ProjectEntry, configId: string) => {
+    setDrafts((prev) => { const copy = { ...prev }; delete copy[configId]; return copy; });
+    void commit(patchProject(cfg, project.workspaceId, (p) => {
+      const kept = p.configs.filter((c) => c.id !== configId);
+      return { ...p, configs: kept, activeConfigId: p.activeConfigId === configId ? (kept[0]?.id ?? '') : p.activeConfigId };
+    }), false);
+  };
+
+  const patchDraft = (draft: LaunchConfig, patch: Partial<LaunchConfig>) => {
+    setDrafts((prev) => ({ ...prev, [draft.id]: { ...draft, ...patch } }));
+  };
+
+  const saveDraft = async (project: ProjectEntry, draft: LaunchConfig) => {
+    const cleaned: LaunchConfig = { ...draft, cwd: draft.cwd !== '' ? draft.cwd : project.path };
+    const saved = await commit(patchProject(cfg, project.workspaceId, (p) => ({
+      ...p,
+      activeConfigId: cleaned.id,
+      configs: p.configs.map((c) => (c.id === cleaned.id ? cleaned : c)),
+    })), true);
+    if (saved) {
+      setDrafts((prev) => { const copy = { ...prev }; delete copy[cleaned.id]; return copy; });
+    }
   };
 
   const runAction = async (action: 'start' | 'stop') => {
@@ -475,7 +560,7 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
         {active === undefined ? (
           <div className="ide-empty">
             <div>还没有项目</div>
-            <div className="ide-note">在 设置 → 插件 → IDE 里添加项目与启动配置</div>
+            <div className="ide-note">点右上角「⚙ 配置」添加项目与启动配置</div>
           </div>
         ) : (
           <>
@@ -490,7 +575,7 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
             </div>
 
             {activeConfig === undefined ? (
-              <div className="ide-note">这个项目还没有启动配置 —— 在 设置 → 插件 → IDE 里添加</div>
+              <div className="ide-note">这个项目还没有启动配置 —— 点「⚙ 配置」添加</div>
             ) : (
               <>
                 <div className="ide-toolbar">
@@ -510,17 +595,119 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
                   <button
                     type="button"
                     className="ide-btn"
+                    data-on={editing}
+                    disabled={active === undefined}
+                    onClick={() => setEditing((v) => !v)}
+                  >
+                    ⚙ 配置
+                  </button>
+                  <button
+                    type="button"
+                    className="ide-btn"
                     disabled={runState?.status !== 'running'}
                     onClick={() => { void (async () => { await runAction('stop'); await runAction('start'); })(); }}
                   >
                     重启
                   </button>
+                  <span className="ide-note">{flash}</span>
                 </div>
 
                 <div className="ide-cmdline">
                   <span className="ide-label">启动命令</span>
                   <span className="ide-cmd">{activeConfig.command === '' ? '（未设置）' : activeConfig.command}</span>
                 </div>
+
+                {editing && active !== undefined ? (
+                  <div className="ide-cfg">
+                    <div className="ide-toolbar">
+                      <span className="ide-title">配置 · {active.title}</span>
+                      <span style={{ flex: 1 }} />
+                      <button type="button" className="ide-chip" onClick={() => addConfig(active)}>＋ 启动配置</button>
+                      <button type="button" className="ide-btn" data-kind="danger" onClick={() => removeProject(active.workspaceId)}>移除项目</button>
+                    </div>
+
+                    {active.configs.length === 0 ? <div className="ide-note">这个项目还没有启动配置</div> : null}
+
+                    {active.configs.map((config2) => {
+                      const draft = drafts[config2.id] ?? config2;
+                      return (
+                        <div className="ide-form" key={config2.id}>
+                          <div className="ide-line">
+                            <span className="ide-label">名称</span>
+                            <input className="ide-field" style={{ maxWidth: 240 }} value={draft.name} onChange={(e) => patchDraft(draft, { name: e.target.value })} />
+                            <button type="button" className="ide-btn" data-kind="primary" onClick={() => { void saveDraft(active, draft); }}>保存</button>
+                            <button type="button" className="ide-btn" data-kind="danger" onClick={() => removeConfig(active, config2.id)}>删除</button>
+                          </div>
+                          <div className="ide-line">
+                            <span className="ide-label">启动命令</span>
+                            <input
+                              className="ide-field ide-mono"
+                              style={{ flex: 1, minWidth: 280 }}
+                              placeholder="例如：mvn -o -pl kun-ai-web spring-boot:run"
+                              value={draft.command}
+                              onChange={(e) => patchDraft(draft, { command: e.target.value })}
+                            />
+                          </div>
+                          <div className="ide-line">
+                            <span className="ide-label">工作目录</span>
+                            <input className="ide-field ide-mono" style={{ flex: 1, minWidth: 280 }} value={draft.cwd} onChange={(e) => patchDraft(draft, { cwd: e.target.value })} />
+                          </div>
+                          <div className="ide-line" style={{ alignItems: 'flex-start' }}>
+                            <span className="ide-label">环境变量</span>
+                            <div style={{ flex: 1 }}>
+                              <table className="ide-envs">
+                                <tbody>
+                                  {draft.envs.map((env, index) => (
+                                    <tr key={index}>
+                                      <td style={{ width: '38%' }}>
+                                        <input
+                                          className="ide-field ide-mono"
+                                          value={env.name}
+                                          placeholder="NAME"
+                                          onChange={(e) => patchDraft(draft, { envs: draft.envs.map((x, i) => (i === index ? { ...x, name: e.target.value } : x)) })}
+                                        />
+                                      </td>
+                                      <td>
+                                        <input
+                                          className="ide-field ide-mono"
+                                          type={isSecretName(env.name) ? 'password' : 'text'}
+                                          title={isSecretName(env.name) ? '密钥类变量在界面上掩码显示' : undefined}
+                                          value={env.value}
+                                          placeholder="value"
+                                          onChange={(e) => patchDraft(draft, { envs: draft.envs.map((x, i) => (i === index ? { ...x, value: e.target.value } : x)) })}
+                                        />
+                                      </td>
+                                      <td style={{ width: 32 }}>
+                                        <button type="button" className="ide-btn" onClick={() => patchDraft(draft, { envs: draft.envs.filter((_, i) => i !== index) })}>×</button>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                              <button type="button" className="ide-chip" onClick={() => patchDraft(draft, { envs: [...draft.envs, { name: '', value: '' }] })}>＋ 变量</button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    <div className="ide-toolbar">
+                      <span className="ide-note">添加项目</span>
+                      {!projects.length ? (
+                        <span className="ide-note">DSH 工作区注册表暂不可用</span>
+                      ) : available.length > 0 ? (
+                        <select className="ide-field" value="" onChange={(event) => { if (event.target.value !== '') addProject(event.target.value); }}>
+                          <option value="">＋ 选择工作区（{available.length} 个可选）</option>
+                          {available.map((p) => <option key={p.workspaceId} value={p.workspaceId}>{p.title} · {p.path}</option>)}
+                        </select>
+                      ) : (
+                        <span className="ide-note">所有工作区都已加入</span>
+                      )}
+                      <span style={{ flex: 1 }} />
+                      <span className="ide-note">存于 ~/.dsh/storages/dsh-newbe-ide.json（0600，不在项目目录里）</span>
+                    </div>
+                  </div>
+                ) : null}
 
                 <div className="ide-filterbar">
                   <input
@@ -583,255 +770,6 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
   );
 }
 
-/* ------------------------------------------------------------------ *
- * 设置页：项目与启动配置的增删改
- * ------------------------------------------------------------------ */
-
-interface SettingsProps {
-  api: RemoteIde | undefined;
-}
-
-function IdeSettings({ api }: SettingsProps): React.ReactElement {
-  const [config, setConfig] = useState<IdeState | null>(null);
-  const [projects, setProjects] = useState<IdeProjectView[]>([]);
-  const [warning, setWarning] = useState('');
-  const [drafts, setDrafts] = useState<Record<string, LaunchConfig>>({});
-  const [flash, setFlash] = useState('');
-  const [error, setError] = useState('');
-
-  const cfg: IdeState = config ?? defaultState();
-
-  const reload = useCallback(async () => {
-    if (api === undefined) {
-      setWarning('remote.ideConfig 不可用，无法读写启动配置');
-      return;
-    }
-    try {
-      const load = envelopeValue(await api.load(), '读取启动配置') as IdeLoad;
-      setConfig(load.config);
-      setProjects(load.projects);
-      setWarning(load.warning);
-      setError('');
-    } catch (e) {
-      setError(String((e as Error)?.message ?? e));
-    }
-  }, [api]);
-
-  useEffect(() => { void reload(); }, [reload]);
-
-  /**
-   * 先本地生效（乐观），再落盘并以宿主返回的状态为准。
-   * 落盘失败必须回到磁盘真实状态：否则页面会显示从未写成的配置，后续提交还会基于它继续写。
-   */
-  const commit = useCallback(async (next: IdeState, showFlash: boolean): Promise<boolean> => {
-    if (api === undefined) {
-      setError('remote.ideConfig 不可用，改动未保存');
-      return false;
-    }
-    setConfig(next);
-    try {
-      setConfig(envelopeValue(await api.submit(next), '保存启动配置') as IdeState);
-      setError('');
-      setWarning('');
-      if (showFlash) {
-        setFlash('已保存 ✓');
-        window.setTimeout(() => setFlash(''), 1600);
-      }
-      return true;
-    } catch (e) {
-      setError(String((e as Error)?.message ?? e));
-      await reload();
-      return false;
-    }
-  }, [api, reload]);
-
-  const available = projects.filter((p) => !cfg.projects.some((entry) => entry.workspaceId === p.workspaceId));
-
-  const addProject = (workspaceId: string) => {
-    const source = projects.find((p) => p.workspaceId === workspaceId);
-    if (source === undefined) return;
-    const entry: ProjectEntry = { workspaceId: source.workspaceId, path: source.path, title: source.title, configs: [], activeConfigId: '' };
-    void commit({ ...cfg, activeWorkspaceId: source.workspaceId, projects: [...cfg.projects, entry] }, false);
-  };
-
-  const addConfig = (project: ProjectEntry) => {
-    const fresh: LaunchConfig = {
-      id: `c${crypto.randomUUID()}`,
-      name: `启动配置 ${project.configs.length + 1}`,
-      command: '',
-      cwd: project.path,
-      envs: [],
-    };
-    setDrafts((prev) => ({ ...prev, [fresh.id]: fresh }));
-    void commit(patchProject(cfg, project.workspaceId, (p) => ({
-      ...p,
-      configs: [...p.configs, fresh],
-      activeConfigId: p.activeConfigId === '' ? fresh.id : p.activeConfigId,
-    })), false);
-  };
-
-  const removeConfig = (project: ProjectEntry, configId: string) => {
-    setDrafts((prev) => { const copy = { ...prev }; delete copy[configId]; return copy; });
-    void commit(patchProject(cfg, project.workspaceId, (p) => {
-      const kept = p.configs.filter((c) => c.id !== configId);
-      return { ...p, configs: kept, activeConfigId: p.activeConfigId === configId ? (kept[0]?.id ?? '') : p.activeConfigId };
-    }), false);
-  };
-
-  const patchDraft = (project: ProjectEntry, draft: LaunchConfig, patch: Partial<LaunchConfig>) => {
-    setDrafts((prev) => ({ ...prev, [draft.id]: { ...draft, ...patch } }));
-  };
-
-  const saveDraft = async (project: ProjectEntry, draft: LaunchConfig) => {
-    const cleaned: LaunchConfig = { ...draft, cwd: draft.cwd !== '' ? draft.cwd : project.path };
-    const saved = await commit(patchProject(cfg, project.workspaceId, (p) => ({
-      ...p,
-      activeConfigId: cleaned.id,
-      configs: p.configs.map((c) => (c.id === cleaned.id ? cleaned : c)),
-    })), true);
-    if (saved) {
-      setDrafts((prev) => { const copy = { ...prev }; delete copy[cleaned.id]; return copy; });
-    }
-  };
-
-  if (config === null) {
-    return (
-      <div className="ide-root ide-settings">
-        <div className="ide-body">
-          <div className="ide-note">正在加载启动配置…</div>
-          {api === undefined ? <div className="ide-warn">remote.ideConfig 不可用</div> : null}
-          {error !== '' ? <div className="ide-err">{error}</div> : null}
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="ide-root ide-settings">
-      <div className="ide-body">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-          <span className="ide-title">IDE · 启动配置</span>
-          <span className="ide-note">{flash}</span>
-        </div>
-        <div className="ide-note">
-          按 DSH 工作区组织，每个项目下可有多条启动配置。持久化到 ~/.dsh/storages/dsh-newbe-ide.json（权限 0600，不在项目目录里、不会被 git 提交）。
-        </div>
-
-        {warning !== '' ? <div className="ide-warn">{warning}</div> : null}
-        {error !== '' ? <div className="ide-err">{error}</div> : null}
-
-        <div className="ide-toolbar">
-          {!projects.length ? (
-            <span className="ide-note">DSH 工作区注册表暂不可用，稍后重试</span>
-          ) : available.length > 0 ? (
-            <select
-              className="ide-field"
-              value=""
-              onChange={(event) => { if (event.target.value !== '') addProject(event.target.value); }}
-            >
-              <option value="">＋ 添加项目（{available.length} 个可选工作区）</option>
-              {available.map((p) => <option key={p.workspaceId} value={p.workspaceId}>{p.title} · {p.path}</option>)}
-            </select>
-          ) : (
-            <span className="ide-note">所有工作区都已加入</span>
-          )}
-        </div>
-
-        {cfg.projects.length === 0 ? (
-          <div className="ide-empty">
-            <div>还没有项目</div>
-            <div className="ide-note">从上面的下拉里挑一个 DSH 工作区</div>
-          </div>
-        ) : null}
-
-        {cfg.projects.map((project) => (
-          <div className="ide-card" key={project.workspaceId}>
-            <div className="ide-cardhead">
-              <span className="ide-title">{project.title}</span>
-              <span className="ide-path">{project.path}</span>
-              <span style={{ flex: 1 }} />
-              <button type="button" className="ide-chip" onClick={() => addConfig(project)}>＋ 启动配置</button>
-              <button
-                type="button"
-                className="ide-btn"
-                data-kind="danger"
-                onClick={() => { void commit({ ...cfg, projects: cfg.projects.filter((p) => p.workspaceId !== project.workspaceId) }, false); }}
-              >
-                移除项目
-              </button>
-            </div>
-
-            {project.configs.length === 0 ? <div className="ide-note">这个项目还没有启动配置</div> : null}
-
-            {project.configs.map((config2) => {
-              const draft = drafts[config2.id] ?? config2;
-              return (
-                <div className="ide-form" key={config2.id}>
-                  <div className="ide-line">
-                    <span className="ide-label">名称</span>
-                    <input className="ide-field" style={{ maxWidth: 240 }} value={draft.name} onChange={(e) => patchDraft(project, draft, { name: e.target.value })} />
-                    <button type="button" className="ide-btn" data-kind="primary" onClick={() => { void saveDraft(project, draft); }}>保存</button>
-                    <button type="button" className="ide-btn" data-kind="danger" onClick={() => removeConfig(project, config2.id)}>删除</button>
-                  </div>
-                  <div className="ide-line">
-                    <span className="ide-label">启动命令</span>
-                    <input
-                      className="ide-field ide-mono"
-                      style={{ flex: 1, minWidth: 280 }}
-                      placeholder="例如：mvn -o -pl kun-ai-web spring-boot:run"
-                      value={draft.command}
-                      onChange={(e) => patchDraft(project, draft, { command: e.target.value })}
-                    />
-                  </div>
-                  <div className="ide-line">
-                    <span className="ide-label">工作目录</span>
-                    <input className="ide-field ide-mono" style={{ flex: 1, minWidth: 280 }} value={draft.cwd} onChange={(e) => patchDraft(project, draft, { cwd: e.target.value })} />
-                  </div>
-                  <div className="ide-line" style={{ alignItems: 'flex-start' }}>
-                    <span className="ide-label">环境变量</span>
-                    <div style={{ flex: 1 }}>
-                      <table className="ide-envs">
-                        <tbody>
-                          {draft.envs.map((env, index) => (
-                            <tr key={index}>
-                              <td style={{ width: '38%' }}>
-                                <input
-                                  className="ide-field ide-mono"
-                                  value={env.name}
-                                  placeholder="NAME"
-                                  onChange={(e) => patchDraft(project, draft, { envs: draft.envs.map((x, i) => (i === index ? { ...x, name: e.target.value } : x)) })}
-                                />
-                              </td>
-                              <td>
-                                <input
-                                  className="ide-field ide-mono"
-                                  type={isSecretName(env.name) ? 'password' : 'text'}
-                                  title={isSecretName(env.name) ? '密钥类变量在界面上掩码显示' : undefined}
-                                  value={env.value}
-                                  placeholder="value"
-                                  onChange={(e) => patchDraft(project, draft, { envs: draft.envs.map((x, i) => (i === index ? { ...x, value: e.target.value } : x)) })}
-                                />
-                              </td>
-                              <td style={{ width: 32 }}>
-                                <button type="button" className="ide-btn" onClick={() => patchDraft(project, draft, { envs: draft.envs.filter((_, i) => i !== index) })}>×</button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                      <button type="button" className="ide-chip" onClick={() => patchDraft(project, draft, { envs: [...draft.envs, { name: '', value: '' }] })}>＋ 变量</button>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 export const inject = ['slots', 'remote'];
 
 export async function apply(ctx: any): Promise<void> {
@@ -856,9 +794,4 @@ export async function apply(ctx: any): Promise<void> {
     () => <IdeView api={api} ctx={ctx} />,
   ));
 
-  // 配置页：项目与启动配置的增删改（设置 → 插件 → IDE）。
-  ctx.slots.inject('settings.plugins.tab', () => ctx.slots.register(
-    { name: 'settings.plugins.tab', id: VIEW_ID, order: SETTINGS_TAB_ORDER, label: () => 'IDE' },
-    () => <IdeSettings api={api} />,
-  ));
 }

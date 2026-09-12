@@ -51,7 +51,7 @@ test('bundle 自注册并导出插件形态', () => {
   assert.deepEqual([...plugin.inject], ['slots', 'remote']);  // vm 里的数组原型不同，摊回宿主 realm 再比
 });
 
-test('注册两个面：会话视图 tab（只读）+ 设置页', async () => {
+test('注册会话视图 tab：对话/轨迹/上下文/IDE 里的第四个', async () => {
   const registered = [];
   const injected = [];
   let mounted;
@@ -69,28 +69,20 @@ test('注册两个面：会话视图 tab（只读）+ 设置页', async () => {
   };
   await loadClient().apply(ctx);
 
-  assert.deepEqual(injected, ['conversation.view', 'settings.plugins.tab']);
+  assert.deepEqual(injected, ['conversation.view'], '配置编辑已经在面板内，不再另注册设置页');
 
   const view = registered.find((r) => r.options.name === 'conversation.view');
-  const settings = registered.find((r) => r.options.name === 'settings.plugins.tab');
-
   assert.ok(view !== undefined, '会话视图未注册');
   assert.equal(view.options.id, 'dsh-newbe-ide');
   assert.equal(view.options.order, 30, '对话 0 / 轨迹 10 / 上下文 20 / IDE 30');
   assert.equal(view.options.label, 'IDE');
   assert.equal(typeof view.component, 'function');
 
-  assert.ok(settings !== undefined, '设置页未注册');
-  assert.equal(settings.options.id, 'dsh-newbe-ide');
-  assert.equal(typeof settings.options.label, 'function');
-  assert.equal(settings.options.label(), 'IDE');
-  assert.equal(typeof settings.component, 'function');
-
   assert.ok(mounted !== undefined, 'remote contribution 未挂载');
   assert.equal(unmounted, false);
 });
 
-test('$mount 失败不会让插件挂掉，两个面仍然注册（各自降级为可见提示）', async () => {
+test('$mount 失败不会让插件挂掉，面板仍注册（降级为可见提示）', async () => {
   const registered = [];
   const slots = {
     inject: (_key, callback) => { callback(); return () => {}; },
@@ -104,7 +96,7 @@ test('$mount 失败不会让插件挂掉，两个面仍然注册（各自降级�
     get: () => undefined,
   };
   await loadClient().apply(ctx);
-  assert.deepEqual(registered.map((r) => r.options.name), ['conversation.view', 'settings.plugins.tab']);
+  assert.deepEqual(registered.map((r) => r.options.name), ['conversation.view']);
 });
 
 test('客户端端点与宿主 Typert 清单逐条一致', async () => {
