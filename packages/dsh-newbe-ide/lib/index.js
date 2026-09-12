@@ -5,6 +5,7 @@ var __export = (target, all) => {
 };
 
 // src/index.ts
+import { existsSync as existsSync2, readFileSync as readFileSync2, readdirSync } from "node:fs";
 import { dirname as dirname2, join as join3 } from "node:path";
 import { dshHomePath } from "@deepseek-ai/dsh-home-paths";
 
@@ -14595,6 +14596,22 @@ var logHistoryRequestSchema = external_exports.object({
   configId: external_exports.string(),
   tail: external_exports.number()
 });
+var ideaCandidateSchema = external_exports.object({
+  name: external_exports.string(),
+  module: external_exports.string(),
+  mainClass: external_exports.string(),
+  envs: external_exports.array(envVarSchema),
+  problem: external_exports.string(),
+  source: external_exports.string()
+});
+var ideaDiscoveryRequestSchema = external_exports.object({
+  workspaceId: external_exports.string()
+});
+var ideaDiscoverySchema = external_exports.object({
+  candidates: external_exports.array(ideaCandidateSchema),
+  errors: external_exports.array(external_exports.string()),
+  scanned: external_exports.array(external_exports.string())
+});
 var logHistorySchema = external_exports.object({
   lines: external_exports.array(external_exports.string()),
   truncated: external_exports.boolean(),
@@ -14994,6 +15011,68 @@ function createFileLogSink(dir, options = {}) {
   };
 }
 
+// src/ideaconfig.ts
+var SPRING_BOOT_TYPE = "SpringBootApplicationConfigurationType";
+var CONFIGURATION_BLOCK = /<configuration\b[^>]*\/>|<configuration\b[^>]*>[\s\S]*?<\/configuration>/g;
+function decodeEntities(text) {
+  return text.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&#39;/g, "'").replace(/&amp;/g, "&");
+}
+function attribute(tag, name2) {
+  const found = new RegExp(`${name2}\\s*=\\s*"([^"]*)"`).exec(tag);
+  return found === null ? "" : decodeEntities(found[1]);
+}
+function parseSpringBootConfigurations(xml) {
+  const blocks = xml.match(CONFIGURATION_BLOCK) ?? [];
+  const candidates = [];
+  for (const block of blocks) {
+    const openTag = /<configuration\b[^>]*>/.exec(block)?.[0] ?? block;
+    if (attribute(openTag, "type") !== SPRING_BOOT_TYPE) continue;
+    const module = attribute(/<module\b[^>]*>/.exec(block)?.[0] ?? "", "name");
+    const mainClass = attribute(
+      /<option\b[^>]*name\s*=\s*"SPRING_BOOT_MAIN_CLASS"[^>]*>/.exec(block)?.[0] ?? "",
+      "value"
+    );
+    const envs = [];
+    for (const envTag of block.match(/<env\b[^>]*?\/?>/g) ?? []) {
+      const key = attribute(envTag, "name");
+      if (key === "") continue;
+      const value = attribute(envTag, "value");
+      const seen = envs.findIndex((entry) => entry.name === key);
+      if (seen >= 0) envs[seen] = { name: key, value };
+      else envs.push({ name: key, value });
+    }
+    const problems = [];
+    if (module === "") problems.push("\u7F3A\u5C11\u6A21\u5757\u540D\uFF08<module>\uFF09");
+    if (mainClass === "") problems.push("\u7F3A\u5C11\u4E3B\u7C7B\uFF08SPRING_BOOT_MAIN_CLASS\uFF09");
+    candidates.push({
+      name: attribute(openTag, "name") || module || "\u672A\u547D\u540D\u914D\u7F6E",
+      module,
+      mainClass,
+      envs,
+      problem: problems.join("\uFF1B")
+    });
+  }
+  return candidates;
+}
+function buildLaunchConfig(candidate, projectPath) {
+  const parts = ["mvn"];
+  if (candidate.module !== "") parts.push("-pl", candidate.module);
+  parts.push("spring-boot:run");
+  if (candidate.mainClass !== "") parts.push(`-Dspring-boot.run.main-class=${candidate.mainClass}`);
+  return {
+    name: candidate.name,
+    command: parts.join(" "),
+    cwd: projectPath,
+    envs: candidate.envs.map((entry) => ({ ...entry }))
+  };
+}
+function plannedConfigName(base, taken) {
+  if (!taken.includes(base)) return base;
+  let index = 2;
+  while (taken.includes(`${base} (${index})`)) index += 1;
+  return `${base} (${index})`;
+}
+
 // src/filter.ts
 var LEVELS = ["ERROR", "WARN", "INFO", "DEBUG", "OTHER"];
 var DEFAULT_LEVELS = {
@@ -15093,6 +15172,35 @@ function apply(ctx) {
     runs() {
       return registry2.snapshots();
     },
+    /** 扫项目里的 IDEA 运行配置文件，认出可以导入的 Spring Boot 配置。 */
+    discover(request) {
+      const project = store.getState().projects.find((p) => p.workspaceId === request.workspaceId);
+      if (project === void 0) throw new Error("\u8FD9\u4E2A\u9879\u76EE\u4E0D\u5728\u9762\u677F\u914D\u7F6E\u91CC");
+      const runDir = join3(project.path, ".run");
+      const files = [join3(project.path, ".idea", "workspace.xml")];
+      if (existsSync2(runDir)) {
+        try {
+          for (const entry of readdirSync(runDir)) {
+            if (entry.endsWith(".xml")) files.push(join3(runDir, entry));
+          }
+        } catch {
+        }
+      }
+      const candidates = [];
+      const errors = [];
+      const scanned = [];
+      for (const file2 of files) {
+        if (!existsSync2(file2)) continue;
+        scanned.push(file2);
+        try {
+          const xml = readFileSync2(file2, "utf8");
+          for (const found of parseSpringBootConfigurations(xml)) candidates.push({ ...found, source: file2 });
+        } catch (error51) {
+          errors.push(`${file2}\uFF1A${String(error51?.message ?? error51)}`);
+        }
+      }
+      return { candidates, errors, scanned };
+    },
     history(request) {
       const key = runKeyOf(request);
       const tail = Number.isFinite(request.tail) && request.tail > 0 ? Math.floor(request.tail) : DEFAULT_HISTORY_LINES;
@@ -15114,6 +15222,7 @@ export {
   LEVELS,
   STORAGE_PATH,
   apply,
+  buildLaunchConfig,
   cleanLine,
   compileMatcher,
   createConfigStore,
@@ -15125,7 +15234,9 @@ export {
   levelOf,
   maskSecrets,
   name,
+  parseSpringBootConfigurations,
   pickActiveConfig,
+  plannedConfigName,
   runKeyOf,
   splitLines
 };

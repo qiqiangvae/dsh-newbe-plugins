@@ -11,6 +11,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   defaultState,
+  ideaDiscoveryRequestSchema,
+  ideaDiscoverySchema,
   ideLoadSchema,
   logHistoryRequestSchema,
   logHistorySchema,
@@ -28,12 +30,15 @@ import {
   type IdeState,
   type LaunchConfig,
   type ProjectEntry,
+  type IdeaCandidateView,
+  type IdeaDiscovery,
   type LogHistory,
   type RunRead,
   type RunSnapshot,
   type RunTarget,
 } from './schema.js';
 import { isSecretName } from './lines.js';
+import { buildLaunchConfig, plannedConfigName } from './ideaconfig.js';
 import { DEFAULT_LEVELS, LEVELS, compileMatcher, filterLines, type RunLevel } from './filter.js';
 
 export const NS = 'dsh-newbe-ide';
@@ -57,6 +62,7 @@ type RemoteIde = {
   read(request: RunTarget & { from: number }): Promise<RemoteEnvelope<unknown>>;
   runs(): Promise<RemoteEnvelope<unknown>>;
   history(request: RunTarget & { tail: number }): Promise<RemoteEnvelope<unknown>>;
+  discover(request: { workspaceId: string }): Promise<RemoteEnvelope<unknown>>;
 };
 
 /** 客户端 Remote contribution：与宿主 ./typert 清单的端点逐一对应。 */
@@ -107,6 +113,15 @@ const REMOTE_CONTRIBUTION = {
       invocation: { kind: 'direct' as const },
       parameters: [],
       result: { mode: 'strict' as const, typeSymbol: 'dsh-newbe-ide#RunSnapshotList', schema: runSnapshotListSchema },
+    },
+    {
+      id: 'dsh-newbe-ide#ideConfig/discover',
+      service: 'ideConfig',
+      namespace: 'ideConfig',
+      method: 'discover',
+      invocation: { kind: 'direct' as const },
+      parameters: [{ name: 'request', wire: 'request', source: 'json' as const, codec: { mode: 'strict' as const, typeSymbol: 'dsh-newbe-ide#IdeaDiscoveryRequest', schema: ideaDiscoveryRequestSchema } }],
+      result: { mode: 'strict' as const, typeSymbol: 'dsh-newbe-ide#IdeaDiscovery', schema: ideaDiscoverySchema },
     },
     {
       id: 'dsh-newbe-ide#ideConfig/history',
@@ -272,6 +287,8 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
   const [editing, setEditing] = useState(false);
   const [drafts, setDrafts] = useState<Record<string, LaunchConfig>>({});
   const [flash, setFlash] = useState('');
+  const [discovery, setDiscovery] = useState<IdeaDiscovery | null>(null);
+  const [discoveryBusy, setDiscoveryBusy] = useState(false);
   const offsetRef = useRef(0);
   const logRef = useRef<HTMLDivElement | null>(null);
   const historyTriedRef = useRef(false);
@@ -494,6 +511,41 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
     }
   };
 
+  const loadDiscovery = async () => {
+    if (api === undefined || active === undefined) return;
+    setDiscoveryBusy(true);
+    setError('');
+    try {
+      setDiscovery(envelopeValue(await api.discover({ workspaceId: active.workspaceId }), '读取 IDEA 配置') as IdeaDiscovery);
+    } catch (e) {
+      setError(String((e as Error)?.message ?? e));
+    } finally {
+      setDiscoveryBusy(false);
+    }
+  };
+
+  /** 导入一条候选：同名不覆盖，自动让路到「名字 (2)」。 */
+  const importCandidate = (candidate: IdeaCandidateView) => {
+    if (active === undefined) return;
+    const built = buildLaunchConfig(candidate, active.path);
+    const name = plannedConfigName(built.name, active.configs.map((c) => c.name));
+    const fresh: LaunchConfig = {
+      id: `c${crypto.randomUUID()}`,
+      name,
+      command: built.command,
+      cwd: built.cwd,
+      envs: built.envs,
+    };
+    setActiveConfigIds((prev) => ({ ...prev, [active.workspaceId]: fresh.id }));
+    setFlash(`已导入 ${name}`);
+    window.setTimeout(() => setFlash(''), 2000);
+    void commit(patchProject(cfg, active.workspaceId, (p) => ({
+      ...p,
+      configs: [...p.configs, fresh],
+      activeConfigId: fresh.id,
+    })), false);
+  };
+
   const runAction = async (action: 'start' | 'stop') => {
     if (api === undefined || active === undefined || activeConfig === undefined) return;
     setError('');
@@ -623,10 +675,61 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
                       <span className="ide-title">配置 · {active.title}</span>
                       <span style={{ flex: 1 }} />
                       <button type="button" className="ide-chip" onClick={() => addConfig(active)}>＋ 启动配置</button>
+                      <button
+                        type="button"
+                        className="ide-chip"
+                        disabled={discoveryBusy}
+                        onClick={() => { void loadDiscovery(); }}
+                      >
+                        {discoveryBusy ? '正在扫描…' : '从 IDEA 导入'}
+                      </button>
                       <button type="button" className="ide-btn" data-kind="danger" onClick={() => removeProject(active.workspaceId)}>移除项目</button>
                     </div>
 
                     {active.configs.length === 0 ? <div className="ide-note">这个项目还没有启动配置</div> : null}
+
+                    {discovery !== null ? (
+                      <div className="ide-form">
+                        <div className="ide-line">
+                          <span className="ide-label">导入</span>
+                          <span className="ide-note">
+                            扫过 {discovery.scanned.length} 个文件，发现 {discovery.candidates.length} 条 IDEA Spring Boot 配置
+                          </span>
+                          <span style={{ flex: 1 }} />
+                          <button type="button" className="ide-btn" onClick={() => setDiscovery(null)}>收起</button>
+                        </div>
+                        {discovery.errors.length > 0 ? discovery.errors.map((message, index) => (
+                          <div className="ide-err" key={index}>{message}</div>
+                        )) : null}
+                        {discovery.candidates.length === 0 ? (
+                          <div className="ide-note">没找到可导入的 Spring Boot 运行配置（只认 .idea/workspace.xml 与 .run/*.xml）</div>
+                        ) : null}
+                        {discovery.candidates.map((candidate) => {
+                          const planned = plannedConfigName(candidate.name, active.configs.map((c) => c.name));
+                          const blocked = candidate.problem !== '';
+                          return (
+                            <div className="ide-line" key={candidate.source + '#' + candidate.name}>
+                              <span className="ide-chip">{candidate.name}</span>
+                              <span className="ide-note ide-mono">
+                                {blocked ? candidate.problem : candidate.module}
+                              </span>
+                              <span className="ide-note">{candidate.envs.length} 个环境变量</span>
+                              <span style={{ flex: 1 }} />
+                              <button
+                                type="button"
+                                className="ide-btn"
+                                data-kind="primary"
+                                disabled={blocked}
+                                title={blocked ? candidate.problem : candidate.source}
+                                onClick={() => importCandidate(candidate)}
+                              >
+                                {planned === candidate.name ? '导入' : `导入为「${planned}」`}
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : null}
 
                     {active.configs.map((config2) => {
                       const draft = drafts[config2.id] ?? config2;

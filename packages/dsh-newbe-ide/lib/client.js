@@ -14610,6 +14610,22 @@ var logHistoryRequestSchema = external_exports.object({
   configId: external_exports.string(),
   tail: external_exports.number()
 });
+var ideaCandidateSchema = external_exports.object({
+  name: external_exports.string(),
+  module: external_exports.string(),
+  mainClass: external_exports.string(),
+  envs: external_exports.array(envVarSchema),
+  problem: external_exports.string(),
+  source: external_exports.string()
+});
+var ideaDiscoveryRequestSchema = external_exports.object({
+  workspaceId: external_exports.string()
+});
+var ideaDiscoverySchema = external_exports.object({
+  candidates: external_exports.array(ideaCandidateSchema),
+  errors: external_exports.array(external_exports.string()),
+  scanned: external_exports.array(external_exports.string())
+});
 var logHistorySchema = external_exports.object({
   lines: external_exports.array(external_exports.string()),
   truncated: external_exports.boolean(),
@@ -14632,6 +14648,26 @@ function runKeyOf(target) {
 var SECRET_NAME = /KEY|SECRET|TOKEN|PASSWORD/i;
 function isSecretName(name) {
   return SECRET_NAME.test(name);
+}
+
+// src/ideaconfig.ts
+function buildLaunchConfig(candidate, projectPath) {
+  const parts = ["mvn"];
+  if (candidate.module !== "") parts.push("-pl", candidate.module);
+  parts.push("spring-boot:run");
+  if (candidate.mainClass !== "") parts.push(`-Dspring-boot.run.main-class=${candidate.mainClass}`);
+  return {
+    name: candidate.name,
+    command: parts.join(" "),
+    cwd: projectPath,
+    envs: candidate.envs.map((entry) => ({ ...entry }))
+  };
+}
+function plannedConfigName(base, taken) {
+  if (!taken.includes(base)) return base;
+  let index = 2;
+  while (taken.includes(`${base} (${index})`)) index += 1;
+  return `${base} (${index})`;
 }
 
 // src/filter.ts
@@ -14734,6 +14770,15 @@ var REMOTE_CONTRIBUTION = {
       invocation: { kind: "direct" },
       parameters: [],
       result: { mode: "strict", typeSymbol: "dsh-newbe-ide#RunSnapshotList", schema: runSnapshotListSchema }
+    },
+    {
+      id: "dsh-newbe-ide#ideConfig/discover",
+      service: "ideConfig",
+      namespace: "ideConfig",
+      method: "discover",
+      invocation: { kind: "direct" },
+      parameters: [{ name: "request", wire: "request", source: "json", codec: { mode: "strict", typeSymbol: "dsh-newbe-ide#IdeaDiscoveryRequest", schema: ideaDiscoveryRequestSchema } }],
+      result: { mode: "strict", typeSymbol: "dsh-newbe-ide#IdeaDiscovery", schema: ideaDiscoverySchema }
     },
     {
       id: "dsh-newbe-ide#ideConfig/history",
@@ -14882,6 +14927,8 @@ function IdeView({ api, ctx }) {
   const [editing, setEditing] = (0, import_react.useState)(false);
   const [drafts, setDrafts] = (0, import_react.useState)({});
   const [flash, setFlash] = (0, import_react.useState)("");
+  const [discovery, setDiscovery] = (0, import_react.useState)(null);
+  const [discoveryBusy, setDiscoveryBusy] = (0, import_react.useState)(false);
   const offsetRef = (0, import_react.useRef)(0);
   const logRef = (0, import_react.useRef)(null);
   const historyTriedRef = (0, import_react.useRef)(false);
@@ -15085,6 +15132,38 @@ function IdeView({ api, ctx }) {
       });
     }
   };
+  const loadDiscovery = async () => {
+    if (api === void 0 || active === void 0) return;
+    setDiscoveryBusy(true);
+    setError("");
+    try {
+      setDiscovery(envelopeValue(await api.discover({ workspaceId: active.workspaceId }), "\u8BFB\u53D6 IDEA \u914D\u7F6E"));
+    } catch (e) {
+      setError(String(e?.message ?? e));
+    } finally {
+      setDiscoveryBusy(false);
+    }
+  };
+  const importCandidate = (candidate) => {
+    if (active === void 0) return;
+    const built = buildLaunchConfig(candidate, active.path);
+    const name = plannedConfigName(built.name, active.configs.map((c) => c.name));
+    const fresh = {
+      id: `c${crypto.randomUUID()}`,
+      name,
+      command: built.command,
+      cwd: built.cwd,
+      envs: built.envs
+    };
+    setActiveConfigIds((prev) => ({ ...prev, [active.workspaceId]: fresh.id }));
+    setFlash(`\u5DF2\u5BFC\u5165 ${name}`);
+    window.setTimeout(() => setFlash(""), 2e3);
+    void commit(patchProject(cfg, active.workspaceId, (p) => ({
+      ...p,
+      configs: [...p.configs, fresh],
+      activeConfigId: fresh.id
+    })), false);
+  };
   const runAction = async (action) => {
     if (api === void 0 || active === void 0 || activeConfig === void 0) return;
     setError("");
@@ -15212,9 +15291,62 @@ function IdeView({ api, ctx }) {
               ] }),
               /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { flex: 1 } }),
               /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-chip", onClick: () => addConfig(active), children: "\uFF0B \u542F\u52A8\u914D\u7F6E" }),
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                "button",
+                {
+                  type: "button",
+                  className: "ide-chip",
+                  disabled: discoveryBusy,
+                  onClick: () => {
+                    void loadDiscovery();
+                  },
+                  children: discoveryBusy ? "\u6B63\u5728\u626B\u63CF\u2026" : "\u4ECE IDEA \u5BFC\u5165"
+                }
+              ),
               /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-btn", "data-kind": "danger", onClick: () => removeProject(active.workspaceId), children: "\u79FB\u9664\u9879\u76EE" })
             ] }),
             active.configs.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-note", children: "\u8FD9\u4E2A\u9879\u76EE\u8FD8\u6CA1\u6709\u542F\u52A8\u914D\u7F6E" }) : null,
+            discovery !== null ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-form", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-line", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-label", children: "\u5BFC\u5165" }),
+                /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "ide-note", children: [
+                  "\u626B\u8FC7 ",
+                  discovery.scanned.length,
+                  " \u4E2A\u6587\u4EF6\uFF0C\u53D1\u73B0 ",
+                  discovery.candidates.length,
+                  " \u6761 IDEA Spring Boot \u914D\u7F6E"
+                ] }),
+                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { flex: 1 } }),
+                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-btn", onClick: () => setDiscovery(null), children: "\u6536\u8D77" })
+              ] }),
+              discovery.errors.length > 0 ? discovery.errors.map((message, index) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-err", children: message }, index)) : null,
+              discovery.candidates.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-note", children: "\u6CA1\u627E\u5230\u53EF\u5BFC\u5165\u7684 Spring Boot \u8FD0\u884C\u914D\u7F6E\uFF08\u53EA\u8BA4 .idea/workspace.xml \u4E0E .run/*.xml\uFF09" }) : null,
+              discovery.candidates.map((candidate) => {
+                const planned = plannedConfigName(candidate.name, active.configs.map((c) => c.name));
+                const blocked = candidate.problem !== "";
+                return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-line", children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-chip", children: candidate.name }),
+                  /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-note ide-mono", children: blocked ? candidate.problem : candidate.module }),
+                  /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "ide-note", children: [
+                    candidate.envs.length,
+                    " \u4E2A\u73AF\u5883\u53D8\u91CF"
+                  ] }),
+                  /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { flex: 1 } }),
+                  /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                    "button",
+                    {
+                      type: "button",
+                      className: "ide-btn",
+                      "data-kind": "primary",
+                      disabled: blocked,
+                      title: blocked ? candidate.problem : candidate.source,
+                      onClick: () => importCandidate(candidate),
+                      children: planned === candidate.name ? "\u5BFC\u5165" : `\u5BFC\u5165\u4E3A\u300C${planned}\u300D`
+                    }
+                  )
+                ] }, candidate.source + "#" + candidate.name);
+              })
+            ] }) : null,
             active.configs.map((config22) => {
               const draft = drafts[config22.id] ?? config22;
               return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-form", children: [

@@ -14585,6 +14585,22 @@ var logHistoryRequestSchema = external_exports.object({
   configId: external_exports.string(),
   tail: external_exports.number()
 });
+var ideaCandidateSchema = external_exports.object({
+  name: external_exports.string(),
+  module: external_exports.string(),
+  mainClass: external_exports.string(),
+  envs: external_exports.array(envVarSchema),
+  problem: external_exports.string(),
+  source: external_exports.string()
+});
+var ideaDiscoveryRequestSchema = external_exports.object({
+  workspaceId: external_exports.string()
+});
+var ideaDiscoverySchema = external_exports.object({
+  candidates: external_exports.array(ideaCandidateSchema),
+  errors: external_exports.array(external_exports.string()),
+  scanned: external_exports.array(external_exports.string())
+});
 var logHistorySchema = external_exports.object({
   lines: external_exports.array(external_exports.string()),
   truncated: external_exports.boolean(),
@@ -14621,6 +14637,16 @@ var readCodec = {
   mode: "strict",
   typeSymbol: "dsh-newbe-ide#RunRead",
   schema: runReadSchema
+};
+var discoveryRequestCodec = {
+  mode: "strict",
+  typeSymbol: "dsh-newbe-ide#IdeaDiscoveryRequest",
+  schema: ideaDiscoveryRequestSchema
+};
+var discoveryCodec = {
+  mode: "strict",
+  typeSymbol: "dsh-newbe-ide#IdeaDiscovery",
+  schema: ideaDiscoverySchema
 };
 var historyRequestCodec = {
   mode: "strict",
@@ -14688,6 +14714,15 @@ var TYPERT = {
       result: snapshotListCodec
     },
     {
+      id: "dsh-newbe-ide#ideConfig/discover",
+      service: "ideConfig",
+      namespace: "ideConfig",
+      method: "discover",
+      invocation: { kind: "direct" },
+      parameters: [{ name: "request", wire: "request", source: "json", codec: discoveryRequestCodec }],
+      result: discoveryCodec
+    },
+    {
       id: "dsh-newbe-ide#ideConfig/history",
       service: "ideConfig",
       namespace: "ideConfig",
@@ -14723,7 +14758,8 @@ var TYPERT = {
           { kind: "method", name: "stop", signature: "stop(target: RunTarget): RunSnapshot" },
           { kind: "method", name: "read", signature: "read(request: RunReadRequest): RunRead" },
           { kind: "method", name: "runs", signature: "runs(): RunSnapshot[]" },
-          { kind: "method", name: "history", signature: "history(request: LogHistoryRequest): LogHistory" }
+          { kind: "method", name: "history", signature: "history(request: LogHistoryRequest): LogHistory" },
+          { kind: "method", name: "discover", signature: "discover(request: { workspaceId: string }): IdeaDiscovery" }
         ],
         types: []
       }

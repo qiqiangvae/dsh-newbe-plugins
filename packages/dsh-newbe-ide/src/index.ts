@@ -6,18 +6,22 @@
  *
  * 这一版只做"存得住、读得回"：不启动任何进程，进程与日志见后续票。
  */
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { dshHomePath } from '@deepseek-ai/dsh-home-paths';
 import { createConfigStore } from './store.js';
 import { createRunRegistry, type RunSpec } from './runtime.js';
 import { createFileLogSink } from './logsink.js';
-import { DEFAULT_HISTORY_LINES, runKeyOf, type IdeLoad, type IdeProjectView, type IdeState, type LogHistory, type LogHistoryRequest, type RunRead, type RunSnapshot } from './schema.js';
+import { parseSpringBootConfigurations } from './ideaconfig.js';
+import { DEFAULT_HISTORY_LINES, runKeyOf, type IdeaDiscovery, type IdeLoad, type IdeProjectView, type IdeState, type LogHistory, type LogHistoryRequest, type RunRead, type RunSnapshot } from './schema.js';
 
 export { createConfigStore } from './store.js';
 export { DEFAULT_HISTORY_LINES, defaultState, pickActiveConfig, runKeyOf } from './schema.js';
 export { cleanLine, isSecretName, maskSecrets, splitLines } from './lines.js';
 export { DEFAULT_LEVELS, LEVELS, compileMatcher, filterLines, levelOf } from './filter.js';
 export { createFileLogSink } from './logsink.js';
+export { buildLaunchConfig, parseSpringBootConfigurations, plannedConfigName } from './ideaconfig.js';
+export type { BuiltLaunchConfig, IdeaCandidate, IdeaEnv } from './ideaconfig.js';
 export type { LogSink, TailResult } from './logsink.js';
 export type { FilteredLine, FilterState, Matcher, MatcherSpec, RunLevel } from './filter.js';
 export { createRunRegistry } from './runtime.js';
@@ -87,6 +91,34 @@ export function apply(ctx: any): void {
     },
     runs(): RunSnapshot[] {
       return registry.snapshots();
+    },
+    /** 扫项目里的 IDEA 运行配置文件，认出可以导入的 Spring Boot 配置。 */
+    discover(request: { workspaceId: string }): IdeaDiscovery {
+      const project = store.getState().projects.find((p) => p.workspaceId === request.workspaceId);
+      if (project === undefined) throw new Error('这个项目不在面板配置里');
+      const runDir = join(project.path, '.run');
+      const files = [join(project.path, '.idea', 'workspace.xml')];
+      if (existsSync(runDir)) {
+        try {
+          for (const entry of readdirSync(runDir)) {
+            if (entry.endsWith('.xml')) files.push(join(runDir, entry));
+          }
+        } catch { /* 目录读不了就当没有：下面按文件缺失处理 */ }
+      }
+      const candidates: IdeaDiscovery['candidates'] = [];
+      const errors: string[] = [];
+      const scanned: string[] = [];
+      for (const file of files) {
+        if (!existsSync(file)) continue;
+        scanned.push(file);
+        try {
+          const xml = readFileSync(file, 'utf8');
+          for (const found of parseSpringBootConfigurations(xml)) candidates.push({ ...found, source: file });
+        } catch (error) {
+          errors.push(`${file}：${String((error as Error)?.message ?? error)}`);
+        }
+      }
+      return { candidates, errors, scanned };
     },
     history(request: LogHistoryRequest): LogHistory {
       const key = runKeyOf(request);

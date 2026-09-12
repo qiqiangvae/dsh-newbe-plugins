@@ -6,7 +6,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, statSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -144,4 +144,51 @@ test('history 读回落盘的日志：进程输出 → 落盘 → 重启后再�
   // 新建一份注册表（模拟 DSH 重启：内存缓冲没了）仍能读回同一份历史
   const fresh = mod.createFileLogSink(join(home, 'storages', 'dsh-newbe-ide', 'logs'));
   assert.deepEqual([...fresh.tail('w1/c1', 100).lines], ['hello', 'world']);
+});
+
+test('discover 扫 .idea/workspace.xml 与 .run/*.xml，只留 Spring Boot 配置', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'dsh-newbe-ide-proj-'));
+  mkdirSync(join(root, '.idea'), { recursive: true });
+  mkdirSync(join(root, '.run'), { recursive: true });
+  writeFileSync(join(root, '.idea', 'workspace.xml'), `
+<project version="4"><component name="RunManager">
+  <configuration name="KunAiApplication" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot">
+    <envs><env name="pingpongx.cloud.tag" value="QQ" /></envs>
+    <module name="kun-ai-web" />
+    <option name="SPRING_BOOT_MAIN_CLASS" value="com.pingpongx.kun.ai.web.KunAiApplication" />
+  </configuration>
+  <configuration name="SomeTest" type="JUnit" factoryName="JUnit"><module name="kun-ai-web" /></configuration>
+</component></project>`);
+  writeFileSync(join(root, '.run', 'Worker.xml'), `
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="worker" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot">
+    <module name="kun-ai-worker" />
+    <option name="SPRING_BOOT_MAIN_CLASS" value="com.pingpongx.kun.ai.worker.WorkerApplication" />
+  </configuration>
+</component>`);
+
+  const { ctx, provided } = makeCtx(null, makeShell());
+  mod.apply(ctx);
+  await provided.ideConfig.submit({
+    projects: [{ workspaceId: 'w1', path: root, title: 'p', activeConfigId: '', configs: [] }],
+    activeWorkspaceId: 'w1',
+    showOverview: false,
+  });
+
+  const found = provided.ideConfig.discover({ workspaceId: 'w1' });
+  assert.equal(found.scanned.length, 2, '两个文件都要扫到：' + found.scanned.join(','));
+  assert.deepEqual([...found.candidates].map((c) => c.name), ['KunAiApplication', 'worker']);
+  assert.ok(found.candidates.every((c) => c.source.startsWith(root)));
+  assert.deepEqual([...found.errors], []);
+  assert.deepEqual([...found.candidates[0].envs], [{ name: 'pingpongx.cloud.tag', value: 'QQ' }]);
+
+  // 从真实工程路径生成命令（不带 -am）
+  const built = mod.buildLaunchConfig(found.candidates[0], root);
+  assert.equal(built.command, 'mvn -pl kun-ai-web spring-boot:run -Dspring-boot.run.main-class=com.pingpongx.kun.ai.web.KunAiApplication');
+});
+
+test('discover 对不在面板里的项目给出可读错误', () => {
+  const { ctx, provided } = makeCtx(null, makeShell());
+  mod.apply(ctx);
+  assert.throws(() => provided.ideConfig.discover({ workspaceId: '不存在' }), /不在面板配置里/);
 });

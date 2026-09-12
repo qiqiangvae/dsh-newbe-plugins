@@ -99,6 +99,28 @@ export const logHistoryRequestSchema = z.object({
   tail: z.number(),
 });
 
+/** 从 IDEA 工程里发现的一条 Spring Boot 运行配置。 */
+export const ideaCandidateSchema = z.object({
+  name: z.string(),
+  module: z.string(),
+  mainClass: z.string(),
+  envs: z.array(envVarSchema),
+  problem: z.string(),
+  source: z.string(),
+});
+
+/** 发现请求：只按项目找。 */
+export const ideaDiscoveryRequestSchema = z.object({
+  workspaceId: z.string(),
+});
+
+/** 发现结果：候选 + 读不了的文件（可读原因）+ 实际扫过的文件。 */
+export const ideaDiscoverySchema = z.object({
+  candidates: z.array(ideaCandidateSchema),
+  errors: z.array(z.string()),
+  scanned: z.array(z.string()),
+});
+
 /** 历史日志（来自落盘文件，跨 DSH 重启可取）。 */
 export const logHistorySchema = z.object({
   lines: z.array(z.string()),
@@ -141,3 +163,5 @@ export type RunReadRequest = z.infer<typeof runReadRequestSchema>;
 export type RunSnapshotList = z.infer<typeof runSnapshotListSchema>;
 export type LogHistoryRequest = z.infer<typeof logHistoryRequestSchema>;
 export type LogHistory = z.infer<typeof logHistorySchema>;
+export type IdeaCandidateView = z.infer<typeof ideaCandidateSchema>;
+export type IdeaDiscovery = z.infer<typeof ideaDiscoverySchema>;
