@@ -136,7 +136,9 @@ function ensureStyles(): () => void {
 .ide-tab[data-sel=true]{color:var(--dsw-alias-label-primary,#1f2329);border-bottom-color:var(--dsw-alias-brand-primary,#3370ff)}
 .ide-body{display:flex;flex-direction:column;flex:1;min-height:0;padding:12px 16px;gap:10px;overflow:auto}
 .ide-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.ide-cmd{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;color:var(--dsw-alias-label-secondary,#697586);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:56%}
+.ide-cmd{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;color:var(--dsw-alias-label-secondary,#697586);word-break:break-all}
+.ide-cmdline{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.ide-configtitle{font-size:15px;font-weight:600}
 .ide-title{font-size:14px;font-weight:600}
 .ide-path{color:var(--dsw-alias-label-secondary,#697586);font-size:11px;word-break:break-all}
 .ide-chip{border:1px solid var(--dsw-alias-border-l2,#d9dce1);border-radius:999px;padding:2px 9px;font-size:12px;color:var(--dsw-alias-label-secondary,#697586);background:none;font:inherit;cursor:pointer;white-space:nowrap}
@@ -401,8 +403,7 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
         ) : (
           <>
             <div className="ide-toolbar">
-              <span className="ide-title">{active.title}</span>
-              <span className="ide-path">{active.path}</span>
+              <span className="ide-path">{active.title} · {active.path}</span>
               <span style={{ flex: 1 }} />
               {active.configs.map((c) => (
                 <button key={c.id} type="button" className="ide-chip" data-sel={c.id === activeConfig?.id} onClick={() => selectConfig(c.id)}>
@@ -416,6 +417,7 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
             ) : (
               <>
                 <div className="ide-toolbar">
+                  <span className="ide-configtitle">{activeConfig.name}</span>
                   <span className="ide-note">{runText}</span>
                   <span style={{ flex: 1 }} />
                   <button
@@ -438,6 +440,11 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
                   </button>
                 </div>
 
+                <div className="ide-cmdline">
+                  <span className="ide-label">启动命令</span>
+                  <span className="ide-cmd">{activeConfig.command === '' ? '（未设置）' : activeConfig.command}</span>
+                </div>
+
                 <div className="ide-logbox">
                   <div
                     className="ide-log"
@@ -451,15 +458,9 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
                       ? <span className="ide-note">{runState?.status === 'running' ? '等待输出…' : '点「启动」运行这条启动配置'}</span>
                       : logLines.map((line, index) => <div key={index}>{line}</div>)}
                   </div>
-                  <div className="ide-note" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span>
-                      已缓存 {logLines.length} 行
-                      {runState?.lossy === true || truncated ? '（输出过快或过长，早期日志已被丢弃）' : ''}
-                    </span>
-                    <span style={{ flex: 1 }} />
-                    <span className="ide-cmd" title={activeConfig.command}>
-                      {activeConfig.command === '' ? '（未设置启动命令）' : activeConfig.command}
-                    </span>
+                  <div className="ide-note">
+                    已缓存 {logLines.length} 行
+                    {runState?.lossy === true || truncated ? '（输出过快或过长，早期日志已被丢弃）' : ''}
                   </div>
                 </div>
               </>
