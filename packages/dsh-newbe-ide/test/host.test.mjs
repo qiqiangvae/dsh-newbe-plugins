@@ -17,15 +17,18 @@ const mod = await import('../lib/index.js');
 
 function makeCtx(workspaces) {
   const provided = {};
+  const effects = [];
   return {
     provided,
+    effects,
     ctx: {
       get: (name) => (name === 'workspaceRegistry' && workspaces !== null ? { list: () => workspaces } : undefined),
       provide: (key, value) => { provided[key] = value; },
       // 真 ctx 的 effect 会保留回调返回的清理函数；这里执行后立刻释放，
-      // 既覆盖了 pump 定时器的启动/清理路径，又不会让定时器吊住测试进程。
+      // 覆盖 effect 的注册与清理路径，又不会让定时器吊住测试进程。
       effect: (fn) => {
         const disposer = fn();
+        effects.push(typeof disposer);
         if (typeof disposer === 'function') disposer();
         return disposer;
       },
@@ -49,6 +52,13 @@ test('apply 提供 ideConfig 服务并把工作区映射成项目', () => {
   ]);
   assert.deepEqual(load.config, { projects: [], activeWorkspaceId: '', showOverview: false });
   assert.equal(load.warning, '');
+});
+
+test('apply 注册了 effect 并返回可调用的清理函数', () => {
+  const { ctx, effects } = makeCtx(null);
+  mod.apply(ctx);
+  assert.ok(effects.length >= 1, 'apply 应当至少注册一个 effect');
+  assert.deepEqual([...new Set(effects)], ['function'], '每个 effect 都应返回清理函数');
 });
 
 test('typertRemote 绑定满足网关校验：service 必须是服务对象本身', () => {

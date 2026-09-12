@@ -4,7 +4,8 @@
  * 只依赖 DSH `shell` 服务的公开契约（resolve / start / ShellProcess.readOutput / kill），
  * 因此可以用假 shell 完整验证；真实进程组回收另有实测覆盖。
  */
-import { cleanLine, maskSecrets, splitLines } from './lines.js';
+import { cleanLine, isSecretName, maskSecrets, splitLines } from './lines.js';
+import type { RunRead, RunSnapshot, RunStatus } from './schema.js';
 
 export interface ShellOutputDelta {
   delta: string;
@@ -24,27 +25,10 @@ export interface ShellServiceLike {
   start(spec: unknown): ShellProcessLike;
 }
 
-export type RunStatus = 'idle' | 'running' | 'exited' | 'stopped' | 'failed';
-
 export interface RunSpec {
   command: string;
   cwd: string;
   envs: readonly { name: string; value: string }[];
-}
-
-export interface RunSnapshot {
-  key: string;
-  status: RunStatus;
-  exitCode: number | null;
-  error: string;
-  lossy: boolean;
-}
-
-export interface RunRead extends RunSnapshot {
-  lines: string[];
-  next: number;
-  /** 请求的起点早于环形缓冲的最旧行，前面的已经丢掉了。 */
-  dropped: boolean;
 }
 
 export interface RunRegistry {
@@ -59,7 +43,6 @@ export interface RunRegistry {
 }
 
 const DEFAULT_MAX_LINES = 5000;
-const SECRET_NAME = /KEY|SECRET|TOKEN|PASSWORD/i;
 
 interface RunRecord {
   key: string;
@@ -130,6 +113,16 @@ export function createRunRegistry(provideShell: ShellProvider, maxLines: number 
     else run.status = run.exitCode === 0 ? 'exited' : 'failed';
   }
 
+  /** 收尾后再判断：已经自然退出的进程不该再被杀。 */
+  function killIfRunning(run: RunRecord): boolean {
+    drain(run);
+    if (run.proc === null || run.status !== 'running') return false;
+    try { run.proc.kill(); } catch { /* 已退出 */ }
+    drain(run);
+    if (run.status === 'running') run.status = 'stopped';
+    return true;
+  }
+
   function snapshotOf(run: RunRecord): RunSnapshot {
     return { key: run.key, status: run.status, exitCode: run.exitCode, error: run.error, lossy: run.lossy };
   }
@@ -147,7 +140,7 @@ export function createRunRegistry(provideShell: ShellProvider, maxLines: number 
       run.lossy = false;
       run.exitCode = null;
       run.error = '';
-      run.secrets = spec.envs.filter((e) => SECRET_NAME.test(e.name) && e.value !== '').map((e) => e.value);
+      run.secrets = spec.envs.filter((e) => isSecretName(e.name) && e.value !== '').map((e) => e.value);
       const env: Record<string, string> = {};
       for (const entry of spec.envs) if (entry.name !== '') env[entry.name] = entry.value;
       try {
@@ -165,11 +158,7 @@ export function createRunRegistry(provideShell: ShellProvider, maxLines: number 
 
     stop(key: string): RunSnapshot {
       const run = record(key);
-      if (run.proc !== null && run.status === 'running') {
-        try { run.proc.kill(); } catch { /* 已退出 */ }
-        drain(run);
-        if (run.status === 'running') run.status = 'stopped';
-      }
+      killIfRunning(run);
       return snapshotOf(run);
     },
 
@@ -206,12 +195,7 @@ export function createRunRegistry(provideShell: ShellProvider, maxLines: number 
     },
 
     dispose(): void {
-      for (const run of runs.values()) {
-        drain(run); // 先收尾：已经自然退出的进程不该再被杀
-        if (run.proc === null || run.status !== 'running') continue;
-        try { run.proc.kill(); } catch { /* 已退出 */ }
-        run.status = 'stopped';
-      }
+      for (const run of runs.values()) killIfRunning(run);
     },
   };
 }

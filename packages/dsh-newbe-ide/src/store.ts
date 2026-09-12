@@ -7,12 +7,7 @@
 import { closeSync, fsyncSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, writeSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { ideStateSchema, type IdeState } from './schema.js';
-
-/** 空配置：面板第一次运行时的状态。 */
-export function defaultState(): IdeState {
-  return { projects: [], activeWorkspaceId: '', showOverview: false };
-}
+import { defaultState, ideStateSchema, type IdeState } from './schema.js';
 
 /**
  * 原子整文件替换：同目录临时文件（wx 独占创建，0600）→ fsync → rename → 目录 fsync（尽力而为）。

@@ -8,13 +8,14 @@
  */
 import { dshHomePath } from '@deepseek-ai/dsh-home-paths';
 import { createConfigStore } from './store.js';
-import { createRunRegistry, type RunRead, type RunSnapshot, type RunSpec } from './runtime.js';
-import type { IdeLoad, IdeProjectView, IdeState } from './schema.js';
+import { createRunRegistry, type RunSpec } from './runtime.js';
+import { runKeyOf, type IdeLoad, type IdeProjectView, type IdeState, type RunRead, type RunSnapshot } from './schema.js';
 
-export { createConfigStore, defaultState } from './store.js';
-export { cleanLine, maskSecrets, splitLines } from './lines.js';
+export { createConfigStore } from './store.js';
+export { defaultState, runKeyOf } from './schema.js';
+export { cleanLine, isSecretName, maskSecrets, splitLines } from './lines.js';
 export { createRunRegistry } from './runtime.js';
-export type { RunRead, RunSnapshot, RunStatus } from './runtime.js';
+export type { RunRead, RunSnapshot, RunStatus } from './schema.js';
 
 /** 持久化文件：$DSH_HOME/storages/dsh-newbe-ide.json。 */
 export const STORAGE_PATH = dshHomePath('storages', 'dsh-newbe-ide.json');
@@ -50,9 +51,6 @@ export function apply(ctx: any): void {
     };
   }, 'dsh-newbe-ide: run pump');
 
-  /** 运行键：一条启动配置 = 一个受管进程。 */
-  const runKey = (target: { workspaceId: string; configId: string }) => `${target.workspaceId}/${target.configId}`;
-
   /** 从持久化配置里取出要跑的命令；找不到就把原因说清楚，而不是抛栈。 */
   function specFor(target: { workspaceId: string; configId: string }): RunSpec {
     const state = store.getState();
@@ -71,13 +69,13 @@ export function apply(ctx: any): void {
       return store.submit(next);
     },
     start(target: { workspaceId: string; configId: string }): RunSnapshot {
-      return registry.start(runKey(target), specFor(target));
+      return registry.start(runKeyOf(target), specFor(target));
     },
     stop(target: { workspaceId: string; configId: string }): RunSnapshot {
-      return registry.stop(runKey(target));
+      return registry.stop(runKeyOf(target));
     },
     read(request: { workspaceId: string; configId: string; from: number }): RunRead {
-      return registry.read(runKey(request), request.from);
+      return registry.read(runKeyOf(request), request.from);
     },
     runs(): RunSnapshot[] {
       return registry.snapshots();

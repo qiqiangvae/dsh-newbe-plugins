@@ -24,3 +24,10 @@ export function maskSecrets(line: string, secrets: readonly string[]): string {
   }
   return masked;
 }
+
+/** 密钥类环境变量名：宿主掩码与界面掩码必须共用这一处判定，规则漂移 = 凭据明文上屏。 */
+const SECRET_NAME = /KEY|SECRET|TOKEN|PASSWORD/i;
+
+export function isSecretName(name: string): boolean {
+  return SECRET_NAME.test(name);
+}

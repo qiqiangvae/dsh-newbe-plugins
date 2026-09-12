@@ -45,7 +45,8 @@ test('启动把命令、工作目录、环境变量交给 shell，并进入运�
 test('读取是增量的：第二次读不重复已给过的行', () => {
   const shell = makeShell();
   const runs = createRunRegistry(() => shell);
-  const { proc } = (runs.start('w/c', SPEC), shell.started[0]);
+  runs.start('w/c', SPEC);
+  const { proc } = shell.started[0];
   proc.emit('one\ntwo\n');
   const first = runs.read('w/c', 0);
   assert.deepEqual(first.lines, ['one', 'two']);

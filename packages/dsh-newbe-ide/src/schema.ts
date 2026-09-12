@@ -89,6 +89,16 @@ export const runReadSchema = z.object({
 
 export const runSnapshotListSchema = z.array(runSnapshotSchema);
 
+/** 空配置：存储层与客户端面板共用的同一个值（宿主与浏览器都从这里取，避免两处各写一份）。 */
+export function defaultState(): IdeState {
+  return { projects: [], activeWorkspaceId: '', showOverview: false };
+}
+
+/** 一条启动配置的进程键：宿主与客户端必须用同一种拼法。 */
+export function runKeyOf(target: RunTarget): string {
+  return `${target.workspaceId}/${target.configId}`;
+}
+
 export type EnvVar = z.infer<typeof envVarSchema>;
 export type LaunchConfig = z.infer<typeof launchConfigSchema>;
 export type ProjectEntry = z.infer<typeof projectEntrySchema>;
@@ -99,3 +109,5 @@ export type RunTarget = z.infer<typeof runTargetSchema>;
 export type RunStatus = z.infer<typeof runStatusSchema>;
 export type RunSnapshot = z.infer<typeof runSnapshotSchema>;
 export type RunRead = z.infer<typeof runReadSchema>;
+export type RunReadRequest = z.infer<typeof runReadRequestSchema>;
+export type RunSnapshotList = z.infer<typeof runSnapshotListSchema>;

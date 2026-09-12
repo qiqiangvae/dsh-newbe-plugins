@@ -14592,6 +14592,31 @@ var loadCodec = {
   typeSymbol: "dsh-newbe-ide#IdeLoad",
   schema: ideLoadSchema
 };
+var targetCodec = {
+  mode: "strict",
+  typeSymbol: "dsh-newbe-ide#RunTarget",
+  schema: runTargetSchema
+};
+var snapshotCodec = {
+  mode: "strict",
+  typeSymbol: "dsh-newbe-ide#RunSnapshot",
+  schema: runSnapshotSchema
+};
+var readRequestCodec = {
+  mode: "strict",
+  typeSymbol: "dsh-newbe-ide#RunReadRequest",
+  schema: runReadRequestSchema
+};
+var readCodec = {
+  mode: "strict",
+  typeSymbol: "dsh-newbe-ide#RunRead",
+  schema: runReadSchema
+};
+var snapshotListCodec = {
+  mode: "strict",
+  typeSymbol: "dsh-newbe-ide#RunSnapshotList",
+  schema: runSnapshotListSchema
+};
 var TYPERT = {
   package: "dsh-newbe-ide",
   face: "host",
@@ -14612,8 +14637,8 @@ var TYPERT = {
       namespace: "ideConfig",
       method: "start",
       invocation: { kind: "direct" },
-      parameters: [{ name: "target", wire: "target", source: "json", codec: { mode: "strict", typeSymbol: "dsh-newbe-ide#RunTarget", schema: runTargetSchema } }],
-      result: { mode: "strict", typeSymbol: "dsh-newbe-ide#RunSnapshot", schema: runSnapshotSchema }
+      parameters: [{ name: "target", wire: "target", source: "json", codec: targetCodec }],
+      result: snapshotCodec
     },
     {
       id: "dsh-newbe-ide#ideConfig/stop",
@@ -14621,8 +14646,8 @@ var TYPERT = {
       namespace: "ideConfig",
       method: "stop",
       invocation: { kind: "direct" },
-      parameters: [{ name: "target", wire: "target", source: "json", codec: { mode: "strict", typeSymbol: "dsh-newbe-ide#RunTarget", schema: runTargetSchema } }],
-      result: { mode: "strict", typeSymbol: "dsh-newbe-ide#RunSnapshot", schema: runSnapshotSchema }
+      parameters: [{ name: "target", wire: "target", source: "json", codec: targetCodec }],
+      result: snapshotCodec
     },
     {
       id: "dsh-newbe-ide#ideConfig/read",
@@ -14630,8 +14655,8 @@ var TYPERT = {
       namespace: "ideConfig",
       method: "read",
       invocation: { kind: "direct" },
-      parameters: [{ name: "request", wire: "request", source: "json", codec: { mode: "strict", typeSymbol: "dsh-newbe-ide#RunReadRequest", schema: runReadRequestSchema } }],
-      result: { mode: "strict", typeSymbol: "dsh-newbe-ide#RunRead", schema: runReadSchema }
+      parameters: [{ name: "request", wire: "request", source: "json", codec: readRequestCodec }],
+      result: readCodec
     },
     {
       id: "dsh-newbe-ide#ideConfig/runs",
@@ -14640,7 +14665,7 @@ var TYPERT = {
       method: "runs",
       invocation: { kind: "direct" },
       parameters: [],
-      result: { mode: "strict", typeSymbol: "dsh-newbe-ide#RunSnapshotList", schema: runSnapshotListSchema }
+      result: snapshotListCodec
     },
     {
       id: "dsh-newbe-ide#ideConfig/submit",

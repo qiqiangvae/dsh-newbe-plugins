@@ -20,16 +20,19 @@ import {
   type IdeState,
   type LaunchConfig,
   type ProjectEntry,
+  defaultState,
+  runKeyOf,
   type RunRead,
   type RunSnapshot,
+  type RunTarget,
 } from './schema.js';
+import { isSecretName } from './lines.js';
 
 export const NS = 'dsh-newbe-ide';
 const VIEW_ID = 'dsh-newbe-ide';
 const VIEW_ORDER = 30; // 对话 0 / 轨迹 10 / 上下文 20 / IDE 30
 
 type RemoteEnvelope<T> = { ok: true; value: T } | { ok: false; error?: { message?: string } };
-type RunTarget = { workspaceId: string; configId: string };
 type RemoteIde = {
   load(): Promise<RemoteEnvelope<unknown>>;
   submit(next: unknown): Promise<RemoteEnvelope<unknown>>;
@@ -102,14 +105,11 @@ const REMOTE_CONTRIBUTION = {
   ],
 };
 
-function envelopeValue(result: RemoteEnvelope<unknown>): unknown {
+function envelopeValue(result: RemoteEnvelope<unknown>, action: string): unknown {
   if (result !== null && typeof result === 'object' && result.ok === true) return result.value;
   const message = (result as { error?: { message?: string } })?.error?.message;
-  throw new Error(message !== undefined && message !== '' ? message : 'IDE 面板调用失败');
+  throw new Error(message !== undefined && message !== '' ? message : `${action}失败`);
 }
-
-/** 密钥类环境变量名：与宿主 runtime.ts 的掩码规则保持一致。 */
-const SECRET_NAME = /KEY|SECRET|TOKEN|PASSWORD/i;
 
 const STYLE_ID = 'dsh-newbe-ide';
 
@@ -161,6 +161,15 @@ function ensureStyles(): () => void {
   return () => { style.remove(); };
 }
 
+/** 运行态文案：状态机到人话只在这一处翻译。 */
+function describeRun(run: RunSnapshot | undefined): string {
+  if (run === undefined || run.status === 'idle') return '未启动';
+  if (run.status === 'running') return '运行中';
+  if (run.status === 'stopped') return '已停止';
+  if (run.status === 'failed' && run.error !== '') return `启动失败：${run.error}`;
+  return `已退出（码 ${run.exitCode ?? '?'}）`;
+}
+
 /** 项目内的不可变更新：只改一条 project entry，其余原样带过。 */
 function patchProject(config: IdeState, workspaceId: string, mutate: (project: ProjectEntry) => ProjectEntry): IdeState {
   return { ...config, projects: config.projects.map((p) => (p.workspaceId === workspaceId ? mutate(p) : p)) };
@@ -201,7 +210,7 @@ function Panel({ api, ctx }: PanelProps): React.ReactElement {
       return;
     }
     try {
-      applyLoad(envelopeValue(await api.load()) as IdeLoad);
+      applyLoad(envelopeValue(await api.load(), '读取启动配置') as IdeLoad);
       setError('');
     } catch (e) {
       setError(String((e as Error)?.message ?? e));
@@ -225,7 +234,7 @@ function Panel({ api, ctx }: PanelProps): React.ReactElement {
     }
     setConfig(next);
     try {
-      setConfig(envelopeValue(await api.submit(next)) as IdeState);
+      setConfig(envelopeValue(await api.submit(next), '保存启动配置') as IdeState);
       setError('');
       setWarning('');
       if (showFlash) {
@@ -240,7 +249,7 @@ function Panel({ api, ctx }: PanelProps): React.ReactElement {
     }
   }, [api, reload]);
 
-  const cfg: IdeState = config ?? { projects: [], activeWorkspaceId: '', showOverview: false };
+  const cfg: IdeState = config ?? defaultState();
   // 注册表为空可能是"尚未就绪"，此时按原样渲染，不能把持久化项目当成失效而清掉。
   const registryKnown = projects.length > 0;
   const isRegistered = (workspaceId: string) => projects.some((w) => w.workspaceId === workspaceId);
@@ -252,7 +261,7 @@ function Panel({ api, ctx }: PanelProps): React.ReactElement {
   const draft = activeConfig !== undefined ? (drafts[activeConfig.id] ?? activeConfig) : undefined;
   const available = projects.filter((p) => !cfg.projects.some((entry) => entry.workspaceId === p.workspaceId));
 
-  const runKey = active !== undefined && activeConfig !== undefined ? `${active.workspaceId}/${activeConfig.id}` : '';
+  const runKey = active !== undefined && activeConfig !== undefined ? runKeyOf({ workspaceId: active.workspaceId, configId: activeConfig.id }) : '';
   const [runs, setRuns] = useState<Record<string, RunSnapshot>>({});
   const [logLines, setLogLines] = useState<string[]>([]);
   const offsetRef = useRef(0);
@@ -270,11 +279,11 @@ function Panel({ api, ctx }: PanelProps): React.ReactElement {
     let stopped = false;
     const tick = async () => {
       try {
-        const list = envelopeValue(await api.runs()) as RunSnapshot[];
+        const list = envelopeValue(await api.runs(), '读取运行态') as RunSnapshot[];
         const map: Record<string, RunSnapshot> = {};
         for (const item of list) map[item.key] = item;
         if (!stopped) setRuns(map);
-        const chunk = envelopeValue(await api.read({ ...target, from: offsetRef.current })) as RunRead;
+        const chunk = envelopeValue(await api.read({ ...target, from: offsetRef.current }), '读取日志') as RunRead;
         if (stopped) return;
         offsetRef.current = chunk.next;
         if (chunk.lines.length > 0) setLogLines((prev) => [...prev, ...chunk.lines].slice(-4000));
@@ -363,11 +372,7 @@ function Panel({ api, ctx }: PanelProps): React.ReactElement {
   };
 
   const runState = runKey !== '' ? runs[runKey] : undefined;
-  const runText = runState === undefined || runState.status === 'idle' ? '未启动'
-    : runState.status === 'running' ? '运行中'
-      : runState.status === 'stopped' ? '已停止'
-        : runState.status === 'exited' ? `已退出（${runState.exitCode ?? '?'}）`
-          : `启动失败：${runState.error}`;
+  const runText = describeRun(runState);
 
   const runAction = async (action: 'start' | 'stop') => {
     if (api === undefined || active === undefined || activeConfig === undefined) return;
@@ -376,7 +381,8 @@ function Panel({ api, ctx }: PanelProps): React.ReactElement {
     try {
       const target = { workspaceId: active.workspaceId, configId: activeConfig.id };
       if (action === 'start') { offsetRef.current = 0; setLogLines([]); }
-      const snap = envelopeValue(action === 'start' ? await api.start(target) : await api.stop(target)) as RunSnapshot;
+      const call = action === 'start' ? api.start(target) : api.stop(target);
+      const snap = envelopeValue(await call, action === 'start' ? '启动' : '停止') as RunSnapshot;
       setRuns((prev) => ({ ...prev, [snap.key]: snap }));
     } catch (e) {
       setError(String((e as Error)?.message ?? e));
@@ -499,7 +505,6 @@ function Panel({ api, ctx }: PanelProps): React.ReactElement {
               </button>
               <button type="button" className="ide-btn" disabled={runState?.status !== 'running'} onClick={() => { void runAction('stop'); }}>停止</button>
               <button type="button" className="ide-btn" disabled={runState?.status !== 'running'} onClick={() => { void restartRun(); }}>重启</button>
-              <span className="ide-note">{runText}</span>
               <span className="ide-note">{flash}</span>
             </div>
 
@@ -543,8 +548,8 @@ function Panel({ api, ctx }: PanelProps): React.ReactElement {
                             <td>
                               <input
                                 className="ide-field ide-mono"
-                                type={SECRET_NAME.test(env.name) ? 'password' : 'text'}
-                                title={SECRET_NAME.test(env.name) ? '密钥类变量在界面上掩码显示' : undefined}
+                                type={isSecretName(env.name) ? 'password' : 'text'}
+                                title={isSecretName(env.name) ? '密钥类变量在界面上掩码显示' : undefined}
                                 value={env.value}
                                 placeholder="value"
                                 onChange={(e) => setDraft({ envs: draft.envs.map((x, i) => (i === index ? { ...x, value: e.target.value } : x)) })}
@@ -570,7 +575,9 @@ function Panel({ api, ctx }: PanelProps): React.ReactElement {
                   ? <span className="ide-note">{runState?.status === 'running' ? '等待输出…' : '点「启动」运行这条启动配置'}</span>
                   : logLines.map((line, index) => <div key={index}>{line}</div>)}
               </div>
-              <div className="ide-note">已缓存 {logLines.length} 行{runState?.lossy === true ? '（输出过快，宿主侧有截断）' : ''}</div>
+              <div className="ide-note">
+                {runText} · 已缓存 {logLines.length} 行{runState?.lossy === true ? '（输出过快，宿主侧有截断）' : ''}
+              </div>
             </div>
           </>
         )}

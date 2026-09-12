@@ -14588,11 +14588,14 @@ var runReadSchema = external_exports.object({
   dropped: external_exports.boolean()
 });
 var runSnapshotListSchema = external_exports.array(runSnapshotSchema);
-
-// src/store.ts
 function defaultState() {
   return { projects: [], activeWorkspaceId: "", showOverview: false };
 }
+function runKeyOf(target) {
+  return `${target.workspaceId}/${target.configId}`;
+}
+
+// src/store.ts
 function writeFileAtomic(file2, text) {
   mkdirSync(dirname(file2), { recursive: true, mode: 448 });
   const tmp = join(dirname(file2), `.${randomUUID()}.tmp`);
@@ -14698,10 +14701,13 @@ function maskSecrets(line, secrets) {
   }
   return masked;
 }
+var SECRET_NAME = /KEY|SECRET|TOKEN|PASSWORD/i;
+function isSecretName(name2) {
+  return SECRET_NAME.test(name2);
+}
 
 // src/runtime.ts
 var DEFAULT_MAX_LINES = 5e3;
-var SECRET_NAME = /KEY|SECRET|TOKEN|PASSWORD/i;
 function createRunRegistry(provideShell, maxLines = DEFAULT_MAX_LINES) {
   const runs = /* @__PURE__ */ new Map();
   function record2(key) {
@@ -14758,6 +14764,17 @@ function createRunRegistry(provideShell, maxLines = DEFAULT_MAX_LINES) {
     if (proc.status === "killed") run.status = "stopped";
     else run.status = run.exitCode === 0 ? "exited" : "failed";
   }
+  function killIfRunning(run) {
+    drain(run);
+    if (run.proc === null || run.status !== "running") return false;
+    try {
+      run.proc.kill();
+    } catch {
+    }
+    drain(run);
+    if (run.status === "running") run.status = "stopped";
+    return true;
+  }
   function snapshotOf(run) {
     return { key: run.key, status: run.status, exitCode: run.exitCode, error: run.error, lossy: run.lossy };
   }
@@ -14774,7 +14791,7 @@ function createRunRegistry(provideShell, maxLines = DEFAULT_MAX_LINES) {
       run.lossy = false;
       run.exitCode = null;
       run.error = "";
-      run.secrets = spec.envs.filter((e) => SECRET_NAME.test(e.name) && e.value !== "").map((e) => e.value);
+      run.secrets = spec.envs.filter((e) => isSecretName(e.name) && e.value !== "").map((e) => e.value);
       const env = {};
       for (const entry of spec.envs) if (entry.name !== "") env[entry.name] = entry.value;
       try {
@@ -14791,14 +14808,7 @@ function createRunRegistry(provideShell, maxLines = DEFAULT_MAX_LINES) {
     },
     stop(key) {
       const run = record2(key);
-      if (run.proc !== null && run.status === "running") {
-        try {
-          run.proc.kill();
-        } catch {
-        }
-        drain(run);
-        if (run.status === "running") run.status = "stopped";
-      }
+      killIfRunning(run);
       return snapshotOf(run);
     },
     read(key, from) {
@@ -14830,15 +14840,7 @@ function createRunRegistry(provideShell, maxLines = DEFAULT_MAX_LINES) {
       for (const run of runs.values()) drain(run);
     },
     dispose() {
-      for (const run of runs.values()) {
-        drain(run);
-        if (run.proc === null || run.status !== "running") continue;
-        try {
-          run.proc.kill();
-        } catch {
-        }
-        run.status = "stopped";
-      }
+      for (const run of runs.values()) killIfRunning(run);
     }
   };
 }
@@ -14870,7 +14872,6 @@ function apply(ctx) {
       registry2.dispose();
     };
   }, "dsh-newbe-ide: run pump");
-  const runKey = (target) => `${target.workspaceId}/${target.configId}`;
   function specFor(target) {
     const state = store.getState();
     const project = state.projects.find((p) => p.workspaceId === target.workspaceId);
@@ -14887,13 +14888,13 @@ function apply(ctx) {
       return store.submit(next);
     },
     start(target) {
-      return registry2.start(runKey(target), specFor(target));
+      return registry2.start(runKeyOf(target), specFor(target));
     },
     stop(target) {
-      return registry2.stop(runKey(target));
+      return registry2.stop(runKeyOf(target));
     },
     read(request) {
-      return registry2.read(runKey(request), request.from);
+      return registry2.read(runKeyOf(request), request.from);
     },
     runs() {
       return registry2.snapshots();
@@ -14914,7 +14915,9 @@ export {
   createConfigStore,
   createRunRegistry,
   defaultState,
+  isSecretName,
   maskSecrets,
   name,
+  runKeyOf,
   splitLines
 };

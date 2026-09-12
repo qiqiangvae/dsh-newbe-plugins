@@ -14604,6 +14604,18 @@ var runReadSchema = external_exports.object({
   dropped: external_exports.boolean()
 });
 var runSnapshotListSchema = external_exports.array(runSnapshotSchema);
+function defaultState() {
+  return { projects: [], activeWorkspaceId: "", showOverview: false };
+}
+function runKeyOf(target) {
+  return `${target.workspaceId}/${target.configId}`;
+}
+
+// src/lines.ts
+var SECRET_NAME = /KEY|SECRET|TOKEN|PASSWORD/i;
+function isSecretName(name) {
+  return SECRET_NAME.test(name);
+}
 
 // src/client.tsx
 var import_jsx_runtime = require("react/jsx-runtime");
@@ -14671,12 +14683,11 @@ var REMOTE_CONTRIBUTION = {
     }
   ]
 };
-function envelopeValue(result) {
+function envelopeValue(result, action) {
   if (result !== null && typeof result === "object" && result.ok === true) return result.value;
   const message = result?.error?.message;
-  throw new Error(message !== void 0 && message !== "" ? message : "IDE \u9762\u677F\u8C03\u7528\u5931\u8D25");
+  throw new Error(message !== void 0 && message !== "" ? message : `${action}\u5931\u8D25`);
 }
-var SECRET_NAME = /KEY|SECRET|TOKEN|PASSWORD/i;
 var STYLE_ID = "dsh-newbe-ide";
 function ensureStyles() {
   if (document.querySelector(`style[data-plugin="${STYLE_ID}"]`) !== null) return () => {
@@ -14728,6 +14739,13 @@ function ensureStyles() {
     style.remove();
   };
 }
+function describeRun(run) {
+  if (run === void 0 || run.status === "idle") return "\u672A\u542F\u52A8";
+  if (run.status === "running") return "\u8FD0\u884C\u4E2D";
+  if (run.status === "stopped") return "\u5DF2\u505C\u6B62";
+  if (run.status === "failed" && run.error !== "") return `\u542F\u52A8\u5931\u8D25\uFF1A${run.error}`;
+  return `\u5DF2\u9000\u51FA\uFF08\u7801 ${run.exitCode ?? "?"}\uFF09`;
+}
 function patchProject(config2, workspaceId, mutate) {
   return { ...config2, projects: config2.projects.map((p) => p.workspaceId === workspaceId ? mutate(p) : p) };
 }
@@ -14756,7 +14774,7 @@ function Panel({ api, ctx }) {
       return;
     }
     try {
-      applyLoad(envelopeValue(await api.load()));
+      applyLoad(envelopeValue(await api.load(), "\u8BFB\u53D6\u542F\u52A8\u914D\u7F6E"));
       setError("");
     } catch (e) {
       setError(String(e?.message ?? e));
@@ -14775,7 +14793,7 @@ function Panel({ api, ctx }) {
     }
     setConfig(next);
     try {
-      setConfig(envelopeValue(await api.submit(next)));
+      setConfig(envelopeValue(await api.submit(next), "\u4FDD\u5B58\u542F\u52A8\u914D\u7F6E"));
       setError("");
       setWarning("");
       if (showFlash) {
@@ -14789,7 +14807,7 @@ function Panel({ api, ctx }) {
       return false;
     }
   }, [api, reload]);
-  const cfg = config2 ?? { projects: [], activeWorkspaceId: "", showOverview: false };
+  const cfg = config2 ?? defaultState();
   const registryKnown = projects.length > 0;
   const isRegistered = (workspaceId) => projects.some((w) => w.workspaceId === workspaceId);
   const registered = registryKnown ? cfg.projects.filter((p) => isRegistered(p.workspaceId)) : cfg.projects;
@@ -14799,7 +14817,7 @@ function Panel({ api, ctx }) {
   const activeConfig = active?.configs.find((c) => c.id === activeConfigId);
   const draft = activeConfig !== void 0 ? drafts[activeConfig.id] ?? activeConfig : void 0;
   const available = projects.filter((p) => !cfg.projects.some((entry) => entry.workspaceId === p.workspaceId));
-  const runKey = active !== void 0 && activeConfig !== void 0 ? `${active.workspaceId}/${activeConfig.id}` : "";
+  const runKey = active !== void 0 && activeConfig !== void 0 ? runKeyOf({ workspaceId: active.workspaceId, configId: activeConfig.id }) : "";
   const [runs, setRuns] = (0, import_react.useState)({});
   const [logLines, setLogLines] = (0, import_react.useState)([]);
   const offsetRef = (0, import_react.useRef)(0);
@@ -14814,11 +14832,11 @@ function Panel({ api, ctx }) {
     let stopped = false;
     const tick = async () => {
       try {
-        const list = envelopeValue(await api.runs());
+        const list = envelopeValue(await api.runs(), "\u8BFB\u53D6\u8FD0\u884C\u6001");
         const map2 = {};
         for (const item of list) map2[item.key] = item;
         if (!stopped) setRuns(map2);
-        const chunk = envelopeValue(await api.read({ ...target, from: offsetRef.current }));
+        const chunk = envelopeValue(await api.read({ ...target, from: offsetRef.current }), "\u8BFB\u53D6\u65E5\u5FD7");
         if (stopped) return;
         offsetRef.current = chunk.next;
         if (chunk.lines.length > 0) setLogLines((prev) => [...prev, ...chunk.lines].slice(-4e3));
@@ -14902,7 +14920,7 @@ function Panel({ api, ctx }) {
     }
   };
   const runState = runKey !== "" ? runs[runKey] : void 0;
-  const runText = runState === void 0 || runState.status === "idle" ? "\u672A\u542F\u52A8" : runState.status === "running" ? "\u8FD0\u884C\u4E2D" : runState.status === "stopped" ? "\u5DF2\u505C\u6B62" : runState.status === "exited" ? `\u5DF2\u9000\u51FA\uFF08${runState.exitCode ?? "?"}\uFF09` : `\u542F\u52A8\u5931\u8D25\uFF1A${runState.error}`;
+  const runText = describeRun(runState);
   const runAction = async (action) => {
     if (api === void 0 || active === void 0 || activeConfig === void 0) return;
     setError("");
@@ -14913,7 +14931,8 @@ function Panel({ api, ctx }) {
         offsetRef.current = 0;
         setLogLines([]);
       }
-      const snap = envelopeValue(action === "start" ? await api.start(target) : await api.stop(target));
+      const call = action === "start" ? api.start(target) : api.stop(target);
+      const snap = envelopeValue(await call, action === "start" ? "\u542F\u52A8" : "\u505C\u6B62");
       setRuns((prev) => ({ ...prev, [snap.key]: snap }));
     } catch (e) {
       setError(String(e?.message ?? e));
@@ -15046,7 +15065,6 @@ function Panel({ api, ctx }) {
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-btn", disabled: runState?.status !== "running", onClick: () => {
             void restartRun();
           }, children: "\u91CD\u542F" }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-note", children: runText }),
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-note", children: flash })
         ] }),
         editing && draft !== void 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-cfg", children: [
@@ -15092,8 +15110,8 @@ function Panel({ api, ctx }) {
                   "input",
                   {
                     className: "ide-field ide-mono",
-                    type: SECRET_NAME.test(env.name) ? "password" : "text",
-                    title: SECRET_NAME.test(env.name) ? "\u5BC6\u94A5\u7C7B\u53D8\u91CF\u5728\u754C\u9762\u4E0A\u63A9\u7801\u663E\u793A" : void 0,
+                    type: isSecretName(env.name) ? "password" : "text",
+                    title: isSecretName(env.name) ? "\u5BC6\u94A5\u7C7B\u53D8\u91CF\u5728\u754C\u9762\u4E0A\u63A9\u7801\u663E\u793A" : void 0,
                     value: env.value,
                     placeholder: "value",
                     onChange: (e) => setDraft({ envs: draft.envs.map((x, i) => i === index ? { ...x, value: e.target.value } : x) })
@@ -15109,7 +15127,8 @@ function Panel({ api, ctx }) {
         /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-logbox", children: [
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-log", ref: logRef, children: logLines.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-note", children: runState?.status === "running" ? "\u7B49\u5F85\u8F93\u51FA\u2026" : "\u70B9\u300C\u542F\u52A8\u300D\u8FD0\u884C\u8FD9\u6761\u542F\u52A8\u914D\u7F6E" }) : logLines.map((line, index) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { children: line }, index)) }),
           /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-note", children: [
-            "\u5DF2\u7F13\u5B58 ",
+            runText,
+            " \xB7 \u5DF2\u7F13\u5B58 ",
             logLines.length,
             " \u884C",
             runState?.lossy === true ? "\uFF08\u8F93\u51FA\u8FC7\u5FEB\uFF0C\u5BBF\u4E3B\u4FA7\u6709\u622A\u65AD\uFF09" : ""

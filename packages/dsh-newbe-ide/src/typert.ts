@@ -17,6 +17,36 @@ const loadCodec = {
   schema: ideLoadSchema,
 };
 
+const targetCodec = {
+  mode: 'strict' as const,
+  typeSymbol: 'dsh-newbe-ide#RunTarget',
+  schema: runTargetSchema,
+};
+
+const snapshotCodec = {
+  mode: 'strict' as const,
+  typeSymbol: 'dsh-newbe-ide#RunSnapshot',
+  schema: runSnapshotSchema,
+};
+
+const readRequestCodec = {
+  mode: 'strict' as const,
+  typeSymbol: 'dsh-newbe-ide#RunReadRequest',
+  schema: runReadRequestSchema,
+};
+
+const readCodec = {
+  mode: 'strict' as const,
+  typeSymbol: 'dsh-newbe-ide#RunRead',
+  schema: runReadSchema,
+};
+
+const snapshotListCodec = {
+  mode: 'strict' as const,
+  typeSymbol: 'dsh-newbe-ide#RunSnapshotList',
+  schema: runSnapshotListSchema,
+};
+
 export const TYPERT = {
   package: 'dsh-newbe-ide',
   face: 'host',
@@ -37,8 +67,8 @@ export const TYPERT = {
       namespace: 'ideConfig',
       method: 'start',
       invocation: { kind: 'direct' },
-      parameters: [{ name: 'target', wire: 'target', source: 'json', codec: { mode: 'strict' as const, typeSymbol: 'dsh-newbe-ide#RunTarget', schema: runTargetSchema } }],
-      result: { mode: 'strict' as const, typeSymbol: 'dsh-newbe-ide#RunSnapshot', schema: runSnapshotSchema },
+      parameters: [{ name: 'target', wire: 'target', source: 'json', codec: targetCodec }],
+      result: snapshotCodec,
     },
     {
       id: 'dsh-newbe-ide#ideConfig/stop',
@@ -46,8 +76,8 @@ export const TYPERT = {
       namespace: 'ideConfig',
       method: 'stop',
       invocation: { kind: 'direct' },
-      parameters: [{ name: 'target', wire: 'target', source: 'json', codec: { mode: 'strict' as const, typeSymbol: 'dsh-newbe-ide#RunTarget', schema: runTargetSchema } }],
-      result: { mode: 'strict' as const, typeSymbol: 'dsh-newbe-ide#RunSnapshot', schema: runSnapshotSchema },
+      parameters: [{ name: 'target', wire: 'target', source: 'json', codec: targetCodec }],
+      result: snapshotCodec,
     },
     {
       id: 'dsh-newbe-ide#ideConfig/read',
@@ -55,8 +85,8 @@ export const TYPERT = {
       namespace: 'ideConfig',
       method: 'read',
       invocation: { kind: 'direct' },
-      parameters: [{ name: 'request', wire: 'request', source: 'json', codec: { mode: 'strict' as const, typeSymbol: 'dsh-newbe-ide#RunReadRequest', schema: runReadRequestSchema } }],
-      result: { mode: 'strict' as const, typeSymbol: 'dsh-newbe-ide#RunRead', schema: runReadSchema },
+      parameters: [{ name: 'request', wire: 'request', source: 'json', codec: readRequestCodec }],
+      result: readCodec,
     },
     {
       id: 'dsh-newbe-ide#ideConfig/runs',
@@ -65,7 +95,7 @@ export const TYPERT = {
       method: 'runs',
       invocation: { kind: 'direct' },
       parameters: [],
-      result: { mode: 'strict' as const, typeSymbol: 'dsh-newbe-ide#RunSnapshotList', schema: runSnapshotListSchema },
+      result: snapshotListCodec,
     },
     {
       id: 'dsh-newbe-ide#ideConfig/submit',
