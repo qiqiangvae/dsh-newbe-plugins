@@ -273,6 +273,8 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
   const offsetRef = useRef(0);
   const logRef = useRef<HTMLDivElement | null>(null);
   const historyTriedRef = useRef(false);
+  /** 当前缓冲里显示的是上一次运行的输出（本进程一旦有输出就让位）。 */
+  const fromHistoryRef = useRef(false);
   /** 是否贴底：由 scroll 事件维护。追加后量高度会把"一次涌入多行"误判成用户上滚。 */
   const pinnedRef = useRef(true);
   /** 运行代次：重启后自增，用来丢弃上一代进程还在飞的读取结果。 */
@@ -326,6 +328,7 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
     genRef.current += 1;
     pinnedRef.current = true;
     historyTriedRef.current = false;
+    fromHistoryRef.current = false;
     setFromHistory(false);
     setTruncated(false);
     setLogLines([]);
@@ -356,7 +359,12 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
         if (chunk.dropped) setTruncated(true);
         if (chunk.lines.length > 0) {
           setLogLines((prev) => {
-            const merged = [...prev, ...chunk.lines];
+            // 历史与本次运行不能混在一个缓冲里：本进程的第一行到达时，历史整段让位。
+            const merged = [...(fromHistoryRef.current ? [] : prev), ...chunk.lines];
+            if (fromHistoryRef.current) {
+              fromHistoryRef.current = false;
+              setFromHistory(false);
+            }
             if (merged.length <= LOG_LIMIT) return merged;
             setTruncated(true);
             return merged.slice(merged.length - LOG_LIMIT);
@@ -369,6 +377,7 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
           if (history.lines.length > 0) {
             setLogLines(history.lines);
             setHistoryPath(history.path);
+            fromHistoryRef.current = true;
             setFromHistory(true);
             if (history.truncated) setTruncated(true);
           }
@@ -410,6 +419,7 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
         offsetRef.current = 0;
         pinnedRef.current = true;
         historyTriedRef.current = true; // 新进程的输出从零开始，不再补历史
+        fromHistoryRef.current = false;
         setFromHistory(false);
         setTruncated(false);
         setLogLines([]);
@@ -558,8 +568,10 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
                   </div>
                   <div className="ide-note">
                     显示 {shown.length} / 共 {filtered.length} 行（缓存 {logLines.length} 行）
-                    {fromHistory ? <span title={historyPath}>（含上次运行的输出）</span> : null}
-                    {runState?.lossy === true || truncated ? '（输出过快或过长，早期部分已丢弃）' : ''}
+                    {fromHistory
+                      ? <span title={historyPath}>（含上次运行的输出{truncated ? '，只取了最近一段' : ''}）</span>
+                      : runState?.lossy === true || truncated ? '（输出过快或过长，早期部分已丢弃）' : ''}
+                    {filtered.length > RENDER_LIMIT ? `（仅渲染最近 ${RENDER_LIMIT} 行）` : ''}
                   </div>
                 </div>
               </>

@@ -24,8 +24,15 @@ test('级别识别：TRACE 归入 DEBUG，FATAL 归入 ERROR，无级别归 OTHE
   assert.equal(levelOf('pure text'), 'OTHER');
 });
 
-test('默认级别集合：ERROR/WARN/INFO/OTHER 开，DEBUG 关', () => {
-  assert.deepEqual({ ...DEFAULT_LEVELS }, { ERROR: true, WARN: true, INFO: true, DEBUG: false, OTHER: true });
+test('默认不隐藏任何级别（要看哪一级由用户关徽章决定）', () => {
+  assert.deepEqual({ ...DEFAULT_LEVELS }, { ERROR: true, WARN: true, INFO: true, DEBUG: true, OTHER: true });
+});
+
+test('小写级别关键字也算（npm/node/go 的输出），但子串不算', () => {
+  assert.equal(levelOf("Error: Cannot find module 'foo'"), 'ERROR');
+  assert.equal(levelOf('warn deprecated left-pad@1.0.0'), 'WARN');
+  assert.equal(levelOf('at com.foo.ErrorHandler.handle(ErrorHandler.java:1)'), 'OTHER');
+  assert.equal(levelOf('INFORMATION_SCHEMA loaded'), 'OTHER');
 });
 
 test('关键字过滤不区分大小写，且标出命中', () => {

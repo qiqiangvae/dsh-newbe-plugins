@@ -14640,16 +14640,18 @@ var DEFAULT_LEVELS = {
   ERROR: true,
   WARN: true,
   INFO: true,
-  DEBUG: false,
+  DEBUG: true,
   OTHER: true
 };
-var LEVEL_PATTERN = /(TRACE|DEBUG|INFO|WARN|ERROR|FATAL)/;
+var UPPER_LEVEL = /\b(TRACE|DEBUG|INFO|WARN|ERROR|FATAL)\b/;
+var LOWER_LEVEL = /\b(trace|debug|info|warn|error|fatal)\b/i;
 function levelOf(line) {
-  const found = LEVEL_PATTERN.exec(line);
+  const found = UPPER_LEVEL.exec(line) ?? LOWER_LEVEL.exec(line);
   if (found === null) return "OTHER";
-  if (found[1] === "FATAL") return "ERROR";
-  if (found[1] === "TRACE") return "DEBUG";
-  return found[1];
+  const keyword = found[1].toUpperCase();
+  if (keyword === "FATAL") return "ERROR";
+  if (keyword === "TRACE") return "DEBUG";
+  return keyword;
 }
 function compileMatcher(spec) {
   const q = spec.q.trim();
@@ -14881,6 +14883,7 @@ function IdeView({ api, ctx }) {
   const offsetRef = (0, import_react.useRef)(0);
   const logRef = (0, import_react.useRef)(null);
   const historyTriedRef = (0, import_react.useRef)(false);
+  const fromHistoryRef = (0, import_react.useRef)(false);
   const pinnedRef = (0, import_react.useRef)(true);
   const genRef = (0, import_react.useRef)(0);
   const tickRef = (0, import_react.useRef)(0);
@@ -14924,6 +14927,7 @@ function IdeView({ api, ctx }) {
     genRef.current += 1;
     pinnedRef.current = true;
     historyTriedRef.current = false;
+    fromHistoryRef.current = false;
     setFromHistory(false);
     setTruncated(false);
     setLogLines([]);
@@ -14954,7 +14958,11 @@ function IdeView({ api, ctx }) {
         if (chunk.dropped) setTruncated(true);
         if (chunk.lines.length > 0) {
           setLogLines((prev) => {
-            const merged = [...prev, ...chunk.lines];
+            const merged = [...fromHistoryRef.current ? [] : prev, ...chunk.lines];
+            if (fromHistoryRef.current) {
+              fromHistoryRef.current = false;
+              setFromHistory(false);
+            }
             if (merged.length <= LOG_LIMIT) return merged;
             setTruncated(true);
             return merged.slice(merged.length - LOG_LIMIT);
@@ -14966,6 +14974,7 @@ function IdeView({ api, ctx }) {
           if (history.lines.length > 0) {
             setLogLines(history.lines);
             setHistoryPath(history.path);
+            fromHistoryRef.current = true;
             setFromHistory(true);
             if (history.truncated) setTruncated(true);
           }
@@ -15005,6 +15014,7 @@ function IdeView({ api, ctx }) {
         offsetRef.current = 0;
         pinnedRef.current = true;
         historyTriedRef.current = true;
+        fromHistoryRef.current = false;
         setFromHistory(false);
         setTruncated(false);
         setLogLines([]);
@@ -15147,8 +15157,12 @@ function IdeView({ api, ctx }) {
               " \u884C\uFF08\u7F13\u5B58 ",
               logLines.length,
               " \u884C\uFF09",
-              fromHistory ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { title: historyPath, children: "\uFF08\u542B\u4E0A\u6B21\u8FD0\u884C\u7684\u8F93\u51FA\uFF09" }) : null,
-              runState?.lossy === true || truncated ? "\uFF08\u8F93\u51FA\u8FC7\u5FEB\u6216\u8FC7\u957F\uFF0C\u65E9\u671F\u90E8\u5206\u5DF2\u4E22\u5F03\uFF09" : ""
+              fromHistory ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { title: historyPath, children: [
+                "\uFF08\u542B\u4E0A\u6B21\u8FD0\u884C\u7684\u8F93\u51FA",
+                truncated ? "\uFF0C\u53EA\u53D6\u4E86\u6700\u8FD1\u4E00\u6BB5" : "",
+                "\uFF09"
+              ] }) : runState?.lossy === true || truncated ? "\uFF08\u8F93\u51FA\u8FC7\u5FEB\u6216\u8FC7\u957F\uFF0C\u65E9\u671F\u90E8\u5206\u5DF2\u4E22\u5F03\uFF09" : "",
+              filtered.length > RENDER_LIMIT ? `\uFF08\u4EC5\u6E32\u67D3\u6700\u8FD1 ${RENDER_LIMIT} \u884C\uFF09` : ""
             ] })
           ] })
         ] })

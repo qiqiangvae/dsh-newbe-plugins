@@ -7,20 +7,26 @@ export type RunLevel = 'ERROR' | 'WARN' | 'INFO' | 'DEBUG' | 'OTHER';
 /** 级别的展示顺序：UI 的徽章、渲染用的 CSS 类都从这一份派生。 */
 export const LEVELS: readonly RunLevel[] = ['ERROR', 'WARN', 'INFO', 'DEBUG', 'OTHER'];
 
-/** 默认开哪几级：DEBUG 默认关（量最大、平时不需要）。 */
+/** 默认全部打开：不主动隐藏任何输出，要看哪一级由用户关掉徽章决定。 */
 export const DEFAULT_LEVELS: Record<RunLevel, boolean> = {
-  ERROR: true, WARN: true, INFO: true, DEBUG: false, OTHER: true,
+  ERROR: true, WARN: true, INFO: true, DEBUG: true, OTHER: true,
 };
 
-/** 行内的级别关键字；FATAL 并入 ERROR，TRACE 并入 DEBUG。 */
-const LEVEL_PATTERN = /(TRACE|DEBUG|INFO|WARN|ERROR|FATAL)/;
+/**
+ * 级别关键字按**独立词**匹配，不做子串匹配：`com.x.ErrorHandler` 不是 ERROR。
+ * 先看标准日志格式里的大写 token；没有再小写兜底（npm / node / go 那些 `error:` 输出）。
+ * FATAL 并入 ERROR，TRACE 并入 DEBUG。
+ */
+const UPPER_LEVEL = /\b(TRACE|DEBUG|INFO|WARN|ERROR|FATAL)\b/;
+const LOWER_LEVEL = /\b(trace|debug|info|warn|error|fatal)\b/i;
 
 export function levelOf(line: string): RunLevel {
-  const found = LEVEL_PATTERN.exec(line);
+  const found = UPPER_LEVEL.exec(line) ?? LOWER_LEVEL.exec(line);
   if (found === null) return 'OTHER';
-  if (found[1] === 'FATAL') return 'ERROR';
-  if (found[1] === 'TRACE') return 'DEBUG';
-  return found[1] as RunLevel;
+  const keyword = found[1].toUpperCase();
+  if (keyword === 'FATAL') return 'ERROR';
+  if (keyword === 'TRACE') return 'DEBUG';
+  return keyword as RunLevel;
 }
 
 export interface Matcher {

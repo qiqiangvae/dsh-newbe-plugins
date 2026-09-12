@@ -27,9 +27,52 @@ export interface LogSinkOptions {
   tailBytes?: number;
 }
 
-/** 键 → 文件名：只留安全字符，避免 ../ 之类的键写到目录外。 */
+/**
+ * 键 → 文件名：百分号编码，可逆且不会撞车。
+ * 不用"把危险字符替换成下划线"那套：键里本来就有 `/`（`workspaceId/configId`），
+ * 替换会让 `a/b` 与 `a_b` 落到同一个文件；补哈希又会让每个文件名都拖一串哈希。
+ */
 function fileName(key: string): string {
-  return key.replace(/[^A-Za-z0-9._-]/g, '_') + '.log';
+  return encodeURIComponent(key) + '.log';
+}
+
+/**
+ * 从文件尾部读若干行。
+ * `from` 会往前多取一个字节，用来判断起点是否正好落在行首——否则会把一条完整行当半行丢掉。
+ */
+function readTailLines(file: string, maxLines: number, tailBytes: number): { lines: string[]; more: boolean } {
+  if (maxLines <= 0 || !existsSync(file)) return { lines: [], more: false };
+  let size: number;
+  try {
+    size = statSync(file).size;
+  } catch {
+    return { lines: [], more: false };
+  }
+  const want = Math.min(size, tailBytes);
+  const from = Math.max(0, size - want - 1);
+  const length = size - from;
+  if (length <= 0) return { lines: [], more: false };
+  const fd = openSync(file, 'r');
+  let text: string;
+  try {
+    const buffer = Buffer.alloc(length);
+    readSync(fd, buffer, 0, length, from);
+    text = buffer.toString('utf8');
+  } finally {
+    closeSync(fd);
+  }
+  let body = text;
+  if (from > 0) {
+    // from 指向 start-1：若它是换行，说明 start 正好是行首，整段都是完整行，不能丢。
+    const cut = text[0] === '\n' ? 1 : text.indexOf('\n') + 1;
+    if (cut === 0) return { lines: [], more: true }; // 这一段里没有换行，整段都是半行
+    body = text.slice(cut);
+  }
+  const parts = body.split('\n');
+  if (parts.length > 0 && parts[parts.length - 1] === '') parts.pop();
+  const more = from > 0 || parts.length > maxLines;
+  const lines = parts.length > maxLines ? parts.slice(parts.length - maxLines) : parts;
+  return { lines, more };
 }
 
 export function createFileLogSink(dir: string, options: LogSinkOptions = {}): LogSink {
@@ -75,28 +118,11 @@ export function createFileLogSink(dir: string, options: LogSinkOptions = {}): Lo
     },
 
     tail(key: string, maxLines: number): TailResult {
-      const file = pathOf(key);
-      if (!existsSync(file)) return { lines: [], truncated: false };
-      const size = sizeOf(file);
-      const start = Math.max(0, size - tailBytes);
-      const length = size - start;
-      if (length <= 0) return { lines: [], truncated: false };
-      const fd = openSync(file, 'r');
-      let text: string;
-      try {
-        const buffer = Buffer.alloc(length);
-        readSync(fd, buffer, 0, length, start);
-        text = buffer.toString('utf8');
-      } finally {
-        closeSync(fd);
-      }
-      const parts = text.split('\n');
-      // 从文件中段开始读时，第一行可能是半行，丢掉。
-      if (start > 0) parts.shift();
-      if (parts.length > 0 && parts[parts.length - 1] === '') parts.pop();
-      const truncated = parts.length > maxLines || start > 0;
-      const lines = parts.length > maxLines ? parts.slice(parts.length - maxLines) : parts;
-      return { lines, truncated };
+      // 先读新一代；不够就补上一代（轮转出来的 .1）——否则"上次为什么挂"恰好落在被轮转掉的那一代里。
+      const newest = readTailLines(pathOf(key), maxLines, tailBytes);
+      if (newest.lines.length >= maxLines) return { lines: newest.lines, truncated: newest.more };
+      const older = readTailLines(pathOf(key) + '.1', maxLines - newest.lines.length, tailBytes);
+      return { lines: [...older.lines, ...newest.lines], truncated: older.more || newest.more };
     },
   };
 }

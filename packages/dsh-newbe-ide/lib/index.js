@@ -14915,7 +14915,40 @@ import { join as join2 } from "node:path";
 var DEFAULT_MAX_BYTES = 8 * 1024 * 1024;
 var DEFAULT_TAIL_BYTES = 512 * 1024;
 function fileName(key) {
-  return key.replace(/[^A-Za-z0-9._-]/g, "_") + ".log";
+  return encodeURIComponent(key) + ".log";
+}
+function readTailLines(file2, maxLines, tailBytes) {
+  if (maxLines <= 0 || !existsSync(file2)) return { lines: [], more: false };
+  let size;
+  try {
+    size = statSync(file2).size;
+  } catch {
+    return { lines: [], more: false };
+  }
+  const want = Math.min(size, tailBytes);
+  const from = Math.max(0, size - want - 1);
+  const length = size - from;
+  if (length <= 0) return { lines: [], more: false };
+  const fd = openSync2(file2, "r");
+  let text;
+  try {
+    const buffer = Buffer.alloc(length);
+    readSync(fd, buffer, 0, length, from);
+    text = buffer.toString("utf8");
+  } finally {
+    closeSync2(fd);
+  }
+  let body = text;
+  if (from > 0) {
+    const cut = text[0] === "\n" ? 1 : text.indexOf("\n") + 1;
+    if (cut === 0) return { lines: [], more: true };
+    body = text.slice(cut);
+  }
+  const parts = body.split("\n");
+  if (parts.length > 0 && parts[parts.length - 1] === "") parts.pop();
+  const more = from > 0 || parts.length > maxLines;
+  const lines = parts.length > maxLines ? parts.slice(parts.length - maxLines) : parts;
+  return { lines, more };
 }
 function createFileLogSink(dir, options = {}) {
   const maxBytes = options.maxBytes ?? DEFAULT_MAX_BYTES;
@@ -14953,27 +14986,10 @@ function createFileLogSink(dir, options = {}) {
       sizes.set(file2, current + Buffer.byteLength(text));
     },
     tail(key, maxLines) {
-      const file2 = pathOf(key);
-      if (!existsSync(file2)) return { lines: [], truncated: false };
-      const size = sizeOf(file2);
-      const start = Math.max(0, size - tailBytes);
-      const length = size - start;
-      if (length <= 0) return { lines: [], truncated: false };
-      const fd = openSync2(file2, "r");
-      let text;
-      try {
-        const buffer = Buffer.alloc(length);
-        readSync(fd, buffer, 0, length, start);
-        text = buffer.toString("utf8");
-      } finally {
-        closeSync2(fd);
-      }
-      const parts = text.split("\n");
-      if (start > 0) parts.shift();
-      if (parts.length > 0 && parts[parts.length - 1] === "") parts.pop();
-      const truncated = parts.length > maxLines || start > 0;
-      const lines = parts.length > maxLines ? parts.slice(parts.length - maxLines) : parts;
-      return { lines, truncated };
+      const newest = readTailLines(pathOf(key), maxLines, tailBytes);
+      if (newest.lines.length >= maxLines) return { lines: newest.lines, truncated: newest.more };
+      const older = readTailLines(pathOf(key) + ".1", maxLines - newest.lines.length, tailBytes);
+      return { lines: [...older.lines, ...newest.lines], truncated: older.more || newest.more };
     }
   };
 }
@@ -14984,16 +15000,18 @@ var DEFAULT_LEVELS = {
   ERROR: true,
   WARN: true,
   INFO: true,
-  DEBUG: false,
+  DEBUG: true,
   OTHER: true
 };
-var LEVEL_PATTERN = /(TRACE|DEBUG|INFO|WARN|ERROR|FATAL)/;
+var UPPER_LEVEL = /\b(TRACE|DEBUG|INFO|WARN|ERROR|FATAL)\b/;
+var LOWER_LEVEL = /\b(trace|debug|info|warn|error|fatal)\b/i;
 function levelOf(line) {
-  const found = LEVEL_PATTERN.exec(line);
+  const found = UPPER_LEVEL.exec(line) ?? LOWER_LEVEL.exec(line);
   if (found === null) return "OTHER";
-  if (found[1] === "FATAL") return "ERROR";
-  if (found[1] === "TRACE") return "DEBUG";
-  return found[1];
+  const keyword = found[1].toUpperCase();
+  if (keyword === "FATAL") return "ERROR";
+  if (keyword === "TRACE") return "DEBUG";
+  return keyword;
 }
 function compileMatcher(spec) {
   const q = spec.q.trim();
