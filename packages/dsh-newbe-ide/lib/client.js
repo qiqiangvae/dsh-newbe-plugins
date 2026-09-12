@@ -14591,7 +14591,11 @@ var runSnapshotSchema = external_exports.object({
   status: runStatusSchema,
   exitCode: external_exports.number().nullable(),
   error: external_exports.string(),
-  lossy: external_exports.boolean()
+  lossy: external_exports.boolean(),
+  /** 本次启动的时刻（毫秒）；未启动为 0。 */
+  startedAtMs: external_exports.number(),
+  /** 从输出里认出的监听端口；认不出为空串。DSH 的 shell 契约不暴露 PID，所以这里没有 pid。 */
+  port: external_exports.string()
 });
 var runReadSchema = external_exports.object({
   key: external_exports.string(),
@@ -14599,6 +14603,8 @@ var runReadSchema = external_exports.object({
   exitCode: external_exports.number().nullable(),
   error: external_exports.string(),
   lossy: external_exports.boolean(),
+  startedAtMs: external_exports.number(),
+  port: external_exports.string(),
   lines: external_exports.array(external_exports.string()),
   next: external_exports.number(),
   dropped: external_exports.boolean()
@@ -14668,6 +14674,25 @@ function plannedConfigName(base, taken) {
   let index = 2;
   while (taken.includes(`${base} (${index})`)) index += 1;
   return `${base} (${index})`;
+}
+
+// src/rundisplay.ts
+function formatUptime(startedAtMs, nowMs) {
+  if (startedAtMs <= 0 || nowMs <= startedAtMs) return "";
+  const seconds = Math.floor((nowMs - startedAtMs) / 1e3);
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ${seconds % 60}s`;
+  return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
+}
+var SEVERITY = { idle: 0, stopped: 1, exited: 2, failed: 3, running: 4 };
+function aggregateStatus(statuses) {
+  if (statuses.length === 0) return "idle";
+  let worst = "idle";
+  for (const status of statuses) {
+    if (SEVERITY[status] > SEVERITY[worst]) worst = status;
+  }
+  return worst;
 }
 
 // src/filter.ts
@@ -14864,6 +14889,16 @@ function ensureStyles() {
 .ide-envs td{padding:3px 4px;vertical-align:middle}
 .ide-envs input{width:100%}
 .ide-toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.ide-subrow{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding-bottom:8px;border-bottom:1px solid var(--dsw-alias-border-l2,#d9dce1)}
+.ide-subtab{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--dsw-alias-border-l2,#d9dce1);border-radius:999px;padding:3px 10px;font:inherit;font-size:12px;color:var(--dsw-alias-label-secondary,#697586);background:none;cursor:pointer}
+.ide-subtab:hover{border-color:var(--dsw-alias-label-secondary,#697586)}
+.ide-subtab[data-sel=true]{background:var(--dsw-alias-interactive-bg-hover,rgba(51,112,255,.12));border-color:var(--dsw-alias-brand-primary,#3370ff);color:var(--dsw-alias-brand-primary,#3370ff)}
+.ide-dot{width:8px;height:8px;border-radius:50%;flex:none;background:var(--dsw-alias-label-tertiary,#a8b0ba)}
+.ide-dot[data-state=running]{background:var(--dsw-alias-state-success-primary,#2ea043)}
+.ide-dot[data-state=failed]{background:var(--dsw-alias-state-error-primary,#d83931)}
+.ide-dot[data-state=exited]{background:var(--dsw-alias-state-warn-primary,#e7a100)}
+.ide-port{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;opacity:.85}
+
 .ide-filterbar{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .ide-filterbar .ide-field{padding:3px 8px;min-width:180px}
 .ide-hit{background:rgba(255,196,0,.18)}
@@ -15209,6 +15244,14 @@ function IdeView({ api, ctx }) {
         "data-sel": p.workspaceId === active?.workspaceId,
         onClick: () => selectProject(p.workspaceId),
         children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+            "span",
+            {
+              className: "ide-dot",
+              "data-state": aggregateStatus(p.configs.map((c) => runs[runKeyOf({ workspaceId: p.workspaceId, configId: c.id })]?.status ?? "idle")),
+              title: "\u8BE5\u9879\u76EE\u4E0B\u4EFB\u4E00\u6761\u914D\u7F6E\u5728\u8DD1\u5C31\u662F\u7EFF\u7684"
+            }
+          ),
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: p.title }),
           p.configs.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-note", children: p.configs.length }) : null
         ]
@@ -15234,13 +15277,41 @@ function IdeView({ api, ctx }) {
             " \xB7 ",
             active.path
           ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { flex: 1 } }),
-          active.configs.map((c) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-chip", "data-sel": c.id === activeConfig?.id, onClick: () => selectConfig(c.id), children: c.name }, c.id))
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { flex: 1 } })
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-subrow", children: [
+          active.configs.map((c) => {
+            const snapshot = runs[runKeyOf({ workspaceId: active.workspaceId, configId: c.id })];
+            return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
+              "button",
+              {
+                type: "button",
+                className: "ide-subtab",
+                "data-sel": c.id === activeConfig?.id,
+                onClick: () => selectConfig(c.id),
+                children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-dot", "data-state": snapshot?.status ?? "idle" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: c.name }),
+                  snapshot !== void 0 && snapshot.port !== "" ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "ide-port", children: [
+                    ":",
+                    snapshot.port
+                  ] }) : null
+                ]
+              },
+              c.id
+            );
+          }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-chip", onClick: () => addConfig(active), children: "\uFF0B \u542F\u52A8\u914D\u7F6E" })
         ] }),
         activeConfig === void 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-note", children: "\u8FD9\u4E2A\u9879\u76EE\u8FD8\u6CA1\u6709\u542F\u52A8\u914D\u7F6E \u2014\u2014 \u70B9\u300C\u2699 \u914D\u7F6E\u300D\u6DFB\u52A0" }) : /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
           /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-toolbar", children: [
             /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-configtitle", children: activeConfig.name }),
             /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-note", children: runText }),
+            runState !== void 0 && runState.port !== "" ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "ide-port", children: [
+              ":",
+              runState.port
+            ] }) : null,
+            runState !== void 0 && runState.status === "running" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-note", children: formatUptime(runState.startedAtMs, Date.now()) }) : null,
             /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { flex: 1 } }),
             /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
               "button",
@@ -15297,7 +15368,6 @@ function IdeView({ api, ctx }) {
                 active.title
               ] }),
               /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { flex: 1 } }),
-              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-chip", onClick: () => addConfig(active), children: "\uFF0B \u542F\u52A8\u914D\u7F6E" }),
               /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
                 "button",
                 {

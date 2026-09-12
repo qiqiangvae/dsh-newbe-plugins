@@ -14567,7 +14567,11 @@ var runSnapshotSchema = external_exports.object({
   status: runStatusSchema,
   exitCode: external_exports.number().nullable(),
   error: external_exports.string(),
-  lossy: external_exports.boolean()
+  lossy: external_exports.boolean(),
+  /** 本次启动的时刻（毫秒）；未启动为 0。 */
+  startedAtMs: external_exports.number(),
+  /** 从输出里认出的监听端口；认不出为空串。DSH 的 shell 契约不暴露 PID，所以这里没有 pid。 */
+  port: external_exports.string()
 });
 var runReadSchema = external_exports.object({
   key: external_exports.string(),
@@ -14575,6 +14579,8 @@ var runReadSchema = external_exports.object({
   exitCode: external_exports.number().nullable(),
   error: external_exports.string(),
   lossy: external_exports.boolean(),
+  startedAtMs: external_exports.number(),
+  port: external_exports.string(),
   lines: external_exports.array(external_exports.string()),
   next: external_exports.number(),
   dropped: external_exports.boolean()

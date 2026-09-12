@@ -35,10 +35,12 @@ import {
   type LogHistory,
   type RunRead,
   type RunSnapshot,
+  type RunStatus,
   type RunTarget,
 } from './schema.js';
 import { isSecretName } from './lines.js';
 import { buildLaunchConfig, plannedConfigName } from './ideaconfig.js';
+import { aggregateStatus, formatUptime } from './rundisplay.js';
 import { DEFAULT_LEVELS, LEVELS, compileMatcher, filterLines, type RunLevel } from './filter.js';
 
 export const NS = 'dsh-newbe-ide';
@@ -214,6 +216,16 @@ function ensureStyles(): () => void {
 .ide-envs td{padding:3px 4px;vertical-align:middle}
 .ide-envs input{width:100%}
 .ide-toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.ide-subrow{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding-bottom:8px;border-bottom:1px solid var(--dsw-alias-border-l2,#d9dce1)}
+.ide-subtab{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--dsw-alias-border-l2,#d9dce1);border-radius:999px;padding:3px 10px;font:inherit;font-size:12px;color:var(--dsw-alias-label-secondary,#697586);background:none;cursor:pointer}
+.ide-subtab:hover{border-color:var(--dsw-alias-label-secondary,#697586)}
+.ide-subtab[data-sel=true]{background:var(--dsw-alias-interactive-bg-hover,rgba(51,112,255,.12));border-color:var(--dsw-alias-brand-primary,#3370ff);color:var(--dsw-alias-brand-primary,#3370ff)}
+.ide-dot{width:8px;height:8px;border-radius:50%;flex:none;background:var(--dsw-alias-label-tertiary,#a8b0ba)}
+.ide-dot[data-state=running]{background:var(--dsw-alias-state-success-primary,#2ea043)}
+.ide-dot[data-state=failed]{background:var(--dsw-alias-state-error-primary,#d83931)}
+.ide-dot[data-state=exited]{background:var(--dsw-alias-state-warn-primary,#e7a100)}
+.ide-port{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;opacity:.85}
+
 .ide-filterbar{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .ide-filterbar .ide-field{padding:3px 8px;min-width:180px}
 .ide-hit{background:rgba(255,196,0,.18)}
@@ -605,6 +617,11 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
               data-sel={p.workspaceId === active?.workspaceId}
               onClick={() => selectProject(p.workspaceId)}
             >
+              <span
+                className="ide-dot"
+                data-state={aggregateStatus(p.configs.map((c) => runs[runKeyOf({ workspaceId: p.workspaceId, configId: c.id })]?.status ?? 'idle'))}
+                title="该项目下任一条配置在跑就是绿的"
+              />
               <span>{p.title}</span>
               {p.configs.length > 0 ? <span className="ide-note">{p.configs.length}</span> : null}
             </button>
@@ -631,11 +648,27 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
             <div className="ide-toolbar">
               <span className="ide-path">{active.title} · {active.path}</span>
               <span style={{ flex: 1 }} />
-              {active.configs.map((c) => (
-                <button key={c.id} type="button" className="ide-chip" data-sel={c.id === activeConfig?.id} onClick={() => selectConfig(c.id)}>
-                  {c.name}
-                </button>
-              ))}
+            </div>
+
+            {/* 二级 tab：一个项目下的多条启动配置各自一行一格，状态点与端口都在这儿 */}
+            <div className="ide-subrow">
+              {active.configs.map((c) => {
+                const snapshot = runs[runKeyOf({ workspaceId: active.workspaceId, configId: c.id })];
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    className="ide-subtab"
+                    data-sel={c.id === activeConfig?.id}
+                    onClick={() => selectConfig(c.id)}
+                  >
+                    <span className="ide-dot" data-state={snapshot?.status ?? 'idle'} />
+                    <span>{c.name}</span>
+                    {snapshot !== undefined && snapshot.port !== '' ? <span className="ide-port">:{snapshot.port}</span> : null}
+                  </button>
+                );
+              })}
+              <button type="button" className="ide-chip" onClick={() => addConfig(active)}>＋ 启动配置</button>
             </div>
 
             {activeConfig === undefined ? (
@@ -645,6 +678,10 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
                 <div className="ide-toolbar">
                   <span className="ide-configtitle">{activeConfig.name}</span>
                   <span className="ide-note">{runText}</span>
+                  {runState !== undefined && runState.port !== '' ? <span className="ide-port">:{runState.port}</span> : null}
+                  {runState !== undefined && runState.status === 'running'
+                    ? <span className="ide-note">{formatUptime(runState.startedAtMs, Date.now())}</span>
+                    : null}
                   <span style={{ flex: 1 }} />
                   <button
                     type="button"
@@ -686,7 +723,6 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
                     <div className="ide-toolbar">
                       <span className="ide-title">配置 · {active.title}</span>
                       <span style={{ flex: 1 }} />
-                      <button type="button" className="ide-chip" onClick={() => addConfig(active)}>＋ 启动配置</button>
                       <button
                         type="button"
                         className="ide-chip"

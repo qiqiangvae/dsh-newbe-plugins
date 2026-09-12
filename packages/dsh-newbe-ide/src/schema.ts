@@ -73,6 +73,10 @@ export const runSnapshotSchema = z.object({
   exitCode: z.number().nullable(),
   error: z.string(),
   lossy: z.boolean(),
+  /** 本次启动的时刻（毫秒）；未启动为 0。 */
+  startedAtMs: z.number(),
+  /** 从输出里认出的监听端口；认不出为空串。DSH 的 shell 契约不暴露 PID，所以这里没有 pid。 */
+  port: z.string(),
 });
 
 /** 增量日志：lines 是这次新增的行，next 是下次请求的偏移。 */
@@ -82,6 +86,8 @@ export const runReadSchema = z.object({
   exitCode: z.number().nullable(),
   error: z.string(),
   lossy: z.boolean(),
+  startedAtMs: z.number(),
+  port: z.string(),
   lines: z.array(z.string()),
   next: z.number(),
   dropped: z.boolean(),

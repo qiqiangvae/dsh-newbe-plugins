@@ -14577,7 +14577,11 @@ var runSnapshotSchema = external_exports.object({
   status: runStatusSchema,
   exitCode: external_exports.number().nullable(),
   error: external_exports.string(),
-  lossy: external_exports.boolean()
+  lossy: external_exports.boolean(),
+  /** 本次启动的时刻（毫秒）；未启动为 0。 */
+  startedAtMs: external_exports.number(),
+  /** 从输出里认出的监听端口；认不出为空串。DSH 的 shell 契约不暴露 PID，所以这里没有 pid。 */
+  port: external_exports.string()
 });
 var runReadSchema = external_exports.object({
   key: external_exports.string(),
@@ -14585,6 +14589,8 @@ var runReadSchema = external_exports.object({
   exitCode: external_exports.number().nullable(),
   error: external_exports.string(),
   lossy: external_exports.boolean(),
+  startedAtMs: external_exports.number(),
+  port: external_exports.string(),
   lines: external_exports.array(external_exports.string()),
   next: external_exports.number(),
   dropped: external_exports.boolean()
@@ -14743,6 +14749,33 @@ function isSecretName(name2) {
   return SECRET_NAME.test(name2);
 }
 
+// src/rundisplay.ts
+function formatUptime(startedAtMs, nowMs) {
+  if (startedAtMs <= 0 || nowMs <= startedAtMs) return "";
+  const seconds = Math.floor((nowMs - startedAtMs) / 1e3);
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ${seconds % 60}s`;
+  return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
+}
+function parsePortFromLines(lines) {
+  let found = "";
+  for (const line of lines) {
+    const matched = /\bport\s+(\d{2,5})\b/i.exec(line);
+    if (matched !== null) found = matched[1];
+  }
+  return found;
+}
+var SEVERITY = { idle: 0, stopped: 1, exited: 2, failed: 3, running: 4 };
+function aggregateStatus(statuses) {
+  if (statuses.length === 0) return "idle";
+  let worst = "idle";
+  for (const status of statuses) {
+    if (SEVERITY[status] > SEVERITY[worst]) worst = status;
+  }
+  return worst;
+}
+
 // src/runtime.ts
 var DEFAULT_MAX_LINES = 5e3;
 var MAX_PENDING_CHARS = 65536;
@@ -14765,7 +14798,9 @@ function createRunRegistry(provideShell, options = {}) {
       secrets: [],
       proc: null,
       stopRequested: false,
-      pendingAppend: []
+      pendingAppend: [],
+      startedAtMs: 0,
+      port: ""
     };
     runs.set(key, fresh);
     return fresh;
@@ -14773,6 +14808,8 @@ function createRunRegistry(provideShell, options = {}) {
   function emit(run, line) {
     pushLine(run, line);
     run.pendingAppend.push(line);
+    const port = parsePortFromLines([line]);
+    if (port !== "") run.port = port;
   }
   function flushAppend(run) {
     if (run.pendingAppend.length === 0) return;
@@ -14854,7 +14891,15 @@ function createRunRegistry(provideShell, options = {}) {
     return true;
   }
   function snapshotOf(run) {
-    return { key: run.key, status: run.status, exitCode: run.exitCode, error: run.error, lossy: run.lossy };
+    return {
+      key: run.key,
+      status: run.status,
+      exitCode: run.exitCode,
+      error: run.error,
+      lossy: run.lossy,
+      startedAtMs: run.startedAtMs,
+      port: run.port
+    };
   }
   return {
     start(key, spec) {
@@ -14869,6 +14914,8 @@ function createRunRegistry(provideShell, options = {}) {
       run.lossy = false;
       run.stopRequested = false;
       run.exitCode = null;
+      run.startedAtMs = Date.now();
+      run.port = "";
       run.error = "";
       run.secrets = spec.envs.filter((e) => isSecretName(e.name) && e.value !== "").map((e) => e.value);
       const env = {};
@@ -15221,6 +15268,7 @@ export {
   DEFAULT_LEVELS,
   LEVELS,
   STORAGE_PATH,
+  aggregateStatus,
   apply,
   buildLaunchConfig,
   cleanLine,
@@ -15230,10 +15278,12 @@ export {
   createRunRegistry,
   defaultState,
   filterLines,
+  formatUptime,
   isSecretName,
   levelOf,
   maskSecrets,
   name,
+  parsePortFromLines,
   parseSpringBootConfigurations,
   pickActiveConfig,
   plannedConfigName,

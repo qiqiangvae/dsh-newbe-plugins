@@ -20,6 +20,7 @@ export { DEFAULT_HISTORY_LINES, defaultState, pickActiveConfig, runKeyOf } from 
 export { cleanLine, isSecretName, maskSecrets, splitLines } from './lines.js';
 export { DEFAULT_LEVELS, LEVELS, compileMatcher, filterLines, levelOf } from './filter.js';
 export { createFileLogSink } from './logsink.js';
+export { aggregateStatus, formatUptime, parsePortFromLines } from './rundisplay.js';
 export { buildLaunchConfig, parseSpringBootConfigurations, plannedConfigName } from './ideaconfig.js';
 export type { BuiltLaunchConfig, IdeaCandidate, IdeaEnv } from './ideaconfig.js';
 export type { LogSink, TailResult } from './logsink.js';

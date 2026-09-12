@@ -5,6 +5,7 @@
  * 因此可以用假 shell 完整验证；真实进程组回收另有实测覆盖。
  */
 import { cleanLine, isSecretName, maskSecrets, splitLines } from './lines.js';
+import { parsePortFromLines } from './rundisplay.js';
 import type { LogSink } from './logsink.js';
 import type { RunRead, RunSnapshot, RunStatus } from './schema.js';
 
@@ -61,6 +62,10 @@ interface RunRecord {
   stopRequested: boolean;
   /** 本轮待落盘的行：一次 drain 批一次写，别一行一次 fsync。 */
   pendingAppend: string[];
+  /** 本次启动时刻（毫秒）；未启动为 0。 */
+  startedAtMs: number;
+  /** 从输出里认出的端口；逐行更新，避免每次快照重扫整段缓冲。 */
+  port: string;
 }
 
 /** shell 服务可能后到（cordis 服务可增可减），因此用取值函数而不是实例。 */
@@ -82,7 +87,7 @@ export function createRunRegistry(provideShell: ShellProvider, options: RunRegis
     if (existing !== undefined) return existing;
     const fresh: RunRecord = {
       key, status: 'idle', exitCode: null, error: '', lossy: false,
-      lines: [], base: 0, pending: '', secrets: [], proc: null, stopRequested: false, pendingAppend: [],
+      lines: [], base: 0, pending: '', secrets: [], proc: null, stopRequested: false, pendingAppend: [], startedAtMs: 0, port: '',
     };
     runs.set(key, fresh);
     return fresh;
@@ -92,6 +97,8 @@ export function createRunRegistry(provideShell: ShellProvider, options: RunRegis
   function emit(run: RunRecord, line: string): void {
     pushLine(run, line);
     run.pendingAppend.push(line);
+    const port = parsePortFromLines([line]);
+    if (port !== '') run.port = port;
   }
 
   function flushAppend(run: RunRecord): void {
@@ -189,7 +196,15 @@ export function createRunRegistry(provideShell: ShellProvider, options: RunRegis
   }
 
   function snapshotOf(run: RunRecord): RunSnapshot {
-    return { key: run.key, status: run.status, exitCode: run.exitCode, error: run.error, lossy: run.lossy };
+    return {
+      key: run.key,
+      status: run.status,
+      exitCode: run.exitCode,
+      error: run.error,
+      lossy: run.lossy,
+      startedAtMs: run.startedAtMs,
+      port: run.port,
+    };
   }
 
   return {
@@ -205,6 +220,8 @@ export function createRunRegistry(provideShell: ShellProvider, options: RunRegis
       run.lossy = false;
       run.stopRequested = false;
       run.exitCode = null;
+      run.startedAtMs = Date.now();
+      run.port = '';
       run.error = '';
       run.secrets = spec.envs.filter((e) => isSecretName(e.name) && e.value !== '').map((e) => e.value);
       const env: Record<string, string> = {};
