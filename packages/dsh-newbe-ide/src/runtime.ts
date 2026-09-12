@@ -66,6 +66,8 @@ interface RunRecord {
   startedAtMs: number;
   /** 从输出里认出的端口；逐行更新，避免每次快照重扫整段缓冲。 */
   port: string;
+  /** 缓冲里最后一条非空行；同样逐行维护。 */
+  lastLine: string;
 }
 
 /** shell 服务可能后到（cordis 服务可增可减），因此用取值函数而不是实例。 */
@@ -87,7 +89,7 @@ export function createRunRegistry(provideShell: ShellProvider, options: RunRegis
     if (existing !== undefined) return existing;
     const fresh: RunRecord = {
       key, status: 'idle', exitCode: null, error: '', lossy: false,
-      lines: [], base: 0, pending: '', secrets: [], proc: null, stopRequested: false, pendingAppend: [], startedAtMs: 0, port: '',
+      lines: [], base: 0, pending: '', secrets: [], proc: null, stopRequested: false, pendingAppend: [], startedAtMs: 0, port: '', lastLine: '',
     };
     runs.set(key, fresh);
     return fresh;
@@ -99,6 +101,7 @@ export function createRunRegistry(provideShell: ShellProvider, options: RunRegis
     run.pendingAppend.push(line);
     const port = parsePortFromLines([line]);
     if (port !== '') run.port = port;
+    if (line.trim() !== '') run.lastLine = line;
   }
 
   function flushAppend(run: RunRecord): void {
@@ -204,6 +207,7 @@ export function createRunRegistry(provideShell: ShellProvider, options: RunRegis
       lossy: run.lossy,
       startedAtMs: run.startedAtMs,
       port: run.port,
+      lastLine: run.lastLine,
     };
   }
 
@@ -222,6 +226,7 @@ export function createRunRegistry(provideShell: ShellProvider, options: RunRegis
       run.exitCode = null;
       run.startedAtMs = Date.now();
       run.port = '';
+      run.lastLine = '';
       run.error = '';
       run.secrets = spec.envs.filter((e) => isSecretName(e.name) && e.value !== '').map((e) => e.value);
       const env: Record<string, string> = {};

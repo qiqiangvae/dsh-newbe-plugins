@@ -179,6 +179,24 @@ function ensureStyles(): () => void {
 .ide-tab{display:flex;align-items:center;gap:7px;padding:9px 10px 8px;color:var(--dsw-alias-label-secondary,#697586);white-space:nowrap;border-bottom:2px solid transparent;margin-bottom:-1px;cursor:pointer;flex:none;background:none;border-left:0;border-right:0;border-top:0;font:inherit}
 .ide-tab:hover{color:var(--dsw-alias-label-primary,#1f2329)}
 .ide-tab[data-sel=true]{color:var(--dsw-alias-label-primary,#1f2329);border-bottom-color:var(--dsw-alias-brand-primary,#3370ff)}
+.ide-tabrow[data-dragging=true]{cursor:grabbing;user-select:none}
+.ide-tab .ide-x{opacity:0;font-size:13px;line-height:1;padding:0 2px;border-radius:4px;color:var(--dsw-alias-label-secondary,#697586)}
+.ide-tab:hover .ide-x{opacity:1}
+.ide-tab .ide-x:hover{background:var(--dsw-alias-interactive-bg-hover,rgba(0,0,0,.07))}
+.ide-tools{margin-left:auto;display:flex;align-items:center;gap:6px;padding-left:12px;flex:none}
+.ide-overflow{position:relative}
+.ide-overflow>summary{list-style:none;cursor:pointer;min-width:26px;height:24px;border:1px solid var(--dsw-alias-border-l2,#d9dce1);border-radius:7px;display:grid;place-items:center;color:var(--dsw-alias-label-secondary,#697586);font-size:12px}
+.ide-overflow>summary::-webkit-details-marker{display:none}
+.ide-overflow>summary:hover{background:var(--dsw-alias-interactive-bg-hover,rgba(0,0,0,.07))}
+.ide-overflow ul{position:absolute;right:0;top:30px;z-index:30;background:var(--dsw-alias-bg-module-platform,#fff);border:1px solid var(--dsw-alias-border-l2,#d9dce1);border-radius:9px;box-shadow:0 14px 34px rgba(0,0,0,.28);padding:6px;margin:0;list-style:none;min-width:240px;max-height:320px;overflow:auto}
+.ide-overflow li{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;cursor:pointer;font-size:12px;color:var(--dsw-alias-label-secondary,#697586);white-space:nowrap}
+.ide-overflow li:hover{background:var(--dsw-alias-interactive-bg-hover,rgba(0,0,0,.07));color:var(--dsw-alias-label-primary,#1f2329)}
+.ide-board{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;align-content:start;overflow:auto;flex:1;min-height:0}
+.ide-card{border:1px solid var(--dsw-alias-border-l2,#d9dce1);border-radius:10px;background:var(--dsw-alias-bg-module-platform,#fff);padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+.ide-cardhead{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.ide-cardrow{display:flex;align-items:center;gap:8px;padding:5px 7px;border-radius:7px;background:var(--dsw-alias-interactive-bg-hover,rgba(128,128,128,.08));font-size:12px}
+.ide-cardrow .ide-name{font-weight:600;cursor:pointer}
+.ide-cardrow .ide-last{flex:1;min-width:0;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;color:var(--dsw-alias-label-secondary,#697586);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ide-body{display:flex;flex-direction:column;flex:1;min-height:0;padding:12px 16px;gap:10px;overflow:auto}
 /* 视图要填满面板：滚动交给日志区自己，其余不滚；设置页仍用上面的 overflow:auto */
 .ide-fill{overflow:hidden}
@@ -311,6 +329,10 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
   const [editing, setEditing] = useState(false);
   const [drafts, setDrafts] = useState<Record<string, LaunchConfig>>({});
   const [flash, setFlash] = useState('');
+  const [onlyRunning, setOnlyRunning] = useState(false);
+  const [overview, setOverview] = useState(false);
+  const [overviewTab, setOverviewTab] = useState(false);
+  const tabRowRef = useRef<HTMLDivElement | null>(null);
   const [discovery, setDiscovery] = useState<IdeaDiscovery | null>(null);
   const [discoveryBusy, setDiscoveryBusy] = useState(false);
   const offsetRef = useRef(0);
@@ -345,6 +367,7 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
     setConfig(load.config);
     setProjects(load.projects);
     setWarning(load.warning);
+    setOverviewTab(load.config.showOverview);
     setActiveProjectId((current) => {
       if (load.config.projects.some((p) => p.workspaceId === current)) return current;
       if (load.config.activeWorkspaceId !== '') return load.config.activeWorkspaceId;
@@ -434,6 +457,52 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
     return () => { stopped = true; window.clearInterval(timer); };
   }, [api, runKey, active, activeConfig, reload]);
 
+  // tab 条横向滑动：滚轮 / 触控板横滑 + 按住拖动（主流 IDE 的做法）。
+  // 用原生监听而不是 onWheel：React 的 wheel 是被动监听，preventDefault 不生效。
+  useEffect(() => {
+    const row = tabRowRef.current;
+    if (row === null) return;
+    const onWheel = (event: WheelEvent) => {
+      if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return; // 本来就是横滑，交给浏览器
+      row.scrollLeft += event.deltaY;
+      event.preventDefault();
+    };
+    let drag: { x: number; left: number } | null = null;
+    const onDown = (event: MouseEvent) => {
+      drag = { x: event.clientX, left: row.scrollLeft };
+      row.dataset.dragging = 'true';
+    };
+    const onMove = (event: MouseEvent) => {
+      if (drag !== null) row.scrollLeft = drag.left - (event.clientX - drag.x);
+    };
+    const onUp = () => {
+      drag = null;
+      delete row.dataset.dragging;
+    };
+    row.addEventListener('wheel', onWheel, { passive: false });
+    row.addEventListener('mousedown', onDown);
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => {
+      row.removeEventListener('wheel', onWheel);
+      row.removeEventListener('mousedown', onDown);
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+  }, []);
+
+  // 选中的 tab 自己滚进视野（项目多了以后必须有）
+  useEffect(() => {
+    const row = tabRowRef.current;
+    if (row === null) return;
+    const selected = row.querySelector('[data-sel="true"]');
+    if (selected !== null) {
+      try {
+        selected.scrollIntoView({ inline: 'nearest', block: 'nearest' });
+      } catch { /* 老旧实现忽略参数即可 */ }
+    }
+  }, [activeProjectId, overview, overviewTab, onlyRunning]);
+
   // 贴底就跟随到底；用户上滚（scroll 事件把 pinned 置 false）后不再打扰他。
   useEffect(() => {
     const el = logRef.current;
@@ -479,11 +548,28 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
   };
 
   const available = projects.filter((p) => !cfg.projects.some((entry) => entry.workspaceId === p.workspaceId));
+  const statusOfProject = (workspaceId: string, configs: readonly LaunchConfig[]) =>
+    aggregateStatus(configs.map((c) => runs[runKeyOf({ workspaceId, configId: c.id })]?.status ?? 'idle'));
+  const visibleProjects = registered.filter((p) => !p.hidden && (!onlyRunning || statusOfProject(p.workspaceId, p.configs) === 'running'));
+
+  const setHidden = (workspaceId: string, hidden: boolean) => {
+    void commit(patchProject(cfg, workspaceId, (p) => ({ ...p, hidden })), false);
+  };
+  const openConfig = (workspaceId: string, configId: string) => {
+    setOverview(false);
+    setActiveProjectId(workspaceId);
+    setActiveConfigIds((prev) => ({ ...prev, [workspaceId]: configId }));
+  };
+  const toggleOverviewTab = (next: boolean) => {
+    setOverviewTab(next);
+    if (!next) setOverview(false);
+    void commit({ ...cfg, showOverview: next }, false);
+  };
 
   const addProject = (workspaceId: string) => {
     const source = projects.find((p) => p.workspaceId === workspaceId);
     if (source === undefined) return;
-    const entry: ProjectEntry = { workspaceId: source.workspaceId, path: source.path, title: source.title, configs: [], activeConfigId: '' };
+    const entry: ProjectEntry = { workspaceId: source.workspaceId, path: source.path, title: source.title, configs: [], activeConfigId: '', hidden: false };
     setActiveProjectId(source.workspaceId);
     void commit({ ...cfg, activeWorkspaceId: source.workspaceId, projects: [...cfg.projects, entry] }, false);
   };
@@ -570,12 +656,14 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
     })), false);
   };
 
-  const runAction = async (action: 'start' | 'stop') => {
-    if (api === undefined || active === undefined || activeConfig === undefined) return;
+  const runAction = async (action: 'start' | 'stop', explicit?: RunTarget) => {
+    const target = explicit ?? (active !== undefined && activeConfig !== undefined
+      ? { workspaceId: active.workspaceId, configId: activeConfig.id }
+      : undefined);
+    if (api === undefined || target === undefined) return;
     setError('');
     try {
-      const target = { workspaceId: active.workspaceId, configId: activeConfig.id };
-      if (action === 'start') {
+      if (action === 'start' && explicit === undefined) {
         genRef.current += 1; // 让上一代在飞的读取结果失效
         offsetRef.current = 0;
         pinnedRef.current = true;
@@ -607,27 +695,63 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
 
   return (
     <div className="ide-root ide-view">
-      {registered.length > 0 ? (
-        <div className="ide-tabrow">
-          {registered.map((p) => (
-            <button
-              key={p.workspaceId}
-              type="button"
-              className="ide-tab"
-              data-sel={p.workspaceId === active?.workspaceId}
-              onClick={() => selectProject(p.workspaceId)}
+      <div className="ide-tabrow" ref={tabRowRef}>
+        {overviewTab ? (
+          <button type="button" className="ide-tab" data-sel={overview} onClick={() => setOverview(true)}>
+            <span>总览</span>
+          </button>
+        ) : null}
+        {visibleProjects.map((p) => (
+          <button
+            key={p.workspaceId}
+            type="button"
+            className="ide-tab"
+            data-sel={!overview && p.workspaceId === active?.workspaceId}
+            onClick={() => { setOverview(false); selectProject(p.workspaceId); }}
+          >
+            <span className="ide-dot" data-state={statusOfProject(p.workspaceId, p.configs)} title="任一条配置在跑就是绿的" />
+            <span>{p.title}</span>
+            {p.configs.length > 0 ? <span className="ide-note">{p.configs.length}</span> : null}
+            <span
+              className="ide-x"
+              title="收起这个项目（配置全部保留，可从 » 里恢复）"
+              onClick={(event) => { event.stopPropagation(); setHidden(p.workspaceId, true); }}
             >
-              <span
-                className="ide-dot"
-                data-state={aggregateStatus(p.configs.map((c) => runs[runKeyOf({ workspaceId: p.workspaceId, configId: c.id })]?.status ?? 'idle'))}
-                title="该项目下任一条配置在跑就是绿的"
-              />
-              <span>{p.title}</span>
-              {p.configs.length > 0 ? <span className="ide-note">{p.configs.length}</span> : null}
-            </button>
-          ))}
-        </div>
-      ) : null}
+              ×
+            </span>
+          </button>
+        ))}
+        <span className="ide-tools">
+          <button type="button" className="ide-chip" data-sel={onlyRunning} onClick={() => setOnlyRunning((v) => !v)}>只看运行中</button>
+          <button type="button" className="ide-chip" data-sel={overviewTab} onClick={() => toggleOverviewTab(!overviewTab)}>总览</button>
+          <details className="ide-overflow">
+            <summary title="全部项目">»</summary>
+            <ul>
+              {cfg.projects.map((p) => (
+                <li
+                  key={p.workspaceId}
+                  onClick={() => { setOverview(false); selectProject(p.workspaceId); if (p.hidden) setHidden(p.workspaceId, false); }}
+                >
+                  <span className="ide-dot" data-state={statusOfProject(p.workspaceId, p.configs)} />
+                  <span>{p.title}</span>
+                  <span className="ide-note" style={{ marginLeft: 'auto' }}>
+                    {p.hidden ? '已收起' : `${p.configs.length} 条配置`}
+                  </span>
+                </li>
+              ))}
+              {cfg.projects.length === 0 ? <li className="ide-note">还没有项目</li> : null}
+            </ul>
+          </details>
+          {!projects.length ? (
+            <span className="ide-note">工作区注册表暂不可用</span>
+          ) : available.length > 0 ? (
+            <select className="ide-field" value="" onChange={(event) => { if (event.target.value !== '') addProject(event.target.value); }}>
+              <option value="">＋ 添加项目（{available.length}）</option>
+              {available.map((p) => <option key={p.workspaceId} value={p.workspaceId}>{p.title} · {p.path}</option>)}
+            </select>
+          ) : null}
+        </span>
+      </div>
 
       <div className="ide-body ide-fill">
         {warning !== '' ? <div className="ide-warn">{warning}</div> : null}
@@ -638,10 +762,46 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
           </div>
         ) : null}
 
-        {active === undefined ? (
+        {overview ? (
+          <div className="ide-board">
+            {cfg.projects.map((p) => (
+              <div className="ide-card" key={p.workspaceId}>
+                <div className="ide-cardhead">
+                  <span className="ide-dot" data-state={statusOfProject(p.workspaceId, p.configs)} />
+                  <span className="ide-title">{p.title}</span>
+                  {p.hidden ? <span className="ide-note">已收起</span> : null}
+                  <span style={{ flex: 1 }} />
+                  <span className="ide-note">{p.configs.length} 条配置</span>
+                </div>
+                <div className="ide-note ide-mono">{p.path}</div>
+                {p.configs.length === 0 ? <div className="ide-note">这个项目还没有启动配置</div> : null}
+                {p.configs.map((c) => {
+                  const snapshot = runs[runKeyOf({ workspaceId: p.workspaceId, configId: c.id })];
+                  return (
+                    <div className="ide-cardrow" key={c.id}>
+                      <span className="ide-dot" data-state={snapshot?.status ?? 'idle'} />
+                      <span className="ide-name" onClick={() => openConfig(p.workspaceId, c.id)}>{c.name}</span>
+                      {snapshot !== undefined && snapshot.port !== '' ? <span className="ide-port">:{snapshot.port}</span> : null}
+                      <span className="ide-note">
+                        {describeRun(snapshot)}
+                        {snapshot !== undefined && snapshot.status === 'running' ? ` · ${formatUptime(snapshot.startedAtMs, Date.now())}` : ''}
+                      </span>
+                      <span className="ide-last" title={snapshot?.lastLine ?? ''}>{snapshot?.lastLine ?? '（无输出）'}</span>
+                      {snapshot?.status === 'running' ? (
+                        <button type="button" className="ide-btn" onClick={() => { void runAction('stop', { workspaceId: p.workspaceId, configId: c.id }); }}>停止</button>
+                      ) : (
+                        <button type="button" className="ide-btn" data-kind="primary" onClick={() => { void runAction('start', { workspaceId: p.workspaceId, configId: c.id }); }}>启动</button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        ) : active === undefined ? (
           <div className="ide-empty">
             <div>还没有项目</div>
-            <div className="ide-note">点右上角「⚙ 配置」添加项目与启动配置</div>
+            <div className="ide-note">从右上角「＋ 添加项目」里挑一个 DSH 工作区</div>
           </div>
         ) : (
           <>

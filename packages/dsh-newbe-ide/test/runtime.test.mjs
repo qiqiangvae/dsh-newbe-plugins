@@ -176,3 +176,18 @@ test('shell 不可用 / 命令为空 / 重复启动给出可读错误', () => {
   runs.start('w/c', SPEC);
   assert.throws(() => runs.start('w/c', SPEC), /已在运行/);
 });
+
+test('快照带上最后一条非空输出与启动时刻', () => {
+  const shell = makeShell();
+  const runs = createRunRegistry(() => shell);
+  const before = Date.now();
+  runs.start('w/c', SPEC);
+  shell.started[0].proc.emit('first\nsecond\n');
+  const snap = runs.snapshot('w/c');
+  assert.equal(snap.lastLine, 'second');
+  assert.ok(snap.startedAtMs >= before, '应当记下启动时刻');
+  assert.equal(snap.port, '', '认不出端口时为空串');
+  shell.started[0].proc.emit('Tomcat started on port 8083 (http)\n');
+  runs.pump();
+  assert.equal(runs.snapshot('w/c').port, '8083');
+});

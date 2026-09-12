@@ -23,6 +23,7 @@ const sample = {
     path: '/tmp/kun-ai',
     title: 'kun-ai',
     activeConfigId: 'c1',
+    hidden: false,
     configs: [{
       id: 'c1',
       name: 'web',
@@ -82,4 +83,22 @@ test('损坏后再次提交可恢复写入', async () => {
   await store.submit(sample);
   assert.deepEqual(createConfigStore(file).getState(), sample);
   assert.equal(store.warning, '');
+});
+
+test('老文件没有 hidden 字段时仍能读回（缺省视为未收起）', () => {
+  const file = tempFile();
+  // 模拟上一版写下的文件：project 条目里没有 hidden
+  writeFileSync(file, JSON.stringify({
+    projects: [{
+      workspaceId: 'w1', path: '/tmp/p', title: 'p', activeConfigId: 'c1',
+      configs: [{ id: 'c1', name: 'A', command: 'x', cwd: '/tmp/p', envs: [] }],
+    }],
+    activeWorkspaceId: 'w1',
+    showOverview: false,
+  }));
+  const store = createConfigStore(file);
+  assert.equal(store.warning, '', '不该被判为损坏');
+  assert.equal(store.getState().projects.length, 1);
+  assert.equal(store.getState().projects[0].hidden, false);
+  assert.equal(store.getState().projects[0].configs.length, 1, '配置不能丢');
 });

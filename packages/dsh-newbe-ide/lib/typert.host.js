@@ -14535,7 +14535,9 @@ var projectEntrySchema = external_exports.object({
   path: external_exports.string(),
   title: external_exports.string(),
   configs: external_exports.array(launchConfigSchema),
-  activeConfigId: external_exports.string()
+  activeConfigId: external_exports.string(),
+  /** 从面板上收起的项目：配置全部保留，只是不出 tab。老文件没有这个字段，缺省视为未收起。 */
+  hidden: external_exports.boolean().default(false)
 });
 var ideStateSchema = external_exports.object({
   projects: external_exports.array(projectEntrySchema),
@@ -14571,7 +14573,9 @@ var runSnapshotSchema = external_exports.object({
   /** 本次启动的时刻（毫秒）；未启动为 0。 */
   startedAtMs: external_exports.number(),
   /** 从输出里认出的监听端口；认不出为空串。DSH 的 shell 契约不暴露 PID，所以这里没有 pid。 */
-  port: external_exports.string()
+  port: external_exports.string(),
+  /** 缓冲里最后一条非空输出：总览卡片要显示"各自最后一行"，而客户端只有当前配置的日志。 */
+  lastLine: external_exports.string()
 });
 var runReadSchema = external_exports.object({
   key: external_exports.string(),
@@ -14581,6 +14585,7 @@ var runReadSchema = external_exports.object({
   lossy: external_exports.boolean(),
   startedAtMs: external_exports.number(),
   port: external_exports.string(),
+  lastLine: external_exports.string(),
   lines: external_exports.array(external_exports.string()),
   next: external_exports.number(),
   dropped: external_exports.boolean()

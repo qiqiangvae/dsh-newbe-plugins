@@ -28,6 +28,8 @@ export const projectEntrySchema = z.object({
   title: z.string(),
   configs: z.array(launchConfigSchema),
   activeConfigId: z.string(),
+  /** 从面板上收起的项目：配置全部保留，只是不出 tab。老文件没有这个字段，缺省视为未收起。 */
+  hidden: z.boolean().default(false),
 });
 
 /** 持久化到 $DSH_HOME/storages/dsh-newbe-ide.json 的完整内容。 */
@@ -77,6 +79,8 @@ export const runSnapshotSchema = z.object({
   startedAtMs: z.number(),
   /** 从输出里认出的监听端口；认不出为空串。DSH 的 shell 契约不暴露 PID，所以这里没有 pid。 */
   port: z.string(),
+  /** 缓冲里最后一条非空输出：总览卡片要显示"各自最后一行"，而客户端只有当前配置的日志。 */
+  lastLine: z.string(),
 });
 
 /** 增量日志：lines 是这次新增的行，next 是下次请求的偏移。 */
@@ -88,6 +92,7 @@ export const runReadSchema = z.object({
   lossy: z.boolean(),
   startedAtMs: z.number(),
   port: z.string(),
+  lastLine: z.string(),
   lines: z.array(z.string()),
   next: z.number(),
   dropped: z.boolean(),
