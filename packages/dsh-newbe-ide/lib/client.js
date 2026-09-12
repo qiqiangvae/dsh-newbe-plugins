@@ -14825,16 +14825,16 @@ function ensureStyles() {
    sessionId/session/pendingInteraction\uFF0C\u770B\u4E0D\u5230\u5F53\u524D\u89C6\u56FE\uFF09\uFF0C\u56E0\u6B64\u4E0E dsh-context \u540C\u6CD5\uFF1A
    \u7528 :has() \u6309\u89C6\u56FE\u6839\u5143\u7D20\u6536\u8D77\u5EA7\u4F4D\u3002\u672B\u5C3E\u7684 :not(...) \u662F\u4FDD\u62A4\u2014\u2014\u8F93\u5165\u6846\u91CC\u4E00\u65E6\u627F\u8F7D
    \u5BA1\u6279 / \u8FFD\u95EE / \u8BA1\u5212\u590D\u6838\uFF0C\u5FC5\u987B\u7559\u7740\uFF0C\u5426\u5219\u7528\u6237\u6CA1\u6CD5\u56DE\u7B54\u3002 */
-[data-conversation-scroll]:has(.ide-root)>[data-composer-seat]:not(:has([data-approval-key],[data-question-key],[data-plan-review-key])){display:none}
-[data-conversation-scroll]:has(.ide-root)~[data-width-handle]{display:none}
+[data-conversation-scroll]:has(.ide-view)>[data-composer-seat]:not(:has([data-approval-key],[data-question-key],[data-plan-review-key])){display:none}
+[data-conversation-scroll]:has(.ide-view)~[data-width-handle]{display:none}
 /* \u8BA9\u65E5\u5FD7\u533A\u6B63\u597D\u7B49\u4E8E\u9762\u677F\u9AD8\u5EA6\uFF0C\u800C\u4E0D\u662F\u968F\u5185\u5BB9\u65E0\u9650\u53D8\u9AD8\u3002
    DSH \u7684\u4F1A\u8BDD\u9AA8\u67B6\u5728 active \u9636\u6BB5\u628A\u89C6\u56FE\u533A\u8BBE\u6210 flex:1 0 auto + min-height:auto\uFF08\u53EA\u5728
    composer overlay \u6A21\u5F0F\u4E0B\u624D\u5939\u6210 flex:1 1 0 + min-height:0\uFF09\uFF0C\u6240\u4EE5\u89C6\u56FE\u9AD8\u5EA6\u7531\u5185\u5BB9\u51B3\u5B9A\uFF1A
    \u65E5\u5FD7\u4E00\u957F\uFF0C\u6574\u9875\u8DDF\u7740\u53D8\u957F\uFF0C\u5F97\u628A\u9875\u9762\u62D6\u5230\u5E95\u624D\u80FD\u770B\u5230\u6700\u65B0\u4E00\u884C\u3002
    \u8FD9\u91CC\u7167 DSH \u81EA\u5DF1\u7684\u505A\u6CD5\uFF0C\u628A\u5305\u4F4F\u672C\u89C6\u56FE\u7684\u90A3\u5C42\u5939\u5230\u786E\u5B9A\u9AD8\u5EA6\u2014\u2014\u4E0D\u78B0\u5B83\u7684\u54C8\u5E0C\u7C7B\u540D\uFF0C
    \u7528 :has(.ide-root) \u5B9A\u4F4D\u5305\u542B\u672C\u89C6\u56FE\u7684\u76F4\u63A5\u5B50\u5C42\u3002 */
-[data-conversation-scroll]:has(.ide-root)>[data-slot="conversation.session"]>*:has(.ide-root),
-[data-conversation-scroll]:has(.ide-root)>[data-slot="conversation.session"]:has(.ide-root){
+[data-conversation-scroll]:has(.ide-view)>[data-slot="conversation.session"]>*:has(.ide-view),
+[data-conversation-scroll]:has(.ide-view)>[data-slot="conversation.session"]:has(.ide-view){
   flex:1 1 0;
   min-height:0;
   overflow:hidden;
@@ -15027,13 +15027,13 @@ function IdeView({ api, ctx }) {
     }
   };
   if (config2 === null) {
-    return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-root", children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-body", children: [
+    return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-root ide-view", children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-body", children: [
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-note", children: "\u6B63\u5728\u52A0\u8F7D\u542F\u52A8\u914D\u7F6E\u2026" }),
       api === void 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-warn", children: "remote.ideConfig \u4E0D\u53EF\u7528" }) : null,
       error51 !== "" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-err", children: error51 }) : null
     ] }) });
   }
-  return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-root", children: [
+  return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-root ide-view", children: [
     registered.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-tabrow", children: registered.map((p) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
       "button",
       {
@@ -15269,13 +15269,13 @@ function IdeSettings({ api }) {
     }
   };
   if (config2 === null) {
-    return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-root", children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-body", children: [
+    return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-root ide-settings", children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-body", children: [
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-note", children: "\u6B63\u5728\u52A0\u8F7D\u542F\u52A8\u914D\u7F6E\u2026" }),
       api === void 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-warn", children: "remote.ideConfig \u4E0D\u53EF\u7528" }) : null,
       error51 !== "" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-err", children: error51 }) : null
     ] }) });
   }
-  return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-root", children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-body", children: [
+  return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-root ide-settings", children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-body", children: [
     /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { style: { display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }, children: [
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-title", children: "IDE \xB7 \u542F\u52A8\u914D\u7F6E" }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-note", children: flash })

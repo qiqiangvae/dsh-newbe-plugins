@@ -200,16 +200,16 @@ function ensureStyles(): () => void {
    sessionId/session/pendingInteraction，看不到当前视图），因此与 dsh-context 同法：
    用 :has() 按视图根元素收起座位。末尾的 :not(...) 是保护——输入框里一旦承载
    审批 / 追问 / 计划复核，必须留着，否则用户没法回答。 */
-[data-conversation-scroll]:has(.ide-root)>[data-composer-seat]:not(:has([data-approval-key],[data-question-key],[data-plan-review-key])){display:none}
-[data-conversation-scroll]:has(.ide-root)~[data-width-handle]{display:none}
+[data-conversation-scroll]:has(.ide-view)>[data-composer-seat]:not(:has([data-approval-key],[data-question-key],[data-plan-review-key])){display:none}
+[data-conversation-scroll]:has(.ide-view)~[data-width-handle]{display:none}
 /* 让日志区正好等于面板高度，而不是随内容无限变高。
    DSH 的会话骨架在 active 阶段把视图区设成 flex:1 0 auto + min-height:auto（只在
    composer overlay 模式下才夹成 flex:1 1 0 + min-height:0），所以视图高度由内容决定：
    日志一长，整页跟着变长，得把页面拖到底才能看到最新一行。
    这里照 DSH 自己的做法，把包住本视图的那层夹到确定高度——不碰它的哈希类名，
    用 :has(.ide-root) 定位包含本视图的直接子层。 */
-[data-conversation-scroll]:has(.ide-root)>[data-slot="conversation.session"]>*:has(.ide-root),
-[data-conversation-scroll]:has(.ide-root)>[data-slot="conversation.session"]:has(.ide-root){
+[data-conversation-scroll]:has(.ide-view)>[data-slot="conversation.session"]>*:has(.ide-view),
+[data-conversation-scroll]:has(.ide-view)>[data-slot="conversation.session"]:has(.ide-view){
   flex:1 1 0;
   min-height:0;
   overflow:hidden;
@@ -434,7 +434,7 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
 
   if (config === null) {
     return (
-      <div className="ide-root">
+      <div className="ide-root ide-view">
         <div className="ide-body">
           <div className="ide-note">正在加载启动配置…</div>
           {api === undefined ? <div className="ide-warn">remote.ideConfig 不可用</div> : null}
@@ -445,7 +445,7 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
   }
 
   return (
-    <div className="ide-root">
+    <div className="ide-root ide-view">
       {registered.length > 0 ? (
         <div className="ide-tabrow">
           {registered.map((p) => (
@@ -696,7 +696,7 @@ function IdeSettings({ api }: SettingsProps): React.ReactElement {
 
   if (config === null) {
     return (
-      <div className="ide-root">
+      <div className="ide-root ide-settings">
         <div className="ide-body">
           <div className="ide-note">正在加载启动配置…</div>
           {api === undefined ? <div className="ide-warn">remote.ideConfig 不可用</div> : null}
@@ -707,7 +707,7 @@ function IdeSettings({ api }: SettingsProps): React.ReactElement {
   }
 
   return (
-    <div className="ide-root">
+    <div className="ide-root ide-settings">
       <div className="ide-body">
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           <span className="ide-title">IDE · 启动配置</span>
