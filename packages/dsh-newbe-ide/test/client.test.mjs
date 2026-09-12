@@ -51,12 +51,13 @@ test('bundle 自注册并导出插件形态', () => {
   assert.deepEqual([...plugin.inject], ['slots', 'remote']);  // vm 里的数组原型不同，摊回宿主 realm 再比
 });
 
-test('注册进会话视图 tab：对话/轨迹/上下文/IDE 里的第四个', async () => {
+test('注册两个面：会话视图 tab（只读）+ 设置页', async () => {
   const registered = [];
+  const injected = [];
   let mounted;
   let unmounted = false;
   const slots = {
-    inject: (key, callback) => { assert.equal(key, 'conversation.view'); callback(); return () => {}; },
+    inject: (key, callback) => { injected.push(key); callback(); return () => {}; },
     register: (options, component) => { registered.push({ options, component }); return () => {}; },
   };
   const ctx = {
@@ -68,17 +69,28 @@ test('注册进会话视图 tab：对话/轨迹/上下文/IDE 里的第四个', 
   };
   await loadClient().apply(ctx);
 
-  assert.equal(registered.length, 1, '应当只注册一个会话视图');
-  assert.equal(registered[0].options.name, 'conversation.view');
-  assert.equal(registered[0].options.id, 'dsh-newbe-ide');
-  assert.equal(registered[0].options.order, 30);
-  assert.equal(registered[0].options.label, 'IDE');
-  assert.equal(typeof registered[0].component, 'function');
+  assert.deepEqual(injected, ['conversation.view', 'settings.plugins.tab']);
+
+  const view = registered.find((r) => r.options.name === 'conversation.view');
+  const settings = registered.find((r) => r.options.name === 'settings.plugins.tab');
+
+  assert.ok(view !== undefined, '会话视图未注册');
+  assert.equal(view.options.id, 'dsh-newbe-ide');
+  assert.equal(view.options.order, 30, '对话 0 / 轨迹 10 / 上下文 20 / IDE 30');
+  assert.equal(view.options.label, 'IDE');
+  assert.equal(typeof view.component, 'function');
+
+  assert.ok(settings !== undefined, '设置页未注册');
+  assert.equal(settings.options.id, 'dsh-newbe-ide');
+  assert.equal(typeof settings.options.label, 'function');
+  assert.equal(settings.options.label(), 'IDE');
+  assert.equal(typeof settings.component, 'function');
+
   assert.ok(mounted !== undefined, 'remote contribution 未挂载');
   assert.equal(unmounted, false);
 });
 
-test('$mount 失败不会让插件挂掉，面板降级为可见提示', async () => {
+test('$mount 失败不会让插件挂掉，两个面仍然注册（各自降级为可见提示）', async () => {
   const registered = [];
   const slots = {
     inject: (_key, callback) => { callback(); return () => {}; },
@@ -92,7 +104,7 @@ test('$mount 失败不会让插件挂掉，面板降级为可见提示', async (
     get: () => undefined,
   };
   await loadClient().apply(ctx);
-  assert.equal(registered.length, 1, '挂载失败仍应注册面板');
+  assert.deepEqual(registered.map((r) => r.options.name), ['conversation.view', 'settings.plugins.tab']);
 });
 
 test('客户端端点与宿主 Typert 清单逐条一致', async () => {

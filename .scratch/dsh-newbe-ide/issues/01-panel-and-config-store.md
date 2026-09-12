@@ -38,3 +38,5 @@
 - **验证证据**：`pnpm -r run check` 四包通过；本包 14 项 `node --test` 全绿——存储行为 6（往返/0600/损坏降级不覆盖/非法拒绝），Host 3（工作区映射、注册表缺失不崩、`typertRemote` 绑定满足网关 `readBinding`），客户端接线 5（bundle 自注册、tab 注册契约、`$mount` 失败降级、端点与宿主清单逐条一致）。
 - **代码评审**：Standards 轴 10 条（含 1 条硬 bug：`typertRemote.service` 传字符串会让每次 RPC 抛 `gateway/binding-invalid`）与 Spec 轴 5 条（含乐观更新无回滚）已全部处理；多配置属 04 范围的重复，见上。
 - **尚未验证**：装进 `~/.dsh/profiles/web` 后的真实渲染（需要重启 `dsh web`），以及真机上的读写往返。
+
+**设计修正（2026-09-12，用户反馈）**：本票交付的"面板里带编辑表单"被推翻——**会话视图不应出现输入控件**（对齐 `dsh-context` 的做法：它的视图里 0 个输入框）。现在的切分是：会话视图只读（项目 tab、启动配置、启停按钮、日志），配置编辑搬到 **设置 → 插件 → IDE**（`settings.plugins.tab`，兄弟包 `dsh-newbe-my-favorites` 用的同一扩展点）。视图每 3 次轮询顺带重读配置，设置页的改动近乎即时可见。

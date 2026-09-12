@@ -22,14 +22,15 @@ DSH 会话视图里的第四个 tab「IDE」（**对话 / 轨迹 / 上下文 / I
 | 项目 | DSH 工作区（`workspaceRegistry` 里的实体，有路径和标题） | 工程、repo、workspace |
 | **启动配置** | 一条具名的可启动条目：名称 + 启动命令 + 工作目录 + 环境变量 | ~~命令~~、任务、run item |
 | 启动命令 | 启动配置里那行 shell 字符串 | ~~脚本~~ |
-| 面板 | 会话视图 tab「IDE」，即 `conversation.view` 里 id=`dsh-newbe-ide`、order=30 的那一格（对话 0 / 轨迹 10 / 上下文 20） | 全局面板、侧栏入口 |
+| 面板 / 视图 | 会话视图 tab「IDE」，即 `conversation.view` 里 id=`dsh-newbe-ide`、order=30 的那一格（对话 0 / 轨迹 10 / 上下文 20）。**只读**：展示与操作（启停、看日志），不放任何输入控件 | 全局面板、侧栏入口 |
+| 配置页 | 设置 → 插件 → IDE（`settings.plugins.tab`）：项目与启动配置的增删改都在这里 | 面板里的编辑表单 |
 | 运行态 | 一条启动配置的当前进程状态：未启动 / 启动中 / 运行中 / 已停止 / 启动失败 | 状态机 |
 | 日志 | 该启动配置进程的 stdout+stderr 合并流 | 输出、terminal |
 
 ## 结构
 
 ```
-会话视图 tab「IDE」（对话 / 轨迹 / 上下文 / **IDE**）
+会话视图 tab「IDE」（对话 / 轨迹 / 上下文 / **IDE**）—— 只读
 ├─ 一级 tab：项目（角标 = 该项目启动配置条数；状态点 = 聚合状态）
 │   └─ 二级 tab：启动配置（各自独立启停/重启、端口/PID/时长、日志、环境变量）
 ├─ 「总览」tab          ← 配置项，默认关；按项目分卡，卡内逐条列启动配置
@@ -37,9 +38,10 @@ DSH 会话视图里的第四个 tab「IDE」（**对话 / 轨迹 / 上下文 / I
 ```
 
 - 二级 tab 位置：**独立一行**（原型变体 A）。
-- 头部一行：`● 项目名` `[二级 tab 或 / 配置名]` `端口` `PID` `运行时长` `⚙ 启动配置` `重启` `停止`。
-- `⚙ 启动配置` 收起时零占位；展开后在头部下方显示 名称 / 启动命令 / 工作目录 / 环境变量 + 保存。
+- 头部一行：`● 项目名` `[二级 tab 或 / 配置名]` `端口` `PID` `运行时长` `重启` `停止`。
+- **视图里不出现输入控件**（对齐 `dsh-context`：它的视图里同样 0 个输入框）。配置在 设置 → 插件 → IDE 里改，视图每 3 次轮询顺带重读一次配置，因此设置页的改动近乎即时可见。
 - tab 管理对齐主流 IDE：横向滑动（滚轮/拖动）、`»` 溢出菜单、`×` 关闭、只看运行中。
+- 配置页：项目增删（从 DSH 工作区里挑）、每个项目下启动配置增删改（名称 / 启动命令 / 工作目录 / 环境变量），保存有反馈，失败回滚到磁盘真实状态。
 
 ## 持久化
 
@@ -79,7 +81,7 @@ DSH 会话视图里的第四个 tab「IDE」（**对话 / 轨迹 / 上下文 / I
 
 ## 验收标准（可观察）
 
-1. 会话视图 tab 排里出现第四个 tab「IDE」（对话 / 轨迹 / 上下文 / IDE），点进去是面板；DSH 重启后启动配置与 tab 顺序仍在（持久化生效）。
+1. 会话视图 tab 排里出现第四个 tab「IDE」（对话 / 轨迹 / 上下文 / IDE），点进去是**只读控制台**（无输入控件）；设置 → 插件 → IDE 里能增删改项目与启动配置；DSH 重启后配置与顺序仍在（持久化生效）。
 2. 一个项目下建两条启动配置，分别启停互不影响；一级 tab 状态点为聚合。
 3. 日志实时滚动；`ERROR` 过滤只剩匹配行；`仅看匹配` / 正则 / level 徽章都生效。
 4. 点停止后 `ps aux | grep java` 无该项目残留，端口释放。
@@ -90,7 +92,7 @@ DSH 会话视图里的第四个 tab「IDE」（**对话 / 轨迹 / 上下文 / I
 
 - 面板承载点：`conversation.view`（list，scope=session，注册 `{ id, order, label }`）——运行时 slot 树已确认占用者 对话 0 / 轨迹 10 / 上下文 20，`dsh-context` 插件是第三方先例；本插件注册 id `dsh-newbe-ide`、order 30、label「IDE」。
 - Host：`shell`（`resolve`/`start`/`ShellProcess.readOutput`/`kill`）、`workspaceRegistry.list()`、`settings`、`clientModules`。
-- Client：`host.call`、`styles.insert`、`ctx.interval`、`React.createElement`。
+- Client：`host.call`、`styles.insert`、`ctx.interval`、`React.createElement`；注册点 `conversation.view`（只读视图）与 `settings.plugins.tab`（配置页，兄弟包 `dsh-newbe-my-favorites` 同样用它）。
 - 打包契约：`dsh.bundle.patch` + `dsh.client`（`exports["./client"]` + `platform: web`）、`lib/` 预构建且提交、安装不触发构建、不声明未发布的 `@deepseek-ai/dsh-client-*` 依赖。
 - 已验证 DSH 版本：`0.1.5-alpha.2`。
 

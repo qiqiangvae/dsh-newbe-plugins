@@ -14622,6 +14622,10 @@ var import_jsx_runtime = require("react/jsx-runtime");
 var NS = "dsh-newbe-ide";
 var VIEW_ID = "dsh-newbe-ide";
 var VIEW_ORDER = 30;
+var SETTINGS_TAB_ORDER = 30;
+var LOG_LIMIT = 4e3;
+var POLL_MS = 800;
+var CONFIG_REFRESH_EVERY = 3;
 var REMOTE_CONTRIBUTION = {
   package: "dsh-newbe-ide",
   descriptors: [
@@ -14701,11 +14705,6 @@ function ensureStyles() {
 .ide-tab{display:flex;align-items:center;gap:7px;padding:9px 10px 8px;color:var(--dsw-alias-label-secondary,#697586);white-space:nowrap;border-bottom:2px solid transparent;margin-bottom:-1px;cursor:pointer;flex:none;background:none;border-left:0;border-right:0;border-top:0;font:inherit}
 .ide-tab:hover{color:var(--dsw-alias-label-primary,#1f2329)}
 .ide-tab[data-sel=true]{color:var(--dsw-alias-label-primary,#1f2329);border-bottom-color:var(--dsw-alias-brand-primary,#3370ff)}
-.ide-tab .ide-x{opacity:0;font-size:13px;line-height:1;padding:0 2px;border-radius:4px;color:var(--dsw-alias-label-secondary,#697586)}
-.ide-tab:hover .ide-x{opacity:1}
-.ide-tab .ide-x:hover{background:var(--dsw-alias-interactive-bg-hover,rgba(0,0,0,.07))}
-.ide-tools{display:flex;align-items:center;gap:6px;margin-left:auto;padding:0 4px 0 10px;flex:none}
-.ide-select{background:var(--dsw-alias-bg-module-platform,#fff);border:1px solid var(--dsw-alias-border-l2,#d9dce1);border-radius:7px;padding:3px 6px;font:inherit;font-size:12px;color:var(--dsw-alias-label-secondary,#697586);max-width:190px}
 .ide-body{display:flex;flex-direction:column;flex:1;min-height:0;padding:12px 16px;gap:10px;overflow:auto}
 .ide-head{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--dsw-alias-border-l2,#d9dce1);border-radius:9px;background:var(--dsw-alias-bg-module-platform,#fff);flex-wrap:wrap}
 .ide-title{font-size:14px;font-weight:600}
@@ -14715,29 +14714,37 @@ function ensureStyles() {
 .ide-chip[data-sel=true]{background:var(--dsw-alias-interactive-bg-hover,rgba(51,112,255,.12));border-color:var(--dsw-alias-brand-primary,#3370ff);color:var(--dsw-alias-brand-primary,#3370ff)}
 .ide-btn{border:1px solid var(--dsw-alias-border-l2,#d9dce1);border-radius:7px;padding:4px 11px;font:inherit;font-size:12px;color:var(--dsw-alias-label-primary,#1f2329);background:none;cursor:pointer}
 .ide-btn:hover{background:var(--dsw-alias-interactive-bg-hover,rgba(0,0,0,.07))}
-.ide-btn[data-on=true]{background:var(--dsw-alias-interactive-bg-hover,rgba(51,112,255,.12));border-color:var(--dsw-alias-brand-primary,#3370ff);color:var(--dsw-alias-brand-primary,#3370ff)}
 .ide-btn[data-kind=primary]{background:var(--dsw-alias-brand-primary,#3370ff);border-color:transparent;color:#fff}
+.ide-btn[data-kind=danger]:hover{color:var(--dsw-alias-state-error-primary,#d83931);border-color:var(--dsw-alias-state-error-primary,#d83931)}
 .ide-btn:disabled{opacity:.5;cursor:default}
 .ide-field{background:var(--dsw-alias-bg-module-platform,#fff);border:1px solid var(--dsw-alias-border-l2,#d9dce1);border-radius:7px;padding:5px 9px;font:inherit;font-size:12px;color:var(--dsw-alias-label-primary,#1f2329);outline:none}
 .ide-field:focus{border-color:var(--dsw-alias-brand-primary,#3370ff)}
 .ide-mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
-.ide-cfg{border:1px solid var(--dsw-alias-border-l2,#d9dce1);border-radius:9px;background:var(--dsw-alias-bg-module-platform,#fff);padding:10px 12px;display:flex;flex-direction:column;gap:8px}
-.ide-line{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.ide-label{color:var(--dsw-alias-label-secondary,#697586);font-size:12px;width:56px;flex:none}
-.ide-envs{width:100%;border-collapse:collapse}
-.ide-envs td{padding:3px 4px;vertical-align:middle}
-.ide-envs input{width:100%}
 .ide-empty{margin:auto;text-align:center;color:var(--dsw-alias-label-secondary,#697586);display:flex;flex-direction:column;gap:8px;align-items:center}
 .ide-note{font-size:11px;color:var(--dsw-alias-label-secondary,#697586)}
 .ide-warn{border:1px dashed var(--dsw-alias-state-warn-primary,#e7a100);color:var(--dsw-alias-state-warn-primary,#e7a100);border-radius:8px;padding:7px 10px;font-size:12px}
 .ide-err{color:var(--dsw-alias-state-error-primary,#d83931);font-size:12px}
 .ide-logbox{display:flex;flex-direction:column;gap:4px;flex:1;min-height:0}
-.ide-log{flex:1;min-height:160px;max-height:54vh;overflow:auto;background:rgba(128,128,128,.10);border:1px solid var(--dsw-alias-border-l2,#d9dce1);border-radius:9px;padding:8px 10px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;line-height:1.5;white-space:pre-wrap;word-break:break-all}
+.ide-log{flex:1;min-height:160px;max-height:56vh;overflow:auto;background:rgba(128,128,128,.10);border:1px solid var(--dsw-alias-border-l2,#d9dce1);border-radius:9px;padding:8px 10px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;line-height:1.5;white-space:pre-wrap;word-break:break-all}
+.ide-section{display:flex;flex-direction:column;gap:10px}
+.ide-sectiontitle{font-size:13px;font-weight:600;margin-top:4px}
+.ide-card{border:1px solid var(--dsw-alias-border-l2,#d9dce1);border-radius:9px;background:var(--dsw-alias-bg-module-platform,#fff);padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+.ide-cardhead{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.ide-form{display:flex;flex-direction:column;gap:8px;border-top:1px solid var(--dsw-alias-border-l2,#d9dce1);padding-top:8px}
+.ide-line{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.ide-label{color:var(--dsw-alias-label-secondary,#697586);font-size:12px;width:64px;flex:none}
+.ide-envs{width:100%;border-collapse:collapse}
+.ide-envs td{padding:3px 4px;vertical-align:middle}
+.ide-envs input{width:100%}
+.ide-toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 `;
   document.head.appendChild(style);
   return () => {
     style.remove();
   };
+}
+function patchProject(config2, workspaceId, mutate) {
+  return { ...config2, projects: config2.projects.map((p) => p.workspaceId === workspaceId ? mutate(p) : p) };
 }
 function describeRun(run) {
   if (run === void 0 || run.status === "idle") return "\u672A\u542F\u52A8";
@@ -14747,18 +14754,35 @@ function describeRun(run) {
   if (run.exitCode === 127) return "\u547D\u4EE4\u4E0D\u5B58\u5728\uFF08\u7801 127\uFF09";
   return `\u5DF2\u9000\u51FA\uFF08\u7801 ${run.exitCode ?? "?"}\uFF09`;
 }
-function patchProject(config2, workspaceId, mutate) {
-  return { ...config2, projects: config2.projects.map((p) => p.workspaceId === workspaceId ? mutate(p) : p) };
+function activeOf(config2, projects, activeProjectId) {
+  const registryKnown = projects.length > 0;
+  const isRegistered = (workspaceId) => projects.some((w) => w.workspaceId === workspaceId);
+  const registered = registryKnown ? config2.projects.filter((p) => isRegistered(p.workspaceId)) : config2.projects;
+  const stale = registryKnown ? config2.projects.filter((p) => !isRegistered(p.workspaceId)) : [];
+  const active = registered.find((p) => p.workspaceId === activeProjectId) ?? registered[0];
+  const activeConfigId = active !== void 0 && active.activeConfigId !== "" ? active.activeConfigId : active?.configs[0]?.id;
+  const activeConfig = active?.configs.find((c) => c.id === activeConfigId);
+  return { registryKnown, registered, stale, active, activeConfig };
 }
-function Panel({ api, ctx }) {
+function IdeView({ api, ctx }) {
   const [config2, setConfig] = (0, import_react.useState)(null);
   const [projects, setProjects] = (0, import_react.useState)([]);
   const [warning, setWarning] = (0, import_react.useState)("");
   const [activeProjectId, setActiveProjectId] = (0, import_react.useState)("");
-  const [drafts, setDrafts] = (0, import_react.useState)({});
-  const [editing, setEditing] = (0, import_react.useState)(false);
-  const [flash, setFlash] = (0, import_react.useState)("");
+  const [runs, setRuns] = (0, import_react.useState)({});
+  const [logLines, setLogLines] = (0, import_react.useState)([]);
+  const [truncated, setTruncated] = (0, import_react.useState)(false);
   const [error51, setError] = (0, import_react.useState)("");
+  const offsetRef = (0, import_react.useRef)(0);
+  const logRef = (0, import_react.useRef)(null);
+  const pinnedRef = (0, import_react.useRef)(true);
+  const genRef = (0, import_react.useRef)(0);
+  const tickRef = (0, import_react.useRef)(0);
+  const cfg = config2 ?? defaultState();
+  const { registered, stale, active, activeConfig } = activeOf(cfg, projects, activeProjectId);
+  const runKey = active !== void 0 && activeConfig !== void 0 ? runKeyOf({ workspaceId: active.workspaceId, configId: activeConfig.id }) : "";
+  const runState = runKey !== "" ? runs[runKey] : void 0;
+  const runText = describeRun(runState);
   const applyLoad = (0, import_react.useCallback)((load) => {
     setConfig(load.config);
     setProjects(load.projects);
@@ -14782,11 +14806,224 @@ function Panel({ api, ctx }) {
     }
   }, [api, applyLoad]);
   (0, import_react.useEffect)(() => {
+    offsetRef.current = 0;
+    genRef.current += 1;
+    pinnedRef.current = true;
+    setTruncated(false);
+    setLogLines([]);
+  }, [runKey]);
+  (0, import_react.useEffect)(() => {
     void reload();
     return ctx.on("connection/reset", () => {
       void reload();
     });
   }, [ctx, reload]);
+  (0, import_react.useEffect)(() => {
+    if (api === void 0 || runKey === "" || active === void 0 || activeConfig === void 0) return;
+    const target = { workspaceId: active.workspaceId, configId: activeConfig.id };
+    let stopped = false;
+    const tick = async () => {
+      const gen = genRef.current;
+      try {
+        const list = envelopeValue(await api.runs(), "\u8BFB\u53D6\u8FD0\u884C\u6001");
+        const map2 = {};
+        for (const item of list) map2[item.key] = item;
+        if (stopped || genRef.current !== gen) return;
+        setRuns(map2);
+        if (tickRef.current % CONFIG_REFRESH_EVERY === 0) void reload();
+        tickRef.current += 1;
+        const chunk = envelopeValue(await api.read({ ...target, from: offsetRef.current }), "\u8BFB\u53D6\u65E5\u5FD7");
+        if (stopped || genRef.current !== gen) return;
+        offsetRef.current = chunk.next;
+        if (chunk.dropped) setTruncated(true);
+        if (chunk.lines.length > 0) {
+          setLogLines((prev) => {
+            const merged = [...prev, ...chunk.lines];
+            if (merged.length <= LOG_LIMIT) return merged;
+            setTruncated(true);
+            return merged.slice(merged.length - LOG_LIMIT);
+          });
+        }
+      } catch (e) {
+        if (!stopped && genRef.current === gen) setError(String(e?.message ?? e));
+      }
+    };
+    void tick();
+    const timer = window.setInterval(() => {
+      void tick();
+    }, POLL_MS);
+    return () => {
+      stopped = true;
+      window.clearInterval(timer);
+    };
+  }, [api, runKey, active, activeConfig, reload]);
+  (0, import_react.useEffect)(() => {
+    const el = logRef.current;
+    if (el === null || !pinnedRef.current) return;
+    el.scrollTop = el.scrollHeight;
+  }, [logLines]);
+  const selectProject = (workspaceId) => {
+    setActiveProjectId(workspaceId);
+    if (cfg.activeWorkspaceId !== workspaceId && api !== void 0) {
+      void api.submit({ ...cfg, activeWorkspaceId: workspaceId }).catch(() => {
+      });
+    }
+  };
+  const selectConfig = (configId) => {
+    if (active === void 0 || api === void 0) return;
+    const next = patchProject(cfg, active.workspaceId, (p) => ({ ...p, activeConfigId: configId }));
+    setConfig(next);
+    void api.submit(next).catch(() => {
+    });
+  };
+  const runAction = async (action) => {
+    if (api === void 0 || active === void 0 || activeConfig === void 0) return;
+    setError("");
+    try {
+      const target = { workspaceId: active.workspaceId, configId: activeConfig.id };
+      if (action === "start") {
+        genRef.current += 1;
+        offsetRef.current = 0;
+        pinnedRef.current = true;
+        setTruncated(false);
+        setLogLines([]);
+      }
+      const call = action === "start" ? api.start(target) : api.stop(target);
+      const snap = envelopeValue(await call, action === "start" ? "\u542F\u52A8" : "\u505C\u6B62");
+      setRuns((prev) => ({ ...prev, [snap.key]: snap }));
+    } catch (e) {
+      setError(String(e?.message ?? e));
+    }
+  };
+  if (config2 === null) {
+    return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-root", children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-body", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-note", children: "\u6B63\u5728\u52A0\u8F7D\u542F\u52A8\u914D\u7F6E\u2026" }),
+      api === void 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-warn", children: "remote.ideConfig \u4E0D\u53EF\u7528" }) : null,
+      error51 !== "" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-err", children: error51 }) : null
+    ] }) });
+  }
+  return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-root", children: [
+    registered.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-tabrow", children: registered.map((p) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
+      "button",
+      {
+        type: "button",
+        className: "ide-tab",
+        "data-sel": p.workspaceId === active?.workspaceId,
+        onClick: () => selectProject(p.workspaceId),
+        children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: p.title }),
+          p.configs.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-note", children: p.configs.length }) : null
+        ]
+      },
+      p.workspaceId
+    )) }) : null,
+    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-body", children: [
+      warning !== "" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-warn", children: warning }) : null,
+      error51 !== "" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-err", children: error51 }) : null,
+      stale.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-warn", children: [
+        "\u6709 ",
+        stale.length,
+        " \u4E2A\u9879\u76EE\u7684 DSH \u5DE5\u4F5C\u533A\u5DF2\u4E0D\u5B58\u5728\uFF0C\u5176 tab \u5DF2\u9690\u85CF\uFF08\u542F\u52A8\u914D\u7F6E\u4ECD\u4FDD\u7559\uFF09\uFF1A",
+        stale.map((p) => p.title).join("\u3001")
+      ] }) : null,
+      active === void 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-empty", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { children: "\u8FD8\u6CA1\u6709\u9879\u76EE" }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-note", children: "\u5728 \u8BBE\u7F6E \u2192 \u63D2\u4EF6 \u2192 IDE \u91CC\u6DFB\u52A0\u9879\u76EE\u4E0E\u542F\u52A8\u914D\u7F6E" })
+      ] }) : /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-head", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-title", children: active.title }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-path", children: active.path }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { flex: 1 } }),
+          active.configs.map((c) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-chip", "data-sel": c.id === activeConfig?.id, onClick: () => selectConfig(c.id), children: c.name }, c.id))
+        ] }),
+        activeConfig === void 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-note", children: "\u8FD9\u4E2A\u9879\u76EE\u8FD8\u6CA1\u6709\u542F\u52A8\u914D\u7F6E \u2014\u2014 \u5728 \u8BBE\u7F6E \u2192 \u63D2\u4EF6 \u2192 IDE \u91CC\u6DFB\u52A0" }) : /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-head", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-note ide-mono", children: activeConfig.command === "" ? "\uFF08\u542F\u52A8\u547D\u4EE4\u4E3A\u7A7A\uFF09" : activeConfig.command }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { flex: 1 } }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+              "button",
+              {
+                type: "button",
+                className: "ide-btn",
+                "data-kind": "primary",
+                disabled: runState?.status === "running",
+                onClick: () => {
+                  void runAction("start");
+                },
+                children: "\u542F\u52A8"
+              }
+            ),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-btn", disabled: runState?.status !== "running", onClick: () => {
+              void runAction("stop");
+            }, children: "\u505C\u6B62" }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+              "button",
+              {
+                type: "button",
+                className: "ide-btn",
+                disabled: runState?.status !== "running",
+                onClick: () => {
+                  void (async () => {
+                    await runAction("stop");
+                    await runAction("start");
+                  })();
+                },
+                children: "\u91CD\u542F"
+              }
+            )
+          ] }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-logbox", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+              "div",
+              {
+                className: "ide-log",
+                ref: logRef,
+                onScroll: (event) => {
+                  const el = event.currentTarget;
+                  pinnedRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+                },
+                children: logLines.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-note", children: runState?.status === "running" ? "\u7B49\u5F85\u8F93\u51FA\u2026" : "\u70B9\u300C\u542F\u52A8\u300D\u8FD0\u884C\u8FD9\u6761\u542F\u52A8\u914D\u7F6E" }) : logLines.map((line, index) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { children: line }, index))
+              }
+            ),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-note", children: [
+              runText,
+              " \xB7 \u5DF2\u7F13\u5B58 ",
+              logLines.length,
+              " \u884C",
+              runState?.lossy === true || truncated ? "\uFF08\u8F93\u51FA\u8FC7\u5FEB\u6216\u8FC7\u957F\uFF0C\u65E9\u671F\u65E5\u5FD7\u5DF2\u88AB\u4E22\u5F03\uFF09" : ""
+            ] })
+          ] })
+        ] })
+      ] })
+    ] })
+  ] });
+}
+function IdeSettings({ api }) {
+  const [config2, setConfig] = (0, import_react.useState)(null);
+  const [projects, setProjects] = (0, import_react.useState)([]);
+  const [warning, setWarning] = (0, import_react.useState)("");
+  const [drafts, setDrafts] = (0, import_react.useState)({});
+  const [flash, setFlash] = (0, import_react.useState)("");
+  const [error51, setError] = (0, import_react.useState)("");
+  const cfg = config2 ?? defaultState();
+  const reload = (0, import_react.useCallback)(async () => {
+    if (api === void 0) {
+      setWarning("remote.ideConfig \u4E0D\u53EF\u7528\uFF0C\u65E0\u6CD5\u8BFB\u5199\u542F\u52A8\u914D\u7F6E");
+      return;
+    }
+    try {
+      const load = envelopeValue(await api.load(), "\u8BFB\u53D6\u542F\u52A8\u914D\u7F6E");
+      setConfig(load.config);
+      setProjects(load.projects);
+      setWarning(load.warning);
+      setError("");
+    } catch (e) {
+      setError(String(e?.message ?? e));
+    }
+  }, [api]);
+  (0, import_react.useEffect)(() => {
+    void reload();
+  }, [reload]);
   const commit = (0, import_react.useCallback)(async (next, showFlash) => {
     if (api === void 0) {
       setError("remote.ideConfig \u4E0D\u53EF\u7528\uFF0C\u6539\u52A8\u672A\u4FDD\u5B58");
@@ -14808,126 +15045,49 @@ function Panel({ api, ctx }) {
       return false;
     }
   }, [api, reload]);
-  const cfg = config2 ?? defaultState();
-  const registryKnown = projects.length > 0;
-  const isRegistered = (workspaceId) => projects.some((w) => w.workspaceId === workspaceId);
-  const registered = registryKnown ? cfg.projects.filter((p) => isRegistered(p.workspaceId)) : cfg.projects;
-  const stale = registryKnown ? cfg.projects.filter((p) => !isRegistered(p.workspaceId)) : [];
-  const active = registered.find((p) => p.workspaceId === activeProjectId) ?? registered[0];
-  const activeConfigId = active !== void 0 && active.activeConfigId !== "" ? active.activeConfigId : active?.configs[0]?.id;
-  const activeConfig = active?.configs.find((c) => c.id === activeConfigId);
-  const draft = activeConfig !== void 0 ? drafts[activeConfig.id] ?? activeConfig : void 0;
   const available = projects.filter((p) => !cfg.projects.some((entry) => entry.workspaceId === p.workspaceId));
-  const runKey = active !== void 0 && activeConfig !== void 0 ? runKeyOf({ workspaceId: active.workspaceId, configId: activeConfig.id }) : "";
-  const [runs, setRuns] = (0, import_react.useState)({});
-  const [logLines, setLogLines] = (0, import_react.useState)([]);
-  const offsetRef = (0, import_react.useRef)(0);
-  const logRef = (0, import_react.useRef)(null);
-  const pinnedRef = (0, import_react.useRef)(true);
-  const genRef = (0, import_react.useRef)(0);
-  const [truncated, setTruncated] = (0, import_react.useState)(false);
-  (0, import_react.useEffect)(() => {
-    offsetRef.current = 0;
-    genRef.current += 1;
-    pinnedRef.current = true;
-    setTruncated(false);
-    setLogLines([]);
-  }, [runKey]);
-  (0, import_react.useEffect)(() => {
-    if (api === void 0 || runKey === "" || active === void 0 || activeConfig === void 0) return;
-    const target = { workspaceId: active.workspaceId, configId: activeConfig.id };
-    let stopped = false;
-    const tick = async () => {
-      const gen = genRef.current;
-      try {
-        const list = envelopeValue(await api.runs(), "\u8BFB\u53D6\u8FD0\u884C\u6001");
-        const map2 = {};
-        for (const item of list) map2[item.key] = item;
-        if (stopped || genRef.current !== gen) return;
-        setRuns(map2);
-        const chunk = envelopeValue(await api.read({ ...target, from: offsetRef.current }), "\u8BFB\u53D6\u65E5\u5FD7");
-        if (stopped || genRef.current !== gen) return;
-        offsetRef.current = chunk.next;
-        if (chunk.dropped) setTruncated(true);
-        if (chunk.lines.length > 0) {
-          setLogLines((prev) => {
-            const merged = [...prev, ...chunk.lines];
-            if (merged.length <= 4e3) return merged;
-            setTruncated(true);
-            return merged.slice(merged.length - 4e3);
-          });
-        }
-      } catch (e) {
-        if (!stopped && genRef.current === gen) setError(String(e?.message ?? e));
-      }
-    };
-    void tick();
-    const timer = window.setInterval(() => {
-      void tick();
-    }, 800);
-    return () => {
-      stopped = true;
-      window.clearInterval(timer);
-    };
-  }, [api, runKey, active, activeConfig]);
-  (0, import_react.useEffect)(() => {
-    const el = logRef.current;
-    if (el === null || !pinnedRef.current) return;
-    el.scrollTop = el.scrollHeight;
-  }, [logLines]);
-  const selectProject = (workspaceId) => {
-    setActiveProjectId(workspaceId);
-    setEditing(false);
-    if (cfg.activeWorkspaceId !== workspaceId) void commit({ ...cfg, activeWorkspaceId: workspaceId }, false);
-  };
   const addProject = (workspaceId) => {
     const source = projects.find((p) => p.workspaceId === workspaceId);
     if (source === void 0) return;
     const entry = { workspaceId: source.workspaceId, path: source.path, title: source.title, configs: [], activeConfigId: "" };
-    setActiveProjectId(source.workspaceId);
     void commit({ ...cfg, activeWorkspaceId: source.workspaceId, projects: [...cfg.projects, entry] }, false);
   };
-  const removeProject = (workspaceId) => {
-    const next = { ...cfg, projects: cfg.projects.filter((p) => p.workspaceId !== workspaceId) };
-    setActiveProjectId(next.projects[0]?.workspaceId ?? "");
-    void commit(next, false);
-  };
-  const selectConfig = (id) => {
-    if (active === void 0) return;
-    setEditing(false);
-    void commit(patchProject(cfg, active.workspaceId, (p) => ({ ...p, activeConfigId: id })), false);
-  };
-  const addConfig = () => {
-    if (active === void 0) return;
+  const addConfig = (project) => {
     const fresh = {
       id: `c${crypto.randomUUID()}`,
-      name: `\u542F\u52A8\u914D\u7F6E ${active.configs.length + 1}`,
+      name: `\u542F\u52A8\u914D\u7F6E ${project.configs.length + 1}`,
       command: "",
-      cwd: active.path,
+      cwd: project.path,
       envs: []
     };
-    setEditing(true);
-    void commit(patchProject(cfg, active.workspaceId, (p) => ({ ...p, configs: [...p.configs, fresh], activeConfigId: fresh.id })), false);
+    setDrafts((prev) => ({ ...prev, [fresh.id]: fresh }));
+    void commit(patchProject(cfg, project.workspaceId, (p) => ({
+      ...p,
+      configs: [...p.configs, fresh],
+      activeConfigId: p.activeConfigId === "" ? fresh.id : p.activeConfigId
+    })), false);
   };
-  const removeConfig = (id) => {
-    if (active === void 0) return;
-    setEditing(false);
-    void commit(patchProject(cfg, active.workspaceId, (p) => {
-      const kept = p.configs.filter((c) => c.id !== id);
-      return { ...p, configs: kept, activeConfigId: kept[0]?.id ?? "" };
+  const removeConfig = (project, configId) => {
+    setDrafts((prev) => {
+      const copy = { ...prev };
+      delete copy[configId];
+      return copy;
+    });
+    void commit(patchProject(cfg, project.workspaceId, (p) => {
+      const kept = p.configs.filter((c) => c.id !== configId);
+      return { ...p, configs: kept, activeConfigId: p.activeConfigId === configId ? kept[0]?.id ?? "" : p.activeConfigId };
     }), false);
   };
-  const saveDraft = async () => {
-    if (active === void 0 || draft === void 0) return;
-    const cleaned = { ...draft, cwd: draft.cwd !== "" ? draft.cwd : active.path };
-    const saved = await commit({
-      ...patchProject(cfg, active.workspaceId, (p) => ({
-        ...p,
-        activeConfigId: cleaned.id,
-        configs: p.configs.map((c) => c.id === cleaned.id ? cleaned : c)
-      })),
-      activeWorkspaceId: active.workspaceId
-    }, true);
+  const patchDraft = (project, draft, patch) => {
+    setDrafts((prev) => ({ ...prev, [draft.id]: { ...draft, ...patch } }));
+  };
+  const saveDraft = async (project, draft) => {
+    const cleaned = { ...draft, cwd: draft.cwd !== "" ? draft.cwd : project.path };
+    const saved = await commit(patchProject(cfg, project.workspaceId, (p) => ({
+      ...p,
+      activeConfigId: cleaned.id,
+      configs: p.configs.map((c) => c.id === cleaned.id ? cleaned : c)
+    })), true);
     if (saved) {
       setDrafts((prev) => {
         const copy = { ...prev };
@@ -14936,165 +15096,77 @@ function Panel({ api, ctx }) {
       });
     }
   };
-  const runState = runKey !== "" ? runs[runKey] : void 0;
-  const runText = describeRun(runState);
-  const runAction = async (action) => {
-    if (api === void 0 || active === void 0 || activeConfig === void 0) return;
-    setError("");
-    setFlash("");
-    try {
-      const target = { workspaceId: active.workspaceId, configId: activeConfig.id };
-      if (action === "start") {
-        genRef.current += 1;
-        offsetRef.current = 0;
-        pinnedRef.current = true;
-        setTruncated(false);
-        setLogLines([]);
-      }
-      const call = action === "start" ? api.start(target) : api.stop(target);
-      const snap = envelopeValue(await call, action === "start" ? "\u542F\u52A8" : "\u505C\u6B62");
-      setRuns((prev) => ({ ...prev, [snap.key]: snap }));
-    } catch (e) {
-      setError(String(e?.message ?? e));
-    }
-  };
-  const restartRun = async () => {
-    await runAction("stop");
-    await runAction("start");
-  };
-  const setDraft = (patch) => {
-    if (draft === void 0) return;
-    setDrafts((prev) => ({ ...prev, [draft.id]: { ...draft, ...patch } }));
-  };
   if (config2 === null) {
     return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-root", children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-body", children: [
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-note", children: "\u6B63\u5728\u52A0\u8F7D\u542F\u52A8\u914D\u7F6E\u2026" }),
-      api === void 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-warn", children: "remote.ideConfig \u4E0D\u53EF\u7528\uFF0C\u9762\u677F\u65E0\u6CD5\u8BFB\u5199\u542F\u52A8\u914D\u7F6E" }) : null,
+      api === void 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-warn", children: "remote.ideConfig \u4E0D\u53EF\u7528" }) : null,
       error51 !== "" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-err", children: error51 }) : null
     ] }) });
   }
-  return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-root", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-tabrow", children: [
-      registered.map((p) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
-        "button",
-        {
-          type: "button",
-          className: "ide-tab",
-          "data-sel": p.workspaceId === active?.workspaceId,
-          onClick: () => selectProject(p.workspaceId),
-          children: [
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: p.title }),
-            p.configs.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-note", children: p.configs.length }) : null,
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-              "span",
-              {
-                className: "ide-x",
-                title: "\u4ECE\u9762\u677F\u79FB\u9664\u8FD9\u4E2A\u9879\u76EE\uFF08\u4E0D\u5F71\u54CD\u5DE5\u4F5C\u533A\u672C\u8EAB\uFF09",
-                onClick: (event) => {
-                  event.stopPropagation();
-                  removeProject(p.workspaceId);
-                },
-                children: "\xD7"
-              }
-            )
-          ]
-        },
-        p.workspaceId
-      )),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-tools", children: !registryKnown ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-note", children: "\u5DE5\u4F5C\u533A\u6CE8\u518C\u8868\u6682\u4E0D\u53EF\u7528" }) : available.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
-        "select",
-        {
-          className: "ide-select",
-          value: "",
-          onChange: (event) => {
-            if (event.target.value !== "") addProject(event.target.value);
-          },
-          children: [
-            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("option", { value: "", children: [
-              "\uFF0B \u6DFB\u52A0\u9879\u76EE\uFF08",
-              available.length,
-              "\uFF09"
-            ] }),
-            available.map((p) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("option", { value: p.workspaceId, children: [
-              p.title,
-              " \xB7 ",
-              p.path
-            ] }, p.workspaceId))
-          ]
-        }
-      ) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-note", children: "\u6240\u6709\u5DE5\u4F5C\u533A\u90FD\u5DF2\u52A0\u5165" }) })
+  return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-root", children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-body", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { style: { display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-title", children: "IDE \xB7 \u542F\u52A8\u914D\u7F6E" }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-note", children: flash })
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-body", children: [
-      warning !== "" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-warn", children: warning }) : null,
-      error51 !== "" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-err", children: error51 }) : null,
-      stale.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-warn", children: [
-        "\u6709 ",
-        stale.length,
-        " \u4E2A\u9879\u76EE\u7684 DSH \u5DE5\u4F5C\u533A\u5DF2\u4E0D\u5B58\u5728\uFF0C\u5176 tab \u5DF2\u9690\u85CF\uFF08\u542F\u52A8\u914D\u7F6E\u4ECD\u4FDD\u7559\uFF09\uFF1A",
-        stale.map((p) => p.title).join("\u3001"),
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-note", children: "\u6309 DSH \u5DE5\u4F5C\u533A\u7EC4\u7EC7\uFF0C\u6BCF\u4E2A\u9879\u76EE\u4E0B\u53EF\u6709\u591A\u6761\u542F\u52A8\u914D\u7F6E\u3002\u6301\u4E45\u5316\u5230 ~/.dsh/storages/dsh-newbe-ide.json\uFF08\u6743\u9650 0600\uFF0C\u4E0D\u5728\u9879\u76EE\u76EE\u5F55\u91CC\u3001\u4E0D\u4F1A\u88AB git \u63D0\u4EA4\uFF09\u3002" }),
+    warning !== "" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-warn", children: warning }) : null,
+    error51 !== "" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-err", children: error51 }) : null,
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-toolbar", children: !projects.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-note", children: "DSH \u5DE5\u4F5C\u533A\u6CE8\u518C\u8868\u6682\u4E0D\u53EF\u7528\uFF0C\u7A0D\u540E\u91CD\u8BD5" }) : available.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
+      "select",
+      {
+        className: "ide-field",
+        value: "",
+        onChange: (event) => {
+          if (event.target.value !== "") addProject(event.target.value);
+        },
+        children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("option", { value: "", children: [
+            "\uFF0B \u6DFB\u52A0\u9879\u76EE\uFF08",
+            available.length,
+            " \u4E2A\u53EF\u9009\u5DE5\u4F5C\u533A\uFF09"
+          ] }),
+          available.map((p) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("option", { value: p.workspaceId, children: [
+            p.title,
+            " \xB7 ",
+            p.path
+          ] }, p.workspaceId))
+        ]
+      }
+    ) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-note", children: "\u6240\u6709\u5DE5\u4F5C\u533A\u90FD\u5DF2\u52A0\u5165" }) }),
+    cfg.projects.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-empty", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { children: "\u8FD8\u6CA1\u6709\u9879\u76EE" }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-note", children: "\u4ECE\u4E0A\u9762\u7684\u4E0B\u62C9\u91CC\u6311\u4E00\u4E2A DSH \u5DE5\u4F5C\u533A" })
+    ] }) : null,
+    cfg.projects.map((project) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-card", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-cardhead", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-title", children: project.title }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-path", children: project.path }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { flex: 1 } }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-chip", onClick: () => addConfig(project), children: "\uFF0B \u542F\u52A8\u914D\u7F6E" }),
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
           "button",
           {
             type: "button",
             className: "ide-btn",
-            style: { marginLeft: 10 },
+            "data-kind": "danger",
             onClick: () => {
-              void commit({ ...cfg, projects: cfg.projects.filter((p) => !stale.includes(p)) }, false);
+              void commit({ ...cfg, projects: cfg.projects.filter((p) => p.workspaceId !== project.workspaceId) }, false);
             },
-            children: "\u79FB\u9664\u8FD9\u4E9B\u914D\u7F6E"
+            children: "\u79FB\u9664\u9879\u76EE"
           }
         )
-      ] }) : null,
-      active === void 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-empty", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { children: "\u8FD8\u6CA1\u6709\u9879\u76EE" }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-note", children: registryKnown ? "\u4ECE\u53F3\u4E0A\u89D2\u300C\uFF0B \u6DFB\u52A0\u9879\u76EE\u300D\u91CC\u6311\u4E00\u4E2A DSH \u5DE5\u4F5C\u533A" : "DSH \u5DE5\u4F5C\u533A\u6CE8\u518C\u8868\u6682\u4E0D\u53EF\u7528\uFF0C\u7A0D\u540E\u91CD\u8BD5\u6216\u91CD\u65B0\u6253\u5F00\u9762\u677F" })
-      ] }) : /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
-        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-head", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-title", children: active.title }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-path", children: active.path }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { flex: 1 } }),
-          active.configs.map((c) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-chip", "data-sel": c.id === activeConfig?.id, onClick: () => selectConfig(c.id), children: c.name }, c.id)),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-chip", onClick: addConfig, children: "\uFF0B \u542F\u52A8\u914D\u7F6E" }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-            "button",
-            {
-              type: "button",
-              className: "ide-btn",
-              "data-on": editing,
-              disabled: activeConfig === void 0,
-              onClick: () => setEditing((v) => !v),
-              children: "\u2699 \u542F\u52A8\u914D\u7F6E"
-            }
-          ),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-            "button",
-            {
-              type: "button",
-              className: "ide-btn",
-              "data-kind": "primary",
-              disabled: activeConfig === void 0 || runState?.status === "running",
-              onClick: () => {
-                void runAction("start");
-              },
-              children: "\u542F\u52A8"
-            }
-          ),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-btn", disabled: runState?.status !== "running", onClick: () => {
-            void runAction("stop");
-          }, children: "\u505C\u6B62" }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-btn", disabled: runState?.status !== "running", onClick: () => {
-            void restartRun();
-          }, children: "\u91CD\u542F" }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-note", children: flash })
-        ] }),
-        editing && draft !== void 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-cfg", children: [
+      ] }),
+      project.configs.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-note", children: "\u8FD9\u4E2A\u9879\u76EE\u8FD8\u6CA1\u6709\u542F\u52A8\u914D\u7F6E" }) : null,
+      project.configs.map((config22) => {
+        const draft = drafts[config22.id] ?? config22;
+        return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-form", children: [
           /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-line", children: [
             /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-label", children: "\u540D\u79F0" }),
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { className: "ide-field", style: { maxWidth: 240 }, value: draft.name, onChange: (e) => setDraft({ name: e.target.value }) }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { className: "ide-field", style: { maxWidth: 240 }, value: draft.name, onChange: (e) => patchDraft(project, draft, { name: e.target.value }) }),
             /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-btn", "data-kind": "primary", onClick: () => {
-              void saveDraft();
+              void saveDraft(project, draft);
             }, children: "\u4FDD\u5B58" }),
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-btn", onClick: () => removeConfig(draft.id), children: "\u5220\u9664" })
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-btn", "data-kind": "danger", onClick: () => removeConfig(project, config22.id), children: "\u5220\u9664" })
           ] }),
           /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-line", children: [
             /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-label", children: "\u542F\u52A8\u547D\u4EE4" }),
@@ -15103,15 +15175,15 @@ function Panel({ api, ctx }) {
               {
                 className: "ide-field ide-mono",
                 style: { flex: 1, minWidth: 280 },
-                placeholder: "\u4F8B\u5982\uFF1Amvn -o -pl kun-ai-web -am spring-boot:run",
+                placeholder: "\u4F8B\u5982\uFF1Amvn -o -pl kun-ai-web spring-boot:run",
                 value: draft.command,
-                onChange: (e) => setDraft({ command: e.target.value })
+                onChange: (e) => patchDraft(project, draft, { command: e.target.value })
               }
             )
           ] }),
           /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-line", children: [
             /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-label", children: "\u5DE5\u4F5C\u76EE\u5F55" }),
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { className: "ide-field ide-mono", style: { flex: 1, minWidth: 280 }, value: draft.cwd, onChange: (e) => setDraft({ cwd: e.target.value }) })
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { className: "ide-field ide-mono", style: { flex: 1, minWidth: 280 }, value: draft.cwd, onChange: (e) => patchDraft(project, draft, { cwd: e.target.value }) })
           ] }),
           /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-line", style: { alignItems: "flex-start" }, children: [
             /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-label", children: "\u73AF\u5883\u53D8\u91CF" }),
@@ -15123,7 +15195,7 @@ function Panel({ api, ctx }) {
                     className: "ide-field ide-mono",
                     value: env.name,
                     placeholder: "NAME",
-                    onChange: (e) => setDraft({ envs: draft.envs.map((x, i) => i === index ? { ...x, name: e.target.value } : x) })
+                    onChange: (e) => patchDraft(project, draft, { envs: draft.envs.map((x, i) => i === index ? { ...x, name: e.target.value } : x) })
                   }
                 ) }),
                 /* @__PURE__ */ (0, import_jsx_runtime.jsx)("td", { children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
@@ -15134,40 +15206,18 @@ function Panel({ api, ctx }) {
                     title: isSecretName(env.name) ? "\u5BC6\u94A5\u7C7B\u53D8\u91CF\u5728\u754C\u9762\u4E0A\u63A9\u7801\u663E\u793A" : void 0,
                     value: env.value,
                     placeholder: "value",
-                    onChange: (e) => setDraft({ envs: draft.envs.map((x, i) => i === index ? { ...x, value: e.target.value } : x) })
+                    onChange: (e) => patchDraft(project, draft, { envs: draft.envs.map((x, i) => i === index ? { ...x, value: e.target.value } : x) })
                   }
                 ) }),
-                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("td", { style: { width: 32 }, children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-btn", onClick: () => setDraft({ envs: draft.envs.filter((_, i) => i !== index) }), children: "\xD7" }) })
+                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("td", { style: { width: 32 }, children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-btn", onClick: () => patchDraft(project, draft, { envs: draft.envs.filter((_, i) => i !== index) }), children: "\xD7" }) })
               ] }, index)) }) }),
-              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-chip", onClick: () => setDraft({ envs: [...draft.envs, { name: "", value: "" }] }), children: "\uFF0B \u53D8\u91CF" })
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-chip", onClick: () => patchDraft(project, draft, { envs: [...draft.envs, { name: "", value: "" }] }), children: "\uFF0B \u53D8\u91CF" })
             ] })
-          ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-note", children: "\u6301\u4E45\u5316\u5230 ~/.dsh/storages/dsh-newbe-ide.json\uFF08\u6743\u9650 0600\uFF0C\u4E0D\u5728\u9879\u76EE\u76EE\u5F55\u91CC\u3001\u4E0D\u4F1A\u88AB git \u63D0\u4EA4\uFF09" })
-        ] }) : null,
-        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-logbox", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-            "div",
-            {
-              className: "ide-log",
-              ref: logRef,
-              onScroll: (event) => {
-                const el = event.currentTarget;
-                pinnedRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
-              },
-              children: logLines.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-note", children: runState?.status === "running" ? "\u7B49\u5F85\u8F93\u51FA\u2026" : "\u70B9\u300C\u542F\u52A8\u300D\u8FD0\u884C\u8FD9\u6761\u542F\u52A8\u914D\u7F6E" }) : logLines.map((line, index) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { children: line }, index))
-            }
-          ),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-note", children: [
-            runText,
-            " \xB7 \u5DF2\u7F13\u5B58 ",
-            logLines.length,
-            " \u884C",
-            runState?.lossy === true || truncated ? "\uFF08\u8F93\u51FA\u8FC7\u5FEB\u6216\u8FC7\u957F\uFF0C\u65E9\u671F\u65E5\u5FD7\u5DF2\u88AB\u4E22\u5F03\uFF09" : ""
           ] })
-        ] })
-      ] })
-    ] })
-  ] });
+        ] }, config22.id);
+      })
+    ] }, project.workspaceId))
+  ] }) });
 }
 var inject = ["slots", "remote"];
 async function apply(ctx) {
@@ -15187,7 +15237,11 @@ async function apply(ctx) {
   if (api === void 0) console.warn("[dsh-newbe-ide] remote.ideConfig \u4E0D\u53EF\u7528\uFF0C\u9762\u677F\u65E0\u6CD5\u8BFB\u5199\u542F\u52A8\u914D\u7F6E");
   ctx.slots.inject("conversation.view", () => ctx.slots.register(
     { name: "conversation.view", id: VIEW_ID, order: VIEW_ORDER, label: "IDE" },
-    () => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Panel, { api, ctx })
+    () => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(IdeView, { api, ctx })
+  ));
+  ctx.slots.inject("settings.plugins.tab", () => ctx.slots.register(
+    { name: "settings.plugins.tab", id: VIEW_ID, order: SETTINGS_TAB_ORDER, label: () => "IDE" },
+    () => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(IdeSettings, { api })
   ));
 }
 return module.exports; } });
