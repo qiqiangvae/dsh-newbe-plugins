@@ -14552,7 +14552,12 @@ var projectEntrySchema = external_exports.object({
 var ideStateSchema = external_exports.object({
   projects: external_exports.array(projectEntrySchema),
   activeWorkspaceId: external_exports.string(),
-  showOverview: external_exports.boolean()
+  /**
+   * 总览 tab 曾经是可配置开关（默认关），现在**常驻**，界面上不再有它。
+   * 字段留着不删，且必须带默认值：删掉它以后，任何还在按老 schema 校验的版本（回滚、
+   * 另装一份旧包）读到新写的文件会因为"缺字段"把整份状态判为损坏，用户的启动配置全没。
+   */
+  showOverview: external_exports.boolean().default(false)
 });
 var ideProjectViewSchema = external_exports.object({
   workspaceId: external_exports.string(),

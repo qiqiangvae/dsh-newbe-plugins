@@ -36,7 +36,12 @@ export const projectEntrySchema = z.object({
 export const ideStateSchema = z.object({
   projects: z.array(projectEntrySchema),
   activeWorkspaceId: z.string(),
-  showOverview: z.boolean(),
+  /**
+   * 总览 tab 曾经是可配置开关（默认关），现在**常驻**，界面上不再有它。
+   * 字段留着不删，且必须带默认值：删掉它以后，任何还在按老 schema 校验的版本（回滚、
+   * 另装一份旧包）读到新写的文件会因为"缺字段"把整份状态判为损坏，用户的启动配置全没。
+   */
+  showOverview: z.boolean().default(false),
 });
 
 /** 面板可选的项目来源：DSH 工作区注册表。字段名与 ProjectEntry 对齐，避免逐字段手工翻译。 */

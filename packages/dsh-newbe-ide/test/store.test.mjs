@@ -102,3 +102,18 @@ test('老文件没有 hidden 字段时仍能读回（缺省视为未收起）', 
   assert.equal(store.getState().projects[0].hidden, false);
   assert.equal(store.getState().projects[0].configs.length, 1, '配置不能丢');
 });
+
+test('老文件没有 showOverview 字段时仍能读回（该字段已无 UI，但不能让文件作废）', () => {
+  const file = tempFile();
+  writeFileSync(file, JSON.stringify({
+    projects: [{
+      workspaceId: 'w1', path: '/tmp/p', title: 'p', activeConfigId: 'c1',
+      configs: [{ id: 'c1', name: 'A', command: 'x', cwd: '/tmp/p', envs: [] }], hidden: false,
+    }],
+    activeWorkspaceId: 'w1',
+  }));
+  const store = createConfigStore(file);
+  assert.equal(store.warning, '', '不该被判为损坏');
+  assert.equal(store.getState().showOverview, false);
+  assert.equal(store.getState().projects[0].configs.length, 1, '配置不能丢');
+});

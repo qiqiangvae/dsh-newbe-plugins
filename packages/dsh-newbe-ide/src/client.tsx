@@ -4,11 +4,14 @@
  *
  * 面板里从上到下：
  *   - 项目 tab 行（横向滑动、可收起、`»` 里是全部项目、`只看运行中` 过滤）
- *   - 二级 tab 行：当前项目下的多条启动配置（状态点 + 名称 + 端口）
- *   - 运行控制行：启动 / 停止 / 重启 / ⚙ 配置（配置块收起时零占位）
- *   - 过滤条 + 日志区（日志区吃掉剩余高度，滚动只发生在它内部）
+ *   - 主从卡片（2026-09-12 由票 08 的变体 C 定稿）：左列是这个项目的启动配置
+ *     （状态点 + 名称 + 端口 + 状态或运行时长，配置多了纵向滚），右列是选中那条的详情
+ *     （状态 / 端口 / 运行时长 / 退出码 指标块、启动·停止·重启、启动命令、过滤条）
+ *   - 日志区（日志区吃掉剩余高度，滚动只发生在它内部）
  *
- * 「⚙ 配置」展开的配置块承担项目与启动配置的增删改，以及从 IDEA 导入。
+ * 「⚙ 配置」展开的配置块承担项目与启动配置的增删改，以及从 IDEA 导入；收起时零占位。
+ * 它**一次只编辑左列选中的那一条**（改完在同一条表单里保存或删除），不再把项目下所有配置
+ * 的表单一起堆出来——配置一多，那种堆法既看不出在改哪条，也容易点错保存。
  * 配置存宿主侧 `$DSH_HOME/storages/dsh-newbe-ide.json`，不进 settings.yaml；
  * **面板是唯一的写者**——曾经短暂另注册过一个设置页，已删除：两个面都整份写盘会互相覆盖。
  *
@@ -197,20 +200,19 @@ function ensureStyles(): () => void {
 .ide-overflow ul{position:absolute;right:0;top:30px;z-index:30;background:var(--dsw-alias-bg-module-platform,#fff);border:1px solid var(--dsw-alias-border-l2,#d9dce1);border-radius:9px;box-shadow:0 14px 34px rgba(0,0,0,.28);padding:6px;margin:0;list-style:none;min-width:240px;max-height:320px;overflow:auto}
 .ide-overflow li{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;cursor:pointer;font-size:12px;color:var(--dsw-alias-label-secondary,#697586);white-space:nowrap}
 .ide-overflow li:hover{background:var(--dsw-alias-interactive-bg-hover,rgba(0,0,0,.07));color:var(--dsw-alias-label-primary,#1f2329)}
-.ide-board{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;align-content:start;overflow:auto;flex:1;min-height:0}
-.ide-card{border:1px solid var(--dsw-alias-border-l2,#d9dce1);border-radius:10px;background:var(--dsw-alias-bg-module-platform,#fff);padding:10px 12px;display:flex;flex-direction:column;gap:8px}
-.ide-cardhead{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.ide-cardrow{display:flex;align-items:center;gap:8px;padding:5px 7px;border-radius:7px;background:var(--dsw-alias-interactive-bg-hover,rgba(128,128,128,.08));font-size:12px}
-.ide-cardrow .ide-name{font-weight:600;cursor:pointer}
+.ide-board{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px;align-content:start;overflow:auto;flex:1;min-height:0}
+/* 一行一条配置：名字与状态各自单行省略，否则窄卡里会折成"停 / 止"那样的竖排 */
+.ide-cardrow{display:flex;align-items:center;gap:8px;padding:5px 7px;border-radius:7px;background:var(--dsw-alias-interactive-bg-hover,rgba(128,128,128,.08));font-size:12px;min-width:0}
+.ide-cardrow .ide-name{font-weight:600;cursor:pointer;flex:none;max-width:9.5em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ide-cardrow .ide-note{flex:none;white-space:nowrap}
+.ide-cardrow .ide-btn{flex:none;white-space:nowrap;padding:2px 9px}
 .ide-cardrow .ide-last{flex:1;min-width:0;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;color:var(--dsw-alias-label-secondary,#697586);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ide-body{display:flex;flex-direction:column;flex:1;min-height:0;padding:12px 16px;gap:10px;overflow:auto}
 /* 视图要填满面板：滚动交给日志区自己，其余不滚 */
 .ide-fill{overflow:hidden}
-.ide-cmd{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;color:var(--dsw-alias-label-secondary,#697586);word-break:break-all}
-.ide-cmdline{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.ide-cmd{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;color:var(--dsw-alias-label-secondary,#697586);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ide-configtitle{font-size:15px;font-weight:600}
 .ide-title{font-size:14px;font-weight:600}
-.ide-path{color:var(--dsw-alias-label-secondary,#697586);font-size:11px;word-break:break-all}
 .ide-chip{border:1px solid var(--dsw-alias-border-l2,#d9dce1);border-radius:999px;padding:2px 9px;font-size:12px;color:var(--dsw-alias-label-secondary,#697586);background:none;font:inherit;cursor:pointer;white-space:nowrap}
 .ide-chip:hover{border-color:var(--dsw-alias-label-secondary,#697586)}
 .ide-chip[data-sel=true]{background:var(--dsw-alias-interactive-bg-hover,rgba(51,112,255,.12));border-color:var(--dsw-alias-brand-primary,#3370ff);color:var(--dsw-alias-brand-primary,#3370ff)}
@@ -238,10 +240,24 @@ function ensureStyles(): () => void {
 .ide-envs td{padding:3px 4px;vertical-align:middle}
 .ide-envs input{width:100%}
 .ide-toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.ide-subrow{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding-bottom:8px;border-bottom:1px solid var(--dsw-alias-border-l2,#d9dce1)}
-.ide-subtab{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--dsw-alias-border-l2,#d9dce1);border-radius:999px;padding:3px 10px;font:inherit;font-size:12px;color:var(--dsw-alias-label-secondary,#697586);background:none;cursor:pointer}
-.ide-subtab:hover{border-color:var(--dsw-alias-label-secondary,#697586)}
-.ide-subtab[data-sel=true]{background:var(--dsw-alias-interactive-bg-hover,rgba(51,112,255,.12));border-color:var(--dsw-alias-brand-primary,#3370ff);color:var(--dsw-alias-brand-primary,#3370ff)}
+/* 主从卡片：左列配置列表（多了纵向滚），右列选中那条的详情 */
+.ide-master{display:flex;flex:none;max-height:240px;overflow:hidden;border:1px solid var(--dsw-alias-border-l2,#d9dce1);border-radius:10px;background:var(--dsw-alias-bg-module-platform,#fff)}
+.ide-mlist{width:224px;flex:none;display:flex;flex-direction:column;gap:2px;padding:8px;overflow:auto;border-right:1px solid var(--dsw-alias-border-l2,#d9dce1)}
+.ide-mhead{padding:2px 6px 6px;min-width:0}
+.ide-mpath{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ide-mitem{display:flex;align-items:center;gap:7px;width:100%;padding:6px 7px;border:1px solid transparent;border-radius:7px;background:none;font:inherit;font-size:12px;color:inherit;text-align:left;cursor:pointer;min-width:0}
+.ide-mitem:hover{background:var(--dsw-alias-interactive-bg-hover,rgba(0,0,0,.07))}
+.ide-mitem[data-sel=true]{background:var(--dsw-alias-interactive-bg-hover,rgba(51,112,255,.12));border-color:var(--dsw-alias-brand-primary,#3370ff)}
+.ide-mname{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ide-mstate{margin-left:auto;flex:none;max-width:104px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ide-madd{justify-content:center;color:var(--dsw-alias-label-secondary,#697586)}
+.ide-detail{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px;padding:9px 11px;overflow:auto}
+.ide-dhead{display:flex;align-items:center;gap:9px;flex-wrap:wrap;min-width:0}
+.ide-dmeter{display:flex;gap:8px;flex-wrap:wrap}
+.ide-metric{display:inline-flex;align-items:baseline;gap:6px;padding:3px 9px;border-radius:7px;background:var(--dsw-alias-interactive-bg-hover,rgba(128,128,128,.08));font-size:11.5px;min-width:0}
+.ide-metric b{font-weight:600;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ide-dactions{display:flex;gap:6px;flex-wrap:wrap}
+.ide-dcmd{display:flex;align-items:center;gap:10px;min-width:0}
 .ide-dot{width:8px;height:8px;border-radius:50%;flex:none;background:var(--dsw-alias-label-tertiary,#a8b0ba)}
 .ide-dot[data-state=running]{background:var(--dsw-alias-state-success-primary,#2ea043)}
 .ide-dot[data-state=failed]{background:var(--dsw-alias-state-error-primary,#d83931)}
@@ -274,7 +290,6 @@ function ensureStyles(): () => void {
   min-height:0;
   overflow:hidden;
 }
-.ide-root{height:100%;min-height:0}
 `;
   document.head.appendChild(style);
   return () => { style.remove(); };
@@ -366,6 +381,11 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
     : '';
   const runState = runKey !== '' ? runs[runKey] : undefined;
   const runText = describeRun(runState);
+  /**
+   * 配置块里正在编辑的那条：草稿优先，没改过就用盘上的值。
+   * **一次只编辑当前选中的那一条**——以前是把项目下所有配置的表单堆在一起。
+   */
+  const activeDraft = activeConfig !== undefined ? drafts[activeConfig.id] ?? activeConfig : undefined;
   const matcher = useMemo(() => compileMatcher({ q: filterQ, regex: filterRegex }), [filterQ, filterRegex]);
   const filtered = useMemo(
     () => filterLines(logLines, { matcher, onlyMatch, levels }),
@@ -516,7 +536,7 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
         selected.scrollIntoView({ inline: 'nearest', block: 'nearest' });
       } catch { /* 老旧实现忽略参数即可 */ }
     }
-  }, [activeProjectId, overview, cfg.showOverview, onlyRunning]);
+  }, [activeProjectId, overview, onlyRunning]);
 
   // 贴底就跟随到底；用户上滚（scroll 事件把 pinned 置 false）后不再打扰他。
   useEffect(() => {
@@ -553,10 +573,6 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
 
   // 选中项是视图状态，不落盘。
   // 单一写者：只有这一处写配置，不存在两个面互相覆盖的窗口。
-  const selectProject = (workspaceId: string) => {
-    setActiveProjectId(workspaceId);
-  };
-
   const selectConfig = (configId: string) => {
     if (active === undefined) return;
     setActiveConfigIds((prev) => ({ ...prev, [active.workspaceId]: configId }));
@@ -592,14 +608,21 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
   const setHidden = (workspaceId: string, hidden: boolean) => {
     void commit(patchProject(cfg, workspaceId, (p) => ({ ...p, hidden })), false);
   };
-  const openConfig = (workspaceId: string, configId: string) => {
+
+  /**
+   * 把用户带到一个项目（configId 给了就顺带选中那条配置）：**藏起来的项目要同时放出来**。
+   * 藏它的开关有两个——`hidden`（收起）与「只看运行中」（该项目没有配置在跑），任一个没让路，
+   * 面板里就没有它的 tab，紧接着上面那条"选中项必须可见"的兜底会立刻把人弹回第一个可见项目，
+   * 看起来就是"点了没反应"。总览里点配置名两条都踩过。
+   */
+  const revealProject = (workspaceId: string, configId = '') => {
     setOverview(false);
     setActiveProjectId(workspaceId);
-    setActiveConfigIds((prev) => ({ ...prev, [workspaceId]: configId }));
-  };
-  const toggleOverviewTab = (next: boolean) => {
-    if (!next) setOverview(false);
-    void commit({ ...cfg, showOverview: next }, false);
+    if (configId !== '') setActiveConfigIds((prev) => ({ ...prev, [workspaceId]: configId }));
+    const project = cfg.projects.find((p) => p.workspaceId === workspaceId);
+    if (project === undefined) return;
+    if (project.hidden) setHidden(workspaceId, false);
+    if (onlyRunning && statusOfProject(project) !== 'running') setOnlyRunning(false);
   };
 
   const addProject = (workspaceId: string) => {
@@ -748,18 +771,16 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
   return (
     <div className="ide-root ide-view">
       <div className="ide-tabrow" ref={tabRowRef}>
-        {cfg.showOverview ? (
-          <button type="button" className="ide-tab" data-sel={overview} onClick={() => setOverview(true)}>
-            <span>总览</span>
-          </button>
-        ) : null}
+        <button type="button" className="ide-tab" data-sel={overview} onClick={() => setOverview(true)}>
+          <span>总览</span>
+        </button>
         {visibleProjects.map((p) => (
           <button
             key={p.workspaceId}
             type="button"
             className="ide-tab"
             data-sel={!overview && p.workspaceId === active?.workspaceId}
-            onClick={() => { setOverview(false); selectProject(p.workspaceId); }}
+            onClick={() => revealProject(p.workspaceId)}
           >
             <span className="ide-dot" data-state={statusOfProject(p)} title="任一条配置在跑就是绿的" />
             <span>{p.title}</span>
@@ -775,14 +796,13 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
         ))}
         <span className="ide-tools">
           <button type="button" className="ide-chip" data-sel={onlyRunning} onClick={() => setOnlyRunning((v) => !v)}>只看运行中</button>
-          <button type="button" className="ide-chip" data-sel={cfg.showOverview} onClick={() => toggleOverviewTab(!cfg.showOverview)}>总览</button>
           <details className="ide-overflow">
             <summary title="全部项目">»</summary>
             <ul>
               {cfg.projects.map((p) => (
                 <li
                   key={p.workspaceId}
-                  onClick={() => { setOverview(false); selectProject(p.workspaceId); if (p.hidden) setHidden(p.workspaceId, false); }}
+                  onClick={() => revealProject(p.workspaceId)}
                 >
                   <span className="ide-dot" data-state={statusOfProject(p)} />
                   <span>{p.title}</span>
@@ -825,7 +845,7 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
                   return (
                     <div className="ide-cardrow" key={c.id}>
                       <span className="ide-dot" data-state={snapshot?.status ?? 'idle'} />
-                      <span className="ide-name" onClick={() => openConfig(p.workspaceId, c.id)}>{c.name}</span>
+                      <span className="ide-name" onClick={() => revealProject(p.workspaceId, c.id)}>{c.name}</span>
                       {snapshot !== undefined && snapshot.port !== '' ? <span className="ide-port">:{snapshot.port}</span> : null}
                       <span className="ide-note">
                         {describeRun(snapshot)}
@@ -850,265 +870,277 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
           </div>
         ) : (
           <>
-            <div className="ide-toolbar">
-              <span className="ide-path">{active.title} · {active.path}</span>
-              <span style={{ flex: 1 }} />
+            {/* 主从卡片：左列是这个项目的启动配置（多了就纵向滚），右列是选中那条的详情。
+                项目名与路径从原来的身份行挪进左列卡头——上面的一级 tab 里已经写过一遍项目名。 */}
+            <div className="ide-master">
+              <div className="ide-mlist">
+                <div className="ide-mhead">
+                  <div className="ide-title">{active.title}</div>
+                  <div className="ide-note ide-mono ide-mpath" title={active.path}>{active.path}</div>
+                </div>
+                {active.configs.map((c) => {
+                  const snapshot = runs[runKeyOf({ workspaceId: active.workspaceId, configId: c.id })];
+                  const up = isRunning(snapshot?.status) ? formatUptime(snapshot?.startedAtMs ?? 0, Date.now()) : '';
+                  return (
+                    <button
+                      key={c.id}
+                      type="button"
+                      className="ide-mitem"
+                      data-sel={c.id === activeConfig?.id}
+                      title={`${c.name} — ${describeRun(snapshot)}`}
+                      onClick={() => selectConfig(c.id)}
+                    >
+                      <span className="ide-dot" data-state={snapshot?.status ?? 'idle'} />
+                      <span className="ide-mname">{c.name}</span>
+                      {snapshot !== undefined && snapshot.port !== '' ? <span className="ide-port">:{snapshot.port}</span> : null}
+                      <span className="ide-note ide-mstate">{up !== '' ? up : describeRun(snapshot)}</span>
+                    </button>
+                  );
+                })}
+                <button type="button" className="ide-mitem ide-madd" onClick={() => addConfig(active)}>＋ 启动配置</button>
+              </div>
+
+              {activeConfig === undefined ? (
+                <div className="ide-detail">
+                  <div className="ide-note">这个项目还没有启动配置 —— 点左列「＋ 启动配置」添加</div>
+                  <div className="ide-dactions">
+                    <button type="button" className="ide-btn" data-on={editing} onClick={() => setEditing((v) => !v)}>⚙ 配置</button>
+                  </div>
+                </div>
+              ) : (
+                <div className="ide-detail">
+                  <div className="ide-dhead">
+                    <span className="ide-configtitle">{activeConfig.name}</span>
+                    <span style={{ flex: 1 }} />
+                    <span className="ide-note">{flash}</span>
+                    <button type="button" className="ide-btn" data-on={editing} onClick={() => setEditing((v) => !v)}>⚙ 配置</button>
+                  </div>
+
+                  {/* 指标块：状态直接复用 describeRun 的文案，免得"运行中/已退出（码 N）"有第二套说法 */}
+                  <div className="ide-dmeter">
+                    <span className="ide-metric" title={runText}>状态<b>{runText}</b></span>
+                    <span className="ide-metric">端口<b>{runState !== undefined && runState.port !== '' ? `:${runState.port}` : '—'}</b></span>
+                    <span className="ide-metric">
+                      运行时长<b>{isRunning(runState?.status) ? formatUptime(runState?.startedAtMs ?? 0, Date.now()) : '—'}</b>
+                    </span>
+                    <span className="ide-metric">
+                      退出码<b>{runState?.exitCode === null || runState?.exitCode === undefined ? '—' : String(runState.exitCode)}</b>
+                    </span>
+                  </div>
+
+                  <div className="ide-dactions">
+                    <button
+                      type="button"
+                      className="ide-btn"
+                      data-kind="primary"
+                      disabled={isRunning(runState?.status)}
+                      onClick={() => { void runAction('start'); }}
+                    >
+                      启动
+                    </button>
+                    <button type="button" className="ide-btn" disabled={runState?.status !== 'running'} onClick={() => { void runAction('stop'); }}>停止</button>
+                    <button
+                      type="button"
+                      className="ide-btn"
+                      disabled={runState?.status !== 'running'}
+                      onClick={() => { void (async () => { await runAction('stop'); await runAction('start'); })(); }}
+                    >
+                      重启
+                    </button>
+                  </div>
+
+                  <div className="ide-dcmd">
+                    <span className="ide-label">启动命令</span>
+                    <span className="ide-cmd" title={activeConfig.command}>{activeConfig.command === '' ? '（未设置）' : activeConfig.command}</span>
+                  </div>
+
+                  <div className="ide-filterbar">
+                    <input
+                      className="ide-field ide-mono"
+                      placeholder="过滤关键字"
+                      value={filterQ}
+                      onChange={(e) => setFilterQ(e.target.value)}
+                    />
+                    <button type="button" className="ide-chip" data-sel={filterRegex} onClick={() => setFilterRegex((v) => !v)}>正则</button>
+                    <button type="button" className="ide-chip" data-sel={onlyMatch} onClick={() => setOnlyMatch((v) => !v)}>仅看匹配</button>
+                    <span style={{ flex: 1 }} />
+                    {LEVELS.map((lv) => (
+                      <button
+                        key={lv}
+                        type="button"
+                        className="ide-chip"
+                        data-sel={levels[lv]}
+                        onClick={() => setLevels((prev) => ({ ...prev, [lv]: !prev[lv] }))}
+                      >
+                        {lv}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
-            {/* 二级 tab：一个项目下的多条启动配置各自一行一格，状态点与端口都在这儿 */}
-            <div className="ide-subrow">
-              {active.configs.map((c) => {
-                const snapshot = runs[runKeyOf({ workspaceId: active.workspaceId, configId: c.id })];
-                return (
-                  <button
-                    key={c.id}
-                    type="button"
-                    className="ide-subtab"
-                    data-sel={c.id === activeConfig?.id}
-                    onClick={() => selectConfig(c.id)}
-                  >
-                    <span className="ide-dot" data-state={snapshot?.status ?? 'idle'} />
-                    <span>{c.name}</span>
-                    {snapshot !== undefined && snapshot.port !== '' ? <span className="ide-port">:{snapshot.port}</span> : null}
-                  </button>
-                );
-              })}
-              <button type="button" className="ide-chip" onClick={() => addConfig(active)}>＋ 启动配置</button>
-            </div>
-
-            {activeConfig === undefined ? (
-              <div className="ide-note">这个项目还没有启动配置 —— 点「⚙ 配置」添加</div>
-            ) : (
-              <>
+            {editing && active !== undefined ? (
+              <div className="ide-cfg">
                 <div className="ide-toolbar">
-                  <span className="ide-configtitle">{activeConfig.name}</span>
-                  <span className="ide-note">{runText}</span>
-                  {runState !== undefined && runState.port !== '' ? <span className="ide-port">:{runState.port}</span> : null}
-                  {isRunning(runState?.status)
-                    ? <span className="ide-note">{formatUptime(runState?.startedAtMs ?? 0, Date.now())}</span>
-                    : null}
+                  <span className="ide-title">配置 · {active.title}</span>
+                  {activeDraft !== undefined ? <span className="ide-note">正在编辑：{activeDraft.name}</span> : null}
                   <span style={{ flex: 1 }} />
                   <button
                     type="button"
-                    className="ide-btn"
-                    data-kind="primary"
-                    disabled={isRunning(runState?.status)}
-                    onClick={() => { void runAction('start'); }}
+                    className="ide-chip"
+                    disabled={discoveryBusy}
+                    onClick={() => { void loadDiscovery(); }}
                   >
-                    启动
+                    {discoveryBusy ? '正在扫描…' : '从 IDEA 导入'}
                   </button>
-                  <button type="button" className="ide-btn" disabled={runState?.status !== 'running'} onClick={() => { void runAction('stop'); }}>停止</button>
-                  <button
-                    type="button"
-                    className="ide-btn"
-                    data-on={editing}
-                    disabled={active === undefined}
-                    onClick={() => setEditing((v) => !v)}
-                  >
-                    ⚙ 配置
-                  </button>
-                  <button
-                    type="button"
-                    className="ide-btn"
-                    disabled={runState?.status !== 'running'}
-                    onClick={() => { void (async () => { await runAction('stop'); await runAction('start'); })(); }}
-                  >
-                    重启
-                  </button>
-                  <span className="ide-note">{flash}</span>
+                  <button type="button" className="ide-btn" data-kind="danger" onClick={() => removeProject(active.workspaceId)}>移除项目</button>
                 </div>
 
-                <div className="ide-cmdline">
-                  <span className="ide-label">启动命令</span>
-                  <span className="ide-cmd">{activeConfig.command === '' ? '（未设置）' : activeConfig.command}</span>
-                </div>
-
-                {editing && active !== undefined ? (
-                  <div className="ide-cfg">
-                    <div className="ide-toolbar">
-                      <span className="ide-title">配置 · {active.title}</span>
+                {discovery !== null ? (
+                  <div className="ide-form">
+                    <div className="ide-line">
+                      <span className="ide-label">导入</span>
+                      <span className="ide-note">
+                        扫过 {discovery.scanned.length} 个文件，发现 {discovery.candidates.length} 条 IDEA Spring Boot 配置
+                      </span>
                       <span style={{ flex: 1 }} />
-                      <button
-                        type="button"
-                        className="ide-chip"
-                        disabled={discoveryBusy}
-                        onClick={() => { void loadDiscovery(); }}
-                      >
-                        {discoveryBusy ? '正在扫描…' : '从 IDEA 导入'}
-                      </button>
-                      <button type="button" className="ide-btn" data-kind="danger" onClick={() => removeProject(active.workspaceId)}>移除项目</button>
+                      <button type="button" className="ide-btn" onClick={() => setDiscovery(null)}>收起</button>
                     </div>
-
-                    {active.configs.length === 0 ? <div className="ide-note">这个项目还没有启动配置</div> : null}
-
-                    {discovery !== null ? (
-                      <div className="ide-form">
-                        <div className="ide-line">
-                          <span className="ide-label">导入</span>
-                          <span className="ide-note">
-                            扫过 {discovery.scanned.length} 个文件，发现 {discovery.candidates.length} 条 IDEA Spring Boot 配置
-                          </span>
-                          <span style={{ flex: 1 }} />
-                          <button type="button" className="ide-btn" onClick={() => setDiscovery(null)}>收起</button>
-                        </div>
-                        {discovery.errors.length > 0 ? discovery.errors.map((message, index) => (
-                          <div className="ide-err" key={index}>{message}</div>
-                        )) : null}
-                        {discovery.candidates.length === 0 ? (
-                          <div className="ide-note">没找到可导入的 Spring Boot 运行配置（只认 .idea/workspace.xml 与 .run/*.xml）</div>
-                        ) : null}
-                        {discovery.candidates.map((candidate) => {
-                          const planned = plannedConfigName(candidate.name, active.configs.map((c) => c.name));
-                          const blocked = candidate.problem !== '';
-                          return (
-                            <div className="ide-line" key={candidate.source + '#' + candidate.name}>
-                              <span className="ide-chip">{candidate.name}</span>
-                              <span className="ide-note ide-mono">
-                                {blocked ? candidate.problem : candidate.module}
-                              </span>
-                              <span className="ide-note">{candidate.envs.length} 个环境变量</span>
-                              <span style={{ flex: 1 }} />
-                              <button
-                                type="button"
-                                className="ide-btn"
-                                data-kind="primary"
-                                disabled={blocked}
-                                title={blocked ? candidate.problem : candidate.source}
-                                onClick={() => importCandidate(candidate, planned)}
-                              >
-                                {planned === candidate.name ? '导入' : `导入为「${planned}」`}
-                              </button>
-                            </div>
-                          );
-                        })}
-                      </div>
+                    {discovery.errors.length > 0 ? discovery.errors.map((message, index) => (
+                      <div className="ide-err" key={index}>{message}</div>
+                    )) : null}
+                    {discovery.candidates.length === 0 ? (
+                      <div className="ide-note">没找到可导入的 Spring Boot 运行配置（只认 .idea/workspace.xml 与 .run/*.xml）</div>
                     ) : null}
-
-                    {active.configs.map((config2) => {
-                      const draft = drafts[config2.id] ?? config2;
+                    {discovery.candidates.map((candidate) => {
+                      const planned = plannedConfigName(candidate.name, active.configs.map((c) => c.name));
+                      const blocked = candidate.problem !== '';
                       return (
-                        <div className="ide-form" key={config2.id}>
-                          <div className="ide-line">
-                            <span className="ide-label">名称</span>
-                            <input className="ide-field" style={{ maxWidth: 240 }} value={draft.name} onChange={(e) => patchDraft(draft, { name: e.target.value })} />
-                            <button type="button" className="ide-btn" data-kind="primary" onClick={() => { void saveDraft(active, draft); }}>保存</button>
-                            <button type="button" className="ide-btn" data-kind="danger" onClick={() => removeConfig(active, config2.id)}>删除</button>
-                          </div>
-                          <div className="ide-line">
-                            <span className="ide-label">启动命令</span>
-                            <input
-                              className="ide-field ide-mono"
-                              style={{ flex: 1, minWidth: 280 }}
-                              placeholder="例如：mvn -o -pl kun-ai-web spring-boot:run"
-                              value={draft.command}
-                              onChange={(e) => patchDraft(draft, { command: e.target.value })}
-                            />
-                          </div>
-                          <div className="ide-line">
-                            <span className="ide-label">工作目录</span>
-                            <input className="ide-field ide-mono" style={{ flex: 1, minWidth: 280 }} value={draft.cwd} onChange={(e) => patchDraft(draft, { cwd: e.target.value })} />
-                          </div>
-                          <div className="ide-line" style={{ alignItems: 'flex-start' }}>
-                            <span className="ide-label">环境变量</span>
-                            <div style={{ flex: 1 }}>
-                              <table className="ide-envs">
-                                <tbody>
-                                  {draft.envs.map((env, index) => (
-                                    <tr key={index}>
-                                      <td style={{ width: '38%' }}>
-                                        <input
-                                          className="ide-field ide-mono"
-                                          value={env.name}
-                                          placeholder="NAME"
-                                          onChange={(e) => patchDraft(draft, { envs: draft.envs.map((x, i) => (i === index ? { ...x, name: e.target.value } : x)) })}
-                                        />
-                                      </td>
-                                      <td>
-                                        <input
-                                          className="ide-field ide-mono"
-                                          type={isSecretName(env.name) ? 'password' : 'text'}
-                                          title={isSecretName(env.name) ? '密钥类变量在界面上掩码显示' : undefined}
-                                          value={env.value}
-                                          placeholder="value"
-                                          onChange={(e) => patchDraft(draft, { envs: draft.envs.map((x, i) => (i === index ? { ...x, value: e.target.value } : x)) })}
-                                        />
-                                      </td>
-                                      <td style={{ width: 32 }}>
-                                        <button type="button" className="ide-btn" onClick={() => patchDraft(draft, { envs: draft.envs.filter((_, i) => i !== index) })}>×</button>
-                                      </td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                              <button type="button" className="ide-chip" onClick={() => patchDraft(draft, { envs: [...draft.envs, { name: '', value: '' }] })}>＋ 变量</button>
-                            </div>
-                          </div>
+                        <div className="ide-line" key={candidate.source + '#' + candidate.name}>
+                          <span className="ide-chip">{candidate.name}</span>
+                          <span className="ide-note ide-mono">
+                            {blocked ? candidate.problem : candidate.module}
+                          </span>
+                          <span className="ide-note">{candidate.envs.length} 个环境变量</span>
+                          <span style={{ flex: 1 }} />
+                          <button
+                            type="button"
+                            className="ide-btn"
+                            data-kind="primary"
+                            disabled={blocked}
+                            title={blocked ? candidate.problem : candidate.source}
+                            onClick={() => importCandidate(candidate, planned)}
+                          >
+                            {planned === candidate.name ? '导入' : `导入为「${planned}」`}
+                          </button>
                         </div>
                       );
                     })}
-
-                    <div className="ide-toolbar">
-                      <span className="ide-note">添加项目</span>
-                      {addProjectControl('＋ 选择工作区')}
-                      <span style={{ flex: 1 }} />
-                      <span className="ide-note">存于 ~/.dsh/storages/dsh-newbe-ide.json（0600，不在项目目录里）</span>
-                    </div>
                   </div>
                 ) : null}
 
-                <div className="ide-filterbar">
-                  <input
-                    className="ide-field ide-mono"
-                    placeholder="过滤关键字"
-                    value={filterQ}
-                    onChange={(e) => setFilterQ(e.target.value)}
-                  />
-                  <button type="button" className="ide-chip" data-sel={filterRegex} onClick={() => setFilterRegex((v) => !v)}>正则</button>
-                  <button type="button" className="ide-chip" data-sel={onlyMatch} onClick={() => setOnlyMatch((v) => !v)}>仅看匹配</button>
-                  <span style={{ flex: 1 }} />
-                  {LEVELS.map((lv) => (
-                    <button
-                      key={lv}
-                      type="button"
-                      className="ide-chip"
-                      data-sel={levels[lv]}
-                      onClick={() => setLevels((prev) => ({ ...prev, [lv]: !prev[lv] }))}
-                    >
-                      {lv}
-                    </button>
-                  ))}
-                </div>
+                {activeDraft === undefined ? (
+                  <div className="ide-note">这个项目还没有启动配置 —— 用左列「＋ 启动配置」或上面的「从 IDEA 导入」加一条</div>
+                ) : (
+                  <div className="ide-form">
+                    <div className="ide-line">
+                      <span className="ide-label">名称</span>
+                      <input className="ide-field" style={{ maxWidth: 240 }} value={activeDraft.name} onChange={(e) => patchDraft(activeDraft, { name: e.target.value })} />
+                      <button type="button" className="ide-btn" data-kind="primary" onClick={() => { void saveDraft(active, activeDraft); }}>保存</button>
+                      <button type="button" className="ide-btn" data-kind="danger" onClick={() => removeConfig(active, activeDraft.id)}>删除</button>
+                    </div>
+                    <div className="ide-line">
+                      <span className="ide-label">启动命令</span>
+                      <input
+                        className="ide-field ide-mono"
+                        style={{ flex: 1, minWidth: 280 }}
+                        placeholder="例如：mvn -o -pl kun-ai-web spring-boot:run"
+                        value={activeDraft.command}
+                        onChange={(e) => patchDraft(activeDraft, { command: e.target.value })}
+                      />
+                    </div>
+                    <div className="ide-line">
+                      <span className="ide-label">工作目录</span>
+                      <input className="ide-field ide-mono" style={{ flex: 1, minWidth: 280 }} value={activeDraft.cwd} onChange={(e) => patchDraft(activeDraft, { cwd: e.target.value })} />
+                    </div>
+                    <div className="ide-line" style={{ alignItems: 'flex-start' }}>
+                      <span className="ide-label">环境变量</span>
+                      <div style={{ flex: 1 }}>
+                        <table className="ide-envs">
+                          <tbody>
+                            {activeDraft.envs.map((env, index) => (
+                              <tr key={index}>
+                                <td style={{ width: '38%' }}>
+                                  <input
+                                    className="ide-field ide-mono"
+                                    value={env.name}
+                                    placeholder="NAME"
+                                    onChange={(e) => patchDraft(activeDraft, { envs: activeDraft.envs.map((x, i) => (i === index ? { ...x, name: e.target.value } : x)) })}
+                                  />
+                                </td>
+                                <td>
+                                  <input
+                                    className="ide-field ide-mono"
+                                    type={isSecretName(env.name) ? 'password' : 'text'}
+                                    title={isSecretName(env.name) ? '密钥类变量在界面上掩码显示' : undefined}
+                                    value={env.value}
+                                    placeholder="value"
+                                    onChange={(e) => patchDraft(activeDraft, { envs: activeDraft.envs.map((x, i) => (i === index ? { ...x, value: e.target.value } : x)) })}
+                                  />
+                                </td>
+                                <td style={{ width: 32 }}>
+                                  <button type="button" className="ide-btn" onClick={() => patchDraft(activeDraft, { envs: activeDraft.envs.filter((_, i) => i !== index) })}>×</button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                        <button type="button" className="ide-chip" onClick={() => patchDraft(activeDraft, { envs: [...activeDraft.envs, { name: '', value: '' }] })}>＋ 变量</button>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
-                <div className="ide-logbox">
-                  <div
-                    className="ide-log"
-                    ref={logRef}
-                    onScroll={(event) => {
-                      const el = event.currentTarget;
-                      pinnedRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
-                    }}
-                  >
-                    {shown.length === 0
-                      ? (
-                        <span className="ide-note">
-                          {logLines.length > 0
-                            ? '没有匹配的日志'
-                            : isRunning(runState?.status) ? '等待输出…' : '点「启动」运行这条启动配置'}
-                        </span>
-                      )
-                      : shown.map((row, index) => (
-                        <div key={index} className={(row.hit ? 'ide-hit ' : '') + 'ide-lv-' + row.level}>{row.line}</div>
-                      ))}
-                  </div>
-                  <div className="ide-note">
-                    显示 {shown.length} / 共 {filtered.length} 行（缓存 {logLines.length} 行）
-                    {fromHistory
-                      ? <span title={historyPath}>（含上次运行的输出{truncated ? '，只取了最近一段' : ''}）</span>
-                      : runState?.lossy === true || truncated ? '（输出过快或过长，早期部分已丢弃）' : ''}
-                    {filtered.length > RENDER_LIMIT ? `（仅渲染最近 ${RENDER_LIMIT} 行）` : ''}
-                  </div>
+                <div className="ide-toolbar">
+                  <span className="ide-note">添加项目</span>
+                  {addProjectControl('＋ 选择工作区')}
+                  <span style={{ flex: 1 }} />
+                  <span className="ide-note">存于 ~/.dsh/storages/dsh-newbe-ide.json（0600，不在项目目录里）</span>
                 </div>
-              </>
+              </div>
+            ) : null}
+
+            {activeConfig === undefined ? null : (
+              <div className="ide-logbox">
+                <div
+                  className="ide-log"
+                  ref={logRef}
+                  onScroll={(event) => {
+                    const el = event.currentTarget;
+                    pinnedRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+                  }}
+                >
+                  {shown.length === 0
+                    ? (
+                      <span className="ide-note">
+                        {logLines.length > 0
+                          ? '没有匹配的日志'
+                          : isRunning(runState?.status) ? '等待输出…' : '点「启动」运行这条启动配置'}
+                      </span>
+                    )
+                    : shown.map((row, index) => (
+                      <div key={index} className={(row.hit ? 'ide-hit ' : '') + 'ide-lv-' + row.level}>{row.line}</div>
+                    ))}
+                </div>
+                <div className="ide-note">
+                  显示 {shown.length} / 共 {filtered.length} 行（缓存 {logLines.length} 行）
+                  {fromHistory
+                    ? <span title={historyPath}>（含上次运行的输出{truncated ? '，只取了最近一段' : ''}）</span>
+                    : runState?.lossy === true || truncated ? '（输出过快或过长，早期部分已丢弃）' : ''}
+                  {filtered.length > RENDER_LIMIT ? `（仅渲染最近 ${RENDER_LIMIT} 行）` : ''}
+                </div>
+              </div>
             )}
           </>
         )}

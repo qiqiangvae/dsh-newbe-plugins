@@ -14566,7 +14566,12 @@ var projectEntrySchema = external_exports.object({
 var ideStateSchema = external_exports.object({
   projects: external_exports.array(projectEntrySchema),
   activeWorkspaceId: external_exports.string(),
-  showOverview: external_exports.boolean()
+  /**
+   * 总览 tab 曾经是可配置开关（默认关），现在**常驻**，界面上不再有它。
+   * 字段留着不删，且必须带默认值：删掉它以后，任何还在按老 schema 校验的版本（回滚、
+   * 另装一份旧包）读到新写的文件会因为"缺字段"把整份状态判为损坏，用户的启动配置全没。
+   */
+  showOverview: external_exports.boolean().default(false)
 });
 var ideProjectViewSchema = external_exports.object({
   workspaceId: external_exports.string(),
@@ -14869,20 +14874,19 @@ function ensureStyles() {
 .ide-overflow ul{position:absolute;right:0;top:30px;z-index:30;background:var(--dsw-alias-bg-module-platform,#fff);border:1px solid var(--dsw-alias-border-l2,#d9dce1);border-radius:9px;box-shadow:0 14px 34px rgba(0,0,0,.28);padding:6px;margin:0;list-style:none;min-width:240px;max-height:320px;overflow:auto}
 .ide-overflow li{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;cursor:pointer;font-size:12px;color:var(--dsw-alias-label-secondary,#697586);white-space:nowrap}
 .ide-overflow li:hover{background:var(--dsw-alias-interactive-bg-hover,rgba(0,0,0,.07));color:var(--dsw-alias-label-primary,#1f2329)}
-.ide-board{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;align-content:start;overflow:auto;flex:1;min-height:0}
-.ide-card{border:1px solid var(--dsw-alias-border-l2,#d9dce1);border-radius:10px;background:var(--dsw-alias-bg-module-platform,#fff);padding:10px 12px;display:flex;flex-direction:column;gap:8px}
-.ide-cardhead{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.ide-cardrow{display:flex;align-items:center;gap:8px;padding:5px 7px;border-radius:7px;background:var(--dsw-alias-interactive-bg-hover,rgba(128,128,128,.08));font-size:12px}
-.ide-cardrow .ide-name{font-weight:600;cursor:pointer}
+.ide-board{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px;align-content:start;overflow:auto;flex:1;min-height:0}
+/* \u4E00\u884C\u4E00\u6761\u914D\u7F6E\uFF1A\u540D\u5B57\u4E0E\u72B6\u6001\u5404\u81EA\u5355\u884C\u7701\u7565\uFF0C\u5426\u5219\u7A84\u5361\u91CC\u4F1A\u6298\u6210"\u505C / \u6B62"\u90A3\u6837\u7684\u7AD6\u6392 */
+.ide-cardrow{display:flex;align-items:center;gap:8px;padding:5px 7px;border-radius:7px;background:var(--dsw-alias-interactive-bg-hover,rgba(128,128,128,.08));font-size:12px;min-width:0}
+.ide-cardrow .ide-name{font-weight:600;cursor:pointer;flex:none;max-width:9.5em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ide-cardrow .ide-note{flex:none;white-space:nowrap}
+.ide-cardrow .ide-btn{flex:none;white-space:nowrap;padding:2px 9px}
 .ide-cardrow .ide-last{flex:1;min-width:0;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;color:var(--dsw-alias-label-secondary,#697586);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ide-body{display:flex;flex-direction:column;flex:1;min-height:0;padding:12px 16px;gap:10px;overflow:auto}
 /* \u89C6\u56FE\u8981\u586B\u6EE1\u9762\u677F\uFF1A\u6EDA\u52A8\u4EA4\u7ED9\u65E5\u5FD7\u533A\u81EA\u5DF1\uFF0C\u5176\u4F59\u4E0D\u6EDA */
 .ide-fill{overflow:hidden}
-.ide-cmd{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;color:var(--dsw-alias-label-secondary,#697586);word-break:break-all}
-.ide-cmdline{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.ide-cmd{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;color:var(--dsw-alias-label-secondary,#697586);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ide-configtitle{font-size:15px;font-weight:600}
 .ide-title{font-size:14px;font-weight:600}
-.ide-path{color:var(--dsw-alias-label-secondary,#697586);font-size:11px;word-break:break-all}
 .ide-chip{border:1px solid var(--dsw-alias-border-l2,#d9dce1);border-radius:999px;padding:2px 9px;font-size:12px;color:var(--dsw-alias-label-secondary,#697586);background:none;font:inherit;cursor:pointer;white-space:nowrap}
 .ide-chip:hover{border-color:var(--dsw-alias-label-secondary,#697586)}
 .ide-chip[data-sel=true]{background:var(--dsw-alias-interactive-bg-hover,rgba(51,112,255,.12));border-color:var(--dsw-alias-brand-primary,#3370ff);color:var(--dsw-alias-brand-primary,#3370ff)}
@@ -14910,10 +14914,24 @@ function ensureStyles() {
 .ide-envs td{padding:3px 4px;vertical-align:middle}
 .ide-envs input{width:100%}
 .ide-toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.ide-subrow{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding-bottom:8px;border-bottom:1px solid var(--dsw-alias-border-l2,#d9dce1)}
-.ide-subtab{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--dsw-alias-border-l2,#d9dce1);border-radius:999px;padding:3px 10px;font:inherit;font-size:12px;color:var(--dsw-alias-label-secondary,#697586);background:none;cursor:pointer}
-.ide-subtab:hover{border-color:var(--dsw-alias-label-secondary,#697586)}
-.ide-subtab[data-sel=true]{background:var(--dsw-alias-interactive-bg-hover,rgba(51,112,255,.12));border-color:var(--dsw-alias-brand-primary,#3370ff);color:var(--dsw-alias-brand-primary,#3370ff)}
+/* \u4E3B\u4ECE\u5361\u7247\uFF1A\u5DE6\u5217\u914D\u7F6E\u5217\u8868\uFF08\u591A\u4E86\u7EB5\u5411\u6EDA\uFF09\uFF0C\u53F3\u5217\u9009\u4E2D\u90A3\u6761\u7684\u8BE6\u60C5 */
+.ide-master{display:flex;flex:none;max-height:240px;overflow:hidden;border:1px solid var(--dsw-alias-border-l2,#d9dce1);border-radius:10px;background:var(--dsw-alias-bg-module-platform,#fff)}
+.ide-mlist{width:224px;flex:none;display:flex;flex-direction:column;gap:2px;padding:8px;overflow:auto;border-right:1px solid var(--dsw-alias-border-l2,#d9dce1)}
+.ide-mhead{padding:2px 6px 6px;min-width:0}
+.ide-mpath{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ide-mitem{display:flex;align-items:center;gap:7px;width:100%;padding:6px 7px;border:1px solid transparent;border-radius:7px;background:none;font:inherit;font-size:12px;color:inherit;text-align:left;cursor:pointer;min-width:0}
+.ide-mitem:hover{background:var(--dsw-alias-interactive-bg-hover,rgba(0,0,0,.07))}
+.ide-mitem[data-sel=true]{background:var(--dsw-alias-interactive-bg-hover,rgba(51,112,255,.12));border-color:var(--dsw-alias-brand-primary,#3370ff)}
+.ide-mname{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ide-mstate{margin-left:auto;flex:none;max-width:104px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ide-madd{justify-content:center;color:var(--dsw-alias-label-secondary,#697586)}
+.ide-detail{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px;padding:9px 11px;overflow:auto}
+.ide-dhead{display:flex;align-items:center;gap:9px;flex-wrap:wrap;min-width:0}
+.ide-dmeter{display:flex;gap:8px;flex-wrap:wrap}
+.ide-metric{display:inline-flex;align-items:baseline;gap:6px;padding:3px 9px;border-radius:7px;background:var(--dsw-alias-interactive-bg-hover,rgba(128,128,128,.08));font-size:11.5px;min-width:0}
+.ide-metric b{font-weight:600;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ide-dactions{display:flex;gap:6px;flex-wrap:wrap}
+.ide-dcmd{display:flex;align-items:center;gap:10px;min-width:0}
 .ide-dot{width:8px;height:8px;border-radius:50%;flex:none;background:var(--dsw-alias-label-tertiary,#a8b0ba)}
 .ide-dot[data-state=running]{background:var(--dsw-alias-state-success-primary,#2ea043)}
 .ide-dot[data-state=failed]{background:var(--dsw-alias-state-error-primary,#d83931)}
@@ -14946,7 +14964,6 @@ function ensureStyles() {
   min-height:0;
   overflow:hidden;
 }
-.ide-root{height:100%;min-height:0}
 `;
   document.head.appendChild(style);
   return () => {
@@ -15013,6 +15030,7 @@ function IdeView({ api, ctx }) {
   const runKey = active !== void 0 && activeConfig !== void 0 ? runKeyOf({ workspaceId: active.workspaceId, configId: activeConfig.id }) : "";
   const runState = runKey !== "" ? runs[runKey] : void 0;
   const runText = describeRun(runState);
+  const activeDraft = activeConfig !== void 0 ? drafts[activeConfig.id] ?? activeConfig : void 0;
   const matcher = (0, import_react.useMemo)(() => compileMatcher({ q: filterQ, regex: filterRegex }), [filterQ, filterRegex]);
   const filtered = (0, import_react.useMemo)(
     () => filterLines(logLines, { matcher, onlyMatch, levels }),
@@ -15154,7 +15172,7 @@ function IdeView({ api, ctx }) {
       } catch {
       }
     }
-  }, [activeProjectId, overview, cfg.showOverview, onlyRunning]);
+  }, [activeProjectId, overview, onlyRunning]);
   (0, import_react.useEffect)(() => {
     const el = logRef.current;
     if (el === null || !pinnedRef.current) return;
@@ -15181,9 +15199,6 @@ function IdeView({ api, ctx }) {
       return false;
     }
   }, [api, reload]);
-  const selectProject = (workspaceId) => {
-    setActiveProjectId(workspaceId);
-  };
   const selectConfig = (configId) => {
     if (active === void 0) return;
     setActiveConfigIds((prev) => ({ ...prev, [active.workspaceId]: configId }));
@@ -15220,14 +15235,14 @@ function IdeView({ api, ctx }) {
   const setHidden = (workspaceId, hidden) => {
     void commit(patchProject(cfg, workspaceId, (p) => ({ ...p, hidden })), false);
   };
-  const openConfig = (workspaceId, configId) => {
+  const revealProject = (workspaceId, configId = "") => {
     setOverview(false);
     setActiveProjectId(workspaceId);
-    setActiveConfigIds((prev) => ({ ...prev, [workspaceId]: configId }));
-  };
-  const toggleOverviewTab = (next) => {
-    if (!next) setOverview(false);
-    void commit({ ...cfg, showOverview: next }, false);
+    if (configId !== "") setActiveConfigIds((prev) => ({ ...prev, [workspaceId]: configId }));
+    const project = cfg.projects.find((p) => p.workspaceId === workspaceId);
+    if (project === void 0) return;
+    if (project.hidden) setHidden(workspaceId, false);
+    if (onlyRunning && statusOfProject(project) !== "running") setOnlyRunning(false);
   };
   const addProject = (workspaceId) => {
     const source = projects.find((p) => p.workspaceId === workspaceId);
@@ -15363,17 +15378,14 @@ function IdeView({ api, ctx }) {
   }
   return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-root ide-view", children: [
     /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-tabrow", ref: tabRowRef, children: [
-      cfg.showOverview ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-tab", "data-sel": overview, onClick: () => setOverview(true), children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "\u603B\u89C8" }) }) : null,
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-tab", "data-sel": overview, onClick: () => setOverview(true), children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "\u603B\u89C8" }) }),
       visibleProjects.map((p) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
         "button",
         {
           type: "button",
           className: "ide-tab",
           "data-sel": !overview && p.workspaceId === active?.workspaceId,
-          onClick: () => {
-            setOverview(false);
-            selectProject(p.workspaceId);
-          },
+          onClick: () => revealProject(p.workspaceId),
           children: [
             /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-dot", "data-state": statusOfProject(p), title: "\u4EFB\u4E00\u6761\u914D\u7F6E\u5728\u8DD1\u5C31\u662F\u7EFF\u7684" }),
             /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: p.title }),
@@ -15396,18 +15408,13 @@ function IdeView({ api, ctx }) {
       )),
       /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "ide-tools", children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-chip", "data-sel": onlyRunning, onClick: () => setOnlyRunning((v) => !v), children: "\u53EA\u770B\u8FD0\u884C\u4E2D" }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-chip", "data-sel": cfg.showOverview, onClick: () => toggleOverviewTab(!cfg.showOverview), children: "\u603B\u89C8" }),
         /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("details", { className: "ide-overflow", children: [
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("summary", { title: "\u5168\u90E8\u9879\u76EE", children: "\xBB" }),
           /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("ul", { children: [
             cfg.projects.map((p) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
               "li",
               {
-                onClick: () => {
-                  setOverview(false);
-                  selectProject(p.workspaceId);
-                  if (p.hidden) setHidden(p.workspaceId, false);
-                },
+                onClick: () => revealProject(p.workspaceId),
                 children: [
                   /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-dot", "data-state": statusOfProject(p) }),
                   /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: p.title }),
@@ -15448,7 +15455,7 @@ function IdeView({ api, ctx }) {
           const snapshot = runs[runKeyOf({ workspaceId: p.workspaceId, configId: c.id })];
           return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-cardrow", children: [
             /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-dot", "data-state": snapshot?.status ?? "idle" }),
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-name", onClick: () => openConfig(p.workspaceId, c.id), children: c.name }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-name", onClick: () => revealProject(p.workspaceId, c.id), children: c.name }),
             snapshot !== void 0 && snapshot.port !== "" ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "ide-port", children: [
               ":",
               snapshot.port
@@ -15469,278 +15476,286 @@ function IdeView({ api, ctx }) {
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { children: "\u8FD8\u6CA1\u6709\u9879\u76EE" }),
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-note", children: "\u4ECE\u53F3\u4E0A\u89D2\u300C\uFF0B \u6DFB\u52A0\u9879\u76EE\u300D\u91CC\u6311\u4E00\u4E2A DSH \u5DE5\u4F5C\u533A" })
       ] }) : /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
-        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-toolbar", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "ide-path", children: [
-            active.title,
-            " \xB7 ",
-            active.path
-          ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { flex: 1 } })
-        ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-subrow", children: [
-          active.configs.map((c) => {
-            const snapshot = runs[runKeyOf({ workspaceId: active.workspaceId, configId: c.id })];
-            return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
-              "button",
-              {
-                type: "button",
-                className: "ide-subtab",
-                "data-sel": c.id === activeConfig?.id,
-                onClick: () => selectConfig(c.id),
-                children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-dot", "data-state": snapshot?.status ?? "idle" }),
-                  /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: c.name }),
-                  snapshot !== void 0 && snapshot.port !== "" ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "ide-port", children: [
-                    ":",
-                    snapshot.port
-                  ] }) : null
-                ]
-              },
-              c.id
-            );
-          }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-chip", onClick: () => addConfig(active), children: "\uFF0B \u542F\u52A8\u914D\u7F6E" })
-        ] }),
-        activeConfig === void 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-note", children: "\u8FD9\u4E2A\u9879\u76EE\u8FD8\u6CA1\u6709\u542F\u52A8\u914D\u7F6E \u2014\u2014 \u70B9\u300C\u2699 \u914D\u7F6E\u300D\u6DFB\u52A0" }) : /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
-          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-toolbar", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-configtitle", children: activeConfig.name }),
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-note", children: runText }),
-            runState !== void 0 && runState.port !== "" ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "ide-port", children: [
-              ":",
-              runState.port
-            ] }) : null,
-            isRunning(runState?.status) ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-note", children: formatUptime(runState?.startedAtMs ?? 0, Date.now()) }) : null,
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { flex: 1 } }),
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-              "button",
-              {
-                type: "button",
-                className: "ide-btn",
-                "data-kind": "primary",
-                disabled: isRunning(runState?.status),
-                onClick: () => {
-                  void runAction("start");
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-master", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-mlist", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-mhead", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-title", children: active.title }),
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-note ide-mono ide-mpath", title: active.path, children: active.path })
+            ] }),
+            active.configs.map((c) => {
+              const snapshot = runs[runKeyOf({ workspaceId: active.workspaceId, configId: c.id })];
+              const up = isRunning(snapshot?.status) ? formatUptime(snapshot?.startedAtMs ?? 0, Date.now()) : "";
+              return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
+                "button",
+                {
+                  type: "button",
+                  className: "ide-mitem",
+                  "data-sel": c.id === activeConfig?.id,
+                  title: `${c.name} \u2014 ${describeRun(snapshot)}`,
+                  onClick: () => selectConfig(c.id),
+                  children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-dot", "data-state": snapshot?.status ?? "idle" }),
+                    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-mname", children: c.name }),
+                    snapshot !== void 0 && snapshot.port !== "" ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "ide-port", children: [
+                      ":",
+                      snapshot.port
+                    ] }) : null,
+                    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-note ide-mstate", children: up !== "" ? up : describeRun(snapshot) })
+                  ]
                 },
-                children: "\u542F\u52A8"
-              }
-            ),
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-btn", disabled: runState?.status !== "running", onClick: () => {
-              void runAction("stop");
-            }, children: "\u505C\u6B62" }),
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-              "button",
-              {
-                type: "button",
-                className: "ide-btn",
-                "data-on": editing,
-                disabled: active === void 0,
-                onClick: () => setEditing((v) => !v),
-                children: "\u2699 \u914D\u7F6E"
-              }
-            ),
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-              "button",
-              {
-                type: "button",
-                className: "ide-btn",
-                disabled: runState?.status !== "running",
-                onClick: () => {
-                  void (async () => {
-                    await runAction("stop");
-                    await runAction("start");
-                  })();
-                },
-                children: "\u91CD\u542F"
-              }
-            ),
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-note", children: flash })
+                c.id
+              );
+            }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-mitem ide-madd", onClick: () => addConfig(active), children: "\uFF0B \u542F\u52A8\u914D\u7F6E" })
           ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-cmdline", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-label", children: "\u542F\u52A8\u547D\u4EE4" }),
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-cmd", children: activeConfig.command === "" ? "\uFF08\u672A\u8BBE\u7F6E\uFF09" : activeConfig.command })
-          ] }),
-          editing && active !== void 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-cfg", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-toolbar", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "ide-title", children: [
-                "\u914D\u7F6E \xB7 ",
-                active.title
-              ] }),
+          activeConfig === void 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-detail", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-note", children: "\u8FD9\u4E2A\u9879\u76EE\u8FD8\u6CA1\u6709\u542F\u52A8\u914D\u7F6E \u2014\u2014 \u70B9\u5DE6\u5217\u300C\uFF0B \u542F\u52A8\u914D\u7F6E\u300D\u6DFB\u52A0" }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-dactions", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-btn", "data-on": editing, onClick: () => setEditing((v) => !v), children: "\u2699 \u914D\u7F6E" }) })
+          ] }) : /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-detail", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-dhead", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-configtitle", children: activeConfig.name }),
               /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { flex: 1 } }),
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-note", children: flash }),
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-btn", "data-on": editing, onClick: () => setEditing((v) => !v), children: "\u2699 \u914D\u7F6E" })
+            ] }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-dmeter", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "ide-metric", title: runText, children: [
+                "\u72B6\u6001",
+                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("b", { children: runText })
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "ide-metric", children: [
+                "\u7AEF\u53E3",
+                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("b", { children: runState !== void 0 && runState.port !== "" ? `:${runState.port}` : "\u2014" })
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "ide-metric", children: [
+                "\u8FD0\u884C\u65F6\u957F",
+                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("b", { children: isRunning(runState?.status) ? formatUptime(runState?.startedAtMs ?? 0, Date.now()) : "\u2014" })
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "ide-metric", children: [
+                "\u9000\u51FA\u7801",
+                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("b", { children: runState?.exitCode === null || runState?.exitCode === void 0 ? "\u2014" : String(runState.exitCode) })
+              ] })
+            ] }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-dactions", children: [
               /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
                 "button",
                 {
                   type: "button",
-                  className: "ide-chip",
-                  disabled: discoveryBusy,
+                  className: "ide-btn",
+                  "data-kind": "primary",
+                  disabled: isRunning(runState?.status),
                   onClick: () => {
-                    void loadDiscovery();
+                    void runAction("start");
                   },
-                  children: discoveryBusy ? "\u6B63\u5728\u626B\u63CF\u2026" : "\u4ECE IDEA \u5BFC\u5165"
+                  children: "\u542F\u52A8"
                 }
               ),
-              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-btn", "data-kind": "danger", onClick: () => removeProject(active.workspaceId), children: "\u79FB\u9664\u9879\u76EE" })
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-btn", disabled: runState?.status !== "running", onClick: () => {
+                void runAction("stop");
+              }, children: "\u505C\u6B62" }),
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                "button",
+                {
+                  type: "button",
+                  className: "ide-btn",
+                  disabled: runState?.status !== "running",
+                  onClick: () => {
+                    void (async () => {
+                      await runAction("stop");
+                      await runAction("start");
+                    })();
+                  },
+                  children: "\u91CD\u542F"
+                }
+              )
             ] }),
-            active.configs.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-note", children: "\u8FD9\u4E2A\u9879\u76EE\u8FD8\u6CA1\u6709\u542F\u52A8\u914D\u7F6E" }) : null,
-            discovery !== null ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-form", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-line", children: [
-                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-label", children: "\u5BFC\u5165" }),
-                /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "ide-note", children: [
-                  "\u626B\u8FC7 ",
-                  discovery.scanned.length,
-                  " \u4E2A\u6587\u4EF6\uFF0C\u53D1\u73B0 ",
-                  discovery.candidates.length,
-                  " \u6761 IDEA Spring Boot \u914D\u7F6E"
-                ] }),
-                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { flex: 1 } }),
-                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-btn", onClick: () => setDiscovery(null), children: "\u6536\u8D77" })
-              ] }),
-              discovery.errors.length > 0 ? discovery.errors.map((message, index) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-err", children: message }, index)) : null,
-              discovery.candidates.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-note", children: "\u6CA1\u627E\u5230\u53EF\u5BFC\u5165\u7684 Spring Boot \u8FD0\u884C\u914D\u7F6E\uFF08\u53EA\u8BA4 .idea/workspace.xml \u4E0E .run/*.xml\uFF09" }) : null,
-              discovery.candidates.map((candidate) => {
-                const planned = plannedConfigName(candidate.name, active.configs.map((c) => c.name));
-                const blocked = candidate.problem !== "";
-                return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-line", children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-chip", children: candidate.name }),
-                  /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-note ide-mono", children: blocked ? candidate.problem : candidate.module }),
-                  /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "ide-note", children: [
-                    candidate.envs.length,
-                    " \u4E2A\u73AF\u5883\u53D8\u91CF"
-                  ] }),
-                  /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { flex: 1 } }),
-                  /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-                    "button",
-                    {
-                      type: "button",
-                      className: "ide-btn",
-                      "data-kind": "primary",
-                      disabled: blocked,
-                      title: blocked ? candidate.problem : candidate.source,
-                      onClick: () => importCandidate(candidate, planned),
-                      children: planned === candidate.name ? "\u5BFC\u5165" : `\u5BFC\u5165\u4E3A\u300C${planned}\u300D`
-                    }
-                  )
-                ] }, candidate.source + "#" + candidate.name);
-              })
-            ] }) : null,
-            active.configs.map((config22) => {
-              const draft = drafts[config22.id] ?? config22;
-              return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-form", children: [
-                /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-line", children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-label", children: "\u540D\u79F0" }),
-                  /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { className: "ide-field", style: { maxWidth: 240 }, value: draft.name, onChange: (e) => patchDraft(draft, { name: e.target.value }) }),
-                  /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-btn", "data-kind": "primary", onClick: () => {
-                    void saveDraft(active, draft);
-                  }, children: "\u4FDD\u5B58" }),
-                  /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-btn", "data-kind": "danger", onClick: () => removeConfig(active, config22.id), children: "\u5220\u9664" })
-                ] }),
-                /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-line", children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-label", children: "\u542F\u52A8\u547D\u4EE4" }),
-                  /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-                    "input",
-                    {
-                      className: "ide-field ide-mono",
-                      style: { flex: 1, minWidth: 280 },
-                      placeholder: "\u4F8B\u5982\uFF1Amvn -o -pl kun-ai-web spring-boot:run",
-                      value: draft.command,
-                      onChange: (e) => patchDraft(draft, { command: e.target.value })
-                    }
-                  )
-                ] }),
-                /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-line", children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-label", children: "\u5DE5\u4F5C\u76EE\u5F55" }),
-                  /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { className: "ide-field ide-mono", style: { flex: 1, minWidth: 280 }, value: draft.cwd, onChange: (e) => patchDraft(draft, { cwd: e.target.value }) })
-                ] }),
-                /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-line", style: { alignItems: "flex-start" }, children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-label", children: "\u73AF\u5883\u53D8\u91CF" }),
-                  /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { style: { flex: 1 }, children: [
-                    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("table", { className: "ide-envs", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("tbody", { children: draft.envs.map((env, index) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("tr", { children: [
-                      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("td", { style: { width: "38%" }, children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-                        "input",
-                        {
-                          className: "ide-field ide-mono",
-                          value: env.name,
-                          placeholder: "NAME",
-                          onChange: (e) => patchDraft(draft, { envs: draft.envs.map((x, i) => i === index ? { ...x, name: e.target.value } : x) })
-                        }
-                      ) }),
-                      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("td", { children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-                        "input",
-                        {
-                          className: "ide-field ide-mono",
-                          type: isSecretName(env.name) ? "password" : "text",
-                          title: isSecretName(env.name) ? "\u5BC6\u94A5\u7C7B\u53D8\u91CF\u5728\u754C\u9762\u4E0A\u63A9\u7801\u663E\u793A" : void 0,
-                          value: env.value,
-                          placeholder: "value",
-                          onChange: (e) => patchDraft(draft, { envs: draft.envs.map((x, i) => i === index ? { ...x, value: e.target.value } : x) })
-                        }
-                      ) }),
-                      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("td", { style: { width: 32 }, children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-btn", onClick: () => patchDraft(draft, { envs: draft.envs.filter((_, i) => i !== index) }), children: "\xD7" }) })
-                    ] }, index)) }) }),
-                    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-chip", onClick: () => patchDraft(draft, { envs: [...draft.envs, { name: "", value: "" }] }), children: "\uFF0B \u53D8\u91CF" })
-                  ] })
-                ] })
-              ] }, config22.id);
-            }),
-            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-toolbar", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-note", children: "\u6DFB\u52A0\u9879\u76EE" }),
-              addProjectControl("\uFF0B \u9009\u62E9\u5DE5\u4F5C\u533A"),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-dcmd", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-label", children: "\u542F\u52A8\u547D\u4EE4" }),
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-cmd", title: activeConfig.command, children: activeConfig.command === "" ? "\uFF08\u672A\u8BBE\u7F6E\uFF09" : activeConfig.command })
+            ] }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-filterbar", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                "input",
+                {
+                  className: "ide-field ide-mono",
+                  placeholder: "\u8FC7\u6EE4\u5173\u952E\u5B57",
+                  value: filterQ,
+                  onChange: (e) => setFilterQ(e.target.value)
+                }
+              ),
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-chip", "data-sel": filterRegex, onClick: () => setFilterRegex((v) => !v), children: "\u6B63\u5219" }),
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-chip", "data-sel": onlyMatch, onClick: () => setOnlyMatch((v) => !v), children: "\u4EC5\u770B\u5339\u914D" }),
               /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { flex: 1 } }),
-              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-note", children: "\u5B58\u4E8E ~/.dsh/storages/dsh-newbe-ide.json\uFF080600\uFF0C\u4E0D\u5728\u9879\u76EE\u76EE\u5F55\u91CC\uFF09" })
+              LEVELS.map((lv) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                "button",
+                {
+                  type: "button",
+                  className: "ide-chip",
+                  "data-sel": levels[lv],
+                  onClick: () => setLevels((prev) => ({ ...prev, [lv]: !prev[lv] })),
+                  children: lv
+                },
+                lv
+              ))
             ] })
-          ] }) : null,
-          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-filterbar", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-              "input",
-              {
-                className: "ide-field ide-mono",
-                placeholder: "\u8FC7\u6EE4\u5173\u952E\u5B57",
-                value: filterQ,
-                onChange: (e) => setFilterQ(e.target.value)
-              }
-            ),
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-chip", "data-sel": filterRegex, onClick: () => setFilterRegex((v) => !v), children: "\u6B63\u5219" }),
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-chip", "data-sel": onlyMatch, onClick: () => setOnlyMatch((v) => !v), children: "\u4EC5\u770B\u5339\u914D" }),
+          ] })
+        ] }),
+        editing && active !== void 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-cfg", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-toolbar", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "ide-title", children: [
+              "\u914D\u7F6E \xB7 ",
+              active.title
+            ] }),
+            activeDraft !== void 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "ide-note", children: [
+              "\u6B63\u5728\u7F16\u8F91\uFF1A",
+              activeDraft.name
+            ] }) : null,
             /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { flex: 1 } }),
-            LEVELS.map((lv) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
               "button",
               {
                 type: "button",
                 className: "ide-chip",
-                "data-sel": levels[lv],
-                onClick: () => setLevels((prev) => ({ ...prev, [lv]: !prev[lv] })),
-                children: lv
-              },
-              lv
-            ))
-          ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-logbox", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-              "div",
-              {
-                className: "ide-log",
-                ref: logRef,
-                onScroll: (event) => {
-                  const el = event.currentTarget;
-                  pinnedRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+                disabled: discoveryBusy,
+                onClick: () => {
+                  void loadDiscovery();
                 },
-                children: shown.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-note", children: logLines.length > 0 ? "\u6CA1\u6709\u5339\u914D\u7684\u65E5\u5FD7" : isRunning(runState?.status) ? "\u7B49\u5F85\u8F93\u51FA\u2026" : "\u70B9\u300C\u542F\u52A8\u300D\u8FD0\u884C\u8FD9\u6761\u542F\u52A8\u914D\u7F6E" }) : shown.map((row, index) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: (row.hit ? "ide-hit " : "") + "ide-lv-" + row.level, children: row.line }, index))
+                children: discoveryBusy ? "\u6B63\u5728\u626B\u63CF\u2026" : "\u4ECE IDEA \u5BFC\u5165"
               }
             ),
-            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-note", children: [
-              "\u663E\u793A ",
-              shown.length,
-              " / \u5171 ",
-              filtered.length,
-              " \u884C\uFF08\u7F13\u5B58 ",
-              logLines.length,
-              " \u884C\uFF09",
-              fromHistory ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { title: historyPath, children: [
-                "\uFF08\u542B\u4E0A\u6B21\u8FD0\u884C\u7684\u8F93\u51FA",
-                truncated ? "\uFF0C\u53EA\u53D6\u4E86\u6700\u8FD1\u4E00\u6BB5" : "",
-                "\uFF09"
-              ] }) : runState?.lossy === true || truncated ? "\uFF08\u8F93\u51FA\u8FC7\u5FEB\u6216\u8FC7\u957F\uFF0C\u65E9\u671F\u90E8\u5206\u5DF2\u4E22\u5F03\uFF09" : "",
-              filtered.length > RENDER_LIMIT ? `\uFF08\u4EC5\u6E32\u67D3\u6700\u8FD1 ${RENDER_LIMIT} \u884C\uFF09` : ""
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-btn", "data-kind": "danger", onClick: () => removeProject(active.workspaceId), children: "\u79FB\u9664\u9879\u76EE" })
+          ] }),
+          discovery !== null ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-form", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-line", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-label", children: "\u5BFC\u5165" }),
+              /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "ide-note", children: [
+                "\u626B\u8FC7 ",
+                discovery.scanned.length,
+                " \u4E2A\u6587\u4EF6\uFF0C\u53D1\u73B0 ",
+                discovery.candidates.length,
+                " \u6761 IDEA Spring Boot \u914D\u7F6E"
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { flex: 1 } }),
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-btn", onClick: () => setDiscovery(null), children: "\u6536\u8D77" })
+            ] }),
+            discovery.errors.length > 0 ? discovery.errors.map((message, index) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-err", children: message }, index)) : null,
+            discovery.candidates.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-note", children: "\u6CA1\u627E\u5230\u53EF\u5BFC\u5165\u7684 Spring Boot \u8FD0\u884C\u914D\u7F6E\uFF08\u53EA\u8BA4 .idea/workspace.xml \u4E0E .run/*.xml\uFF09" }) : null,
+            discovery.candidates.map((candidate) => {
+              const planned = plannedConfigName(candidate.name, active.configs.map((c) => c.name));
+              const blocked = candidate.problem !== "";
+              return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-line", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-chip", children: candidate.name }),
+                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-note ide-mono", children: blocked ? candidate.problem : candidate.module }),
+                /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "ide-note", children: [
+                  candidate.envs.length,
+                  " \u4E2A\u73AF\u5883\u53D8\u91CF"
+                ] }),
+                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { flex: 1 } }),
+                /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                  "button",
+                  {
+                    type: "button",
+                    className: "ide-btn",
+                    "data-kind": "primary",
+                    disabled: blocked,
+                    title: blocked ? candidate.problem : candidate.source,
+                    onClick: () => importCandidate(candidate, planned),
+                    children: planned === candidate.name ? "\u5BFC\u5165" : `\u5BFC\u5165\u4E3A\u300C${planned}\u300D`
+                  }
+                )
+              ] }, candidate.source + "#" + candidate.name);
+            })
+          ] }) : null,
+          activeDraft === void 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-note", children: "\u8FD9\u4E2A\u9879\u76EE\u8FD8\u6CA1\u6709\u542F\u52A8\u914D\u7F6E \u2014\u2014 \u7528\u5DE6\u5217\u300C\uFF0B \u542F\u52A8\u914D\u7F6E\u300D\u6216\u4E0A\u9762\u7684\u300C\u4ECE IDEA \u5BFC\u5165\u300D\u52A0\u4E00\u6761" }) : /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-form", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-line", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-label", children: "\u540D\u79F0" }),
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { className: "ide-field", style: { maxWidth: 240 }, value: activeDraft.name, onChange: (e) => patchDraft(activeDraft, { name: e.target.value }) }),
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-btn", "data-kind": "primary", onClick: () => {
+                void saveDraft(active, activeDraft);
+              }, children: "\u4FDD\u5B58" }),
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-btn", "data-kind": "danger", onClick: () => removeConfig(active, activeDraft.id), children: "\u5220\u9664" })
+            ] }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-line", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-label", children: "\u542F\u52A8\u547D\u4EE4" }),
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                "input",
+                {
+                  className: "ide-field ide-mono",
+                  style: { flex: 1, minWidth: 280 },
+                  placeholder: "\u4F8B\u5982\uFF1Amvn -o -pl kun-ai-web spring-boot:run",
+                  value: activeDraft.command,
+                  onChange: (e) => patchDraft(activeDraft, { command: e.target.value })
+                }
+              )
+            ] }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-line", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-label", children: "\u5DE5\u4F5C\u76EE\u5F55" }),
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { className: "ide-field ide-mono", style: { flex: 1, minWidth: 280 }, value: activeDraft.cwd, onChange: (e) => patchDraft(activeDraft, { cwd: e.target.value }) })
+            ] }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-line", style: { alignItems: "flex-start" }, children: [
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-label", children: "\u73AF\u5883\u53D8\u91CF" }),
+              /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { style: { flex: 1 }, children: [
+                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("table", { className: "ide-envs", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("tbody", { children: activeDraft.envs.map((env, index) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("tr", { children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime.jsx)("td", { style: { width: "38%" }, children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                    "input",
+                    {
+                      className: "ide-field ide-mono",
+                      value: env.name,
+                      placeholder: "NAME",
+                      onChange: (e) => patchDraft(activeDraft, { envs: activeDraft.envs.map((x, i) => i === index ? { ...x, name: e.target.value } : x) })
+                    }
+                  ) }),
+                  /* @__PURE__ */ (0, import_jsx_runtime.jsx)("td", { children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                    "input",
+                    {
+                      className: "ide-field ide-mono",
+                      type: isSecretName(env.name) ? "password" : "text",
+                      title: isSecretName(env.name) ? "\u5BC6\u94A5\u7C7B\u53D8\u91CF\u5728\u754C\u9762\u4E0A\u63A9\u7801\u663E\u793A" : void 0,
+                      value: env.value,
+                      placeholder: "value",
+                      onChange: (e) => patchDraft(activeDraft, { envs: activeDraft.envs.map((x, i) => i === index ? { ...x, value: e.target.value } : x) })
+                    }
+                  ) }),
+                  /* @__PURE__ */ (0, import_jsx_runtime.jsx)("td", { style: { width: 32 }, children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-btn", onClick: () => patchDraft(activeDraft, { envs: activeDraft.envs.filter((_, i) => i !== index) }), children: "\xD7" }) })
+                ] }, index)) }) }),
+                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-chip", onClick: () => patchDraft(activeDraft, { envs: [...activeDraft.envs, { name: "", value: "" }] }), children: "\uFF0B \u53D8\u91CF" })
+              ] })
             ] })
+          ] }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-toolbar", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-note", children: "\u6DFB\u52A0\u9879\u76EE" }),
+            addProjectControl("\uFF0B \u9009\u62E9\u5DE5\u4F5C\u533A"),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { flex: 1 } }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-note", children: "\u5B58\u4E8E ~/.dsh/storages/dsh-newbe-ide.json\uFF080600\uFF0C\u4E0D\u5728\u9879\u76EE\u76EE\u5F55\u91CC\uFF09" })
+          ] })
+        ] }) : null,
+        activeConfig === void 0 ? null : /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-logbox", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+            "div",
+            {
+              className: "ide-log",
+              ref: logRef,
+              onScroll: (event) => {
+                const el = event.currentTarget;
+                pinnedRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+              },
+              children: shown.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-note", children: logLines.length > 0 ? "\u6CA1\u6709\u5339\u914D\u7684\u65E5\u5FD7" : isRunning(runState?.status) ? "\u7B49\u5F85\u8F93\u51FA\u2026" : "\u70B9\u300C\u542F\u52A8\u300D\u8FD0\u884C\u8FD9\u6761\u542F\u52A8\u914D\u7F6E" }) : shown.map((row, index) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: (row.hit ? "ide-hit " : "") + "ide-lv-" + row.level, children: row.line }, index))
+            }
+          ),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-note", children: [
+            "\u663E\u793A ",
+            shown.length,
+            " / \u5171 ",
+            filtered.length,
+            " \u884C\uFF08\u7F13\u5B58 ",
+            logLines.length,
+            " \u884C\uFF09",
+            fromHistory ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { title: historyPath, children: [
+              "\uFF08\u542B\u4E0A\u6B21\u8FD0\u884C\u7684\u8F93\u51FA",
+              truncated ? "\uFF0C\u53EA\u53D6\u4E86\u6700\u8FD1\u4E00\u6BB5" : "",
+              "\uFF09"
+            ] }) : runState?.lossy === true || truncated ? "\uFF08\u8F93\u51FA\u8FC7\u5FEB\u6216\u8FC7\u957F\uFF0C\u65E9\u671F\u90E8\u5206\u5DF2\u4E22\u5F03\uFF09" : "",
+            filtered.length > RENDER_LIMIT ? `\uFF08\u4EC5\u6E32\u67D3\u6700\u8FD1 ${RENDER_LIMIT} \u884C\uFF09` : ""
           ] })
         ] })
       ] })
