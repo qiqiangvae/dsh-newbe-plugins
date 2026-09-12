@@ -1,7 +1,7 @@
 # dsh-newbe-ide — 规格
 
 **Status:** 设计已定稿，待实现
-**原型:** [`prototype/dsh-newbe-ide.html`](../../prototype/dsh-newbe-ide.html)（一次性产物，定稿后丢弃，只保留选中的形态）
+**原型:** 存档在分支 `prototype/dsh-newbe-ide`（文件 `prototype/dsh-newbe-ide.html`，分支停在 `9030f29`）。主分支只保留选定的形态，即 `packages/dsh-newbe-ide`。
 
 ## 一句话
 
