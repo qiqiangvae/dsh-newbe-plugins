@@ -14738,6 +14738,13 @@ function ensureStyles() {
 .ide-envs td{padding:3px 4px;vertical-align:middle}
 .ide-envs input{width:100%}
 .ide-toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+/* IDE \u89C6\u56FE\u5360\u6EE1\u9762\u677F\uFF1A\u672C\u89C6\u56FE\u5728\u573A\u65F6\u6536\u8D77\u5E95\u90E8\u7684\u6D88\u606F\u8F93\u5165\u6846\u3002
+   DSH \u6CA1\u6709"\u6309\u89C6\u56FE\u9690\u85CF\u8F93\u5165\u6846"\u7684 API\uFF08conversation.composer \u94FE\u7684 select \u53EA\u80FD\u62FF\u5230
+   sessionId/session/pendingInteraction\uFF0C\u770B\u4E0D\u5230\u5F53\u524D\u89C6\u56FE\uFF09\uFF0C\u56E0\u6B64\u4E0E dsh-context \u540C\u6CD5\uFF1A
+   \u7528 :has() \u6309\u89C6\u56FE\u6839\u5143\u7D20\u6536\u8D77\u5EA7\u4F4D\u3002\u672B\u5C3E\u7684 :not(...) \u662F\u4FDD\u62A4\u2014\u2014\u8F93\u5165\u6846\u91CC\u4E00\u65E6\u627F\u8F7D
+   \u5BA1\u6279 / \u8FFD\u95EE / \u8BA1\u5212\u590D\u6838\uFF0C\u5FC5\u987B\u7559\u7740\uFF0C\u5426\u5219\u7528\u6237\u6CA1\u6CD5\u56DE\u7B54\u3002 */
+[data-conversation-scroll]:has(.ide-root)>[data-composer-seat]:not(:has([data-approval-key],[data-question-key],[data-plan-review-key])){display:none}
+[data-conversation-scroll]:has(.ide-root)~[data-width-handle]{display:none}
 `;
   document.head.appendChild(style);
   return () => {

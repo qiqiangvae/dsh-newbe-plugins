@@ -166,6 +166,13 @@ function ensureStyles(): () => void {
 .ide-envs td{padding:3px 4px;vertical-align:middle}
 .ide-envs input{width:100%}
 .ide-toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+/* IDE 视图占满面板：本视图在场时收起底部的消息输入框。
+   DSH 没有"按视图隐藏输入框"的 API（conversation.composer 链的 select 只能拿到
+   sessionId/session/pendingInteraction，看不到当前视图），因此与 dsh-context 同法：
+   用 :has() 按视图根元素收起座位。末尾的 :not(...) 是保护——输入框里一旦承载
+   审批 / 追问 / 计划复核，必须留着，否则用户没法回答。 */
+[data-conversation-scroll]:has(.ide-root)>[data-composer-seat]:not(:has([data-approval-key],[data-question-key],[data-plan-review-key])){display:none}
+[data-conversation-scroll]:has(.ide-root)~[data-width-handle]{display:none}
 `;
   document.head.appendChild(style);
   return () => { style.remove(); };
