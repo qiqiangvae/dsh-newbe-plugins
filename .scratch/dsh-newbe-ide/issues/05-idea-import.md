@@ -7,7 +7,7 @@
 **Status:** ready-for-agent
 
 - [ ] 发现项目根的 `.idea/workspace.xml` 与 `.run/*.xml` 里的 Spring Boot 运行配置，并列出可导入项
-- [ ] 字段映射正确：模块名 → `-pl <module> -am`；`SPRING_BOOT_MAIN_CLASS` → `-Dspring-boot.run.main-class=...`；`<envs>` → 环境变量；配置名 → 启动配置名称
+- [ ] 字段映射正确：模块名 → `-pl <module>`（**不带 `-am`**，实测带 `-am` 会让 run 目标先在没有主类的聚合工程上失败）；`SPRING_BOOT_MAIN_CLASS` → `-Dspring-boot.run.main-class=...`；`<envs>` → 环境变量；配置名 → 启动配置名称
 - [ ] 导入 `kun-ai` 后生成的启动配置可直接启动成功（含 5 个环境变量），实测通过
 - [ ] 已存在同名启动配置时不静默覆盖，改为提示并让用户选择
 - [ ] 环境变量里的密钥值在界面上掩码

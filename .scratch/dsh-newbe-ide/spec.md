@@ -63,12 +63,15 @@ DSH 会话视图里的第四个 tab「IDE」（**对话 / 轨迹 / 上下文 / I
 
 | IDEA 字段 | 变成 |
 | --- | --- |
-| `<module name>` | `-pl <module> -am` |
+| `<module name>` | `-pl <module>`（**不能带 `-am`**） |
 | `SPRING_BOOT_MAIN_CLASS` | `-Dspring-boot.run.main-class=<主类>` |
 | `<envs><env name value>` | 环境变量（值原样，密钥掩码显示） |
 | 配置名 | 启动配置名称 |
 
-生成的启动命令形如 `mvn -o -pl kun-ai-web -am spring-boot:run -Dspring-boot.run.main-class=com.pingpongx.kun.ai.web.KunAiApplication`，导入后可编辑。
+生成的启动命令形如 `mvn -o -pl kun-ai-web spring-boot:run -Dspring-boot.run.main-class=com.pingpongx.kun.ai.web.KunAiApplication`，导入后可编辑。
+
+**为什么不能带 `-am`（实测踩过）**：`-am` 会把目标模块的上游工程（父工程与依赖模块）一起放进 reactor，而 `spring-boot:run` 这类 CLI 目标会对 reactor 里**每一个**工程执行，于是先在「没有主类的聚合工程」上失败：
+`Unable to find a suitable main class, please add a 'mainClass' property`。依赖模块缺失时，先跑一次 `mvn -o -pl <module> -am install -DskipTests` 装进本地仓库，再单独对目标模块 `spring-boot:run`。
 
 ## 明确不做
 

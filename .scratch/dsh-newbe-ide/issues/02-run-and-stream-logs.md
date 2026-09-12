@@ -26,4 +26,5 @@
 - 密钥掩码两处：日志里替换为 `****`；界面里密钥类变量的输入框用 `password` 类型。
 - 插件停用 / DSH 退出时回收：`ctx.effect` 的清理函数里 `clearInterval` + `registry.dispose()`（只杀仍在跑的，已自然退出的不碰——这条是测试先发现实现有 bug 才补上的）。
 - **验证证据**：本包 28 项测试全绿。新增 9 项运行注册表契约测试（假 shell 驱动：启动参数透传、增量读取、半行拼接、自然退出 0/非 0、停止调 kill、dispose 回收、密钥掩码、环形丢弃、三类可读错误）+ 5 项日志行测试。
-- **尚未验证**：真实进程的启停与实时输出、`ps` 确认无残留（需要重启 `dsh web` 后在界面上跑一次）。
+- **真机实测（2026-09-12，用户在界面上跑）**：`mvn -o -pl kun-ai-web -am spring-boot:run` 在 AI-SPACE 工作区下首先因工作目录不对而失败（`Could not find the selected project in the reactor`）；改到 kun-ai 工作区后又因 `-am` 让 run 目标施加到父工程而失败（`Unable to find a suitable main class`）。两次都是**命令/工作目录配置问题，不是插件问题**——日志面板把完整 Maven 输出实时流了出来，状态行正确显示 `已退出（码 1） · 已缓存 40 行`。结论已回写进 spec 与票 05：导入器生成的 run 命令**不能带 `-am`**。
+- **仍未验证**：一条**能跑起来**的命令（Spring Boot 真正启动）的实时滚动效果，以及停止后的 `ps`/端口检查。
