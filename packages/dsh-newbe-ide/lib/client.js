@@ -14607,6 +14607,12 @@ var runSnapshotListSchema = external_exports.array(runSnapshotSchema);
 function defaultState() {
   return { projects: [], activeWorkspaceId: "", showOverview: false };
 }
+function pickActiveConfig(project, preferredId) {
+  const preferred = project.configs.find((c) => c.id === preferredId);
+  if (preferred !== void 0) return preferred;
+  const remembered = project.configs.find((c) => c.id === project.activeConfigId);
+  return remembered ?? project.configs[0];
+}
 function runKeyOf(target) {
   return `${target.workspaceId}/${target.configId}`;
 }
@@ -14768,9 +14774,7 @@ function activeOf(config2, projects, activeProjectId) {
   const registered = registryKnown ? config2.projects.filter((p) => isRegistered(p.workspaceId)) : config2.projects;
   const stale = registryKnown ? config2.projects.filter((p) => !isRegistered(p.workspaceId)) : [];
   const active = registered.find((p) => p.workspaceId === activeProjectId) ?? registered[0];
-  const activeConfigId = active !== void 0 && active.activeConfigId !== "" ? active.activeConfigId : active?.configs[0]?.id;
-  const activeConfig = active?.configs.find((c) => c.id === activeConfigId);
-  return { registryKnown, registered, stale, active, activeConfig };
+  return { registryKnown, registered, stale, active };
 }
 function IdeView({ api, ctx }) {
   const [config2, setConfig] = (0, import_react.useState)(null);
@@ -14786,8 +14790,10 @@ function IdeView({ api, ctx }) {
   const pinnedRef = (0, import_react.useRef)(true);
   const genRef = (0, import_react.useRef)(0);
   const tickRef = (0, import_react.useRef)(0);
+  const [activeConfigIds, setActiveConfigIds] = (0, import_react.useState)({});
   const cfg = config2 ?? defaultState();
-  const { registered, stale, active, activeConfig } = activeOf(cfg, projects, activeProjectId);
+  const { registered, stale, active } = activeOf(cfg, projects, activeProjectId);
+  const activeConfig = active !== void 0 ? pickActiveConfig(active, activeConfigIds[active.workspaceId] ?? "") : void 0;
   const runKey = active !== void 0 && activeConfig !== void 0 ? runKeyOf({ workspaceId: active.workspaceId, configId: activeConfig.id }) : "";
   const runState = runKey !== "" ? runs[runKey] : void 0;
   const runText = describeRun(runState);
@@ -14872,17 +14878,10 @@ function IdeView({ api, ctx }) {
   }, [logLines]);
   const selectProject = (workspaceId) => {
     setActiveProjectId(workspaceId);
-    if (cfg.activeWorkspaceId !== workspaceId && api !== void 0) {
-      void api.submit({ ...cfg, activeWorkspaceId: workspaceId }).catch(() => {
-      });
-    }
   };
   const selectConfig = (configId) => {
-    if (active === void 0 || api === void 0) return;
-    const next = patchProject(cfg, active.workspaceId, (p) => ({ ...p, activeConfigId: configId }));
-    setConfig(next);
-    void api.submit(next).catch(() => {
-    });
+    if (active === void 0) return;
+    setActiveConfigIds((prev) => ({ ...prev, [active.workspaceId]: configId }));
   };
   const runAction = async (action) => {
     if (api === void 0 || active === void 0 || activeConfig === void 0) return;

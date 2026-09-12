@@ -94,6 +94,17 @@ export function defaultState(): IdeState {
   return { projects: [], activeWorkspaceId: '', showOverview: false };
 }
 
+/**
+ * 当前选中的启动配置：局部选择优先，其次磁盘上记住的，最后退回第一条。
+ * 局部优先是必须的——磁盘值是异步读回来的，周期性重读会把刚点的选择盖回去。
+ */
+export function pickActiveConfig(project: ProjectEntry, preferredId: string): LaunchConfig | undefined {
+  const preferred = project.configs.find((c) => c.id === preferredId);
+  if (preferred !== undefined) return preferred;
+  const remembered = project.configs.find((c) => c.id === project.activeConfigId);
+  return remembered ?? project.configs[0];
+}
+
 /** 一条启动配置的进程键：宿主与客户端必须用同一种拼法。 */
 export function runKeyOf(target: RunTarget): string {
   return `${target.workspaceId}/${target.configId}`;

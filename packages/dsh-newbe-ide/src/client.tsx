@@ -12,6 +12,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   defaultState,
   ideLoadSchema,
+  pickActiveConfig,
   ideStateSchema,
   runKeyOf,
   runReadRequestSchema,
@@ -199,9 +200,7 @@ function activeOf(config: IdeState, projects: IdeProjectView[], activeProjectId:
   const registered = registryKnown ? config.projects.filter((p) => isRegistered(p.workspaceId)) : config.projects;
   const stale = registryKnown ? config.projects.filter((p) => !isRegistered(p.workspaceId)) : [];
   const active = registered.find((p) => p.workspaceId === activeProjectId) ?? registered[0];
-  const activeConfigId = active !== undefined && active.activeConfigId !== '' ? active.activeConfigId : active?.configs[0]?.id;
-  const activeConfig = active?.configs.find((c) => c.id === activeConfigId);
-  return { registryKnown, registered, stale, active, activeConfig };
+  return { registryKnown, registered, stale, active };
 }
 
 /* ------------------------------------------------------------------ *
@@ -232,8 +231,11 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
   const genRef = useRef(0);
   const tickRef = useRef(0);
 
+  /** 局部选中项：切换启动配置只动这里，不等磁盘回读（回读会把它盖回去）。 */
+  const [activeConfigIds, setActiveConfigIds] = useState<Record<string, string>>({});
   const cfg: IdeState = config ?? defaultState();
-  const { registered, stale, active, activeConfig } = activeOf(cfg, projects, activeProjectId);
+  const { registered, stale, active } = activeOf(cfg, projects, activeProjectId);
+  const activeConfig = active !== undefined ? pickActiveConfig(active, activeConfigIds[active.workspaceId] ?? '') : undefined;
   const runKey = active !== undefined && activeConfig !== undefined
     ? runKeyOf({ workspaceId: active.workspaceId, configId: activeConfig.id })
     : '';
@@ -320,18 +322,15 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
     el.scrollTop = el.scrollHeight;
   }, [logLines]);
 
+  // 选中项是视图状态，不落盘：视图从不写配置，只有设置页写。
+  // 两个面都整份写盘的话，并发保存会互相覆盖；保持"单写者"就没有这个窗口。
   const selectProject = (workspaceId: string) => {
     setActiveProjectId(workspaceId);
-    if (cfg.activeWorkspaceId !== workspaceId && api !== undefined) {
-      void api.submit({ ...cfg, activeWorkspaceId: workspaceId }).catch(() => { /* 只影响下次打开时的默认选中 */ });
-    }
   };
 
   const selectConfig = (configId: string) => {
-    if (active === undefined || api === undefined) return;
-    const next = patchProject(cfg, active.workspaceId, (p) => ({ ...p, activeConfigId: configId }));
-    setConfig(next);
-    void api.submit(next).catch(() => { /* 同上：只是记住选中项 */ });
+    if (active === undefined) return;
+    setActiveConfigIds((prev) => ({ ...prev, [active.workspaceId]: configId }));
   };
 
   const runAction = async (action: 'start' | 'stop') => {

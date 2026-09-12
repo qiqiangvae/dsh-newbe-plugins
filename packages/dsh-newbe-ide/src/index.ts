@@ -12,7 +12,7 @@ import { createRunRegistry, type RunSpec } from './runtime.js';
 import { runKeyOf, type IdeLoad, type IdeProjectView, type IdeState, type RunRead, type RunSnapshot } from './schema.js';
 
 export { createConfigStore } from './store.js';
-export { defaultState, runKeyOf } from './schema.js';
+export { defaultState, pickActiveConfig, runKeyOf } from './schema.js';
 export { cleanLine, isSecretName, maskSecrets, splitLines } from './lines.js';
 export { createRunRegistry } from './runtime.js';
 export type { RunRead, RunSnapshot, RunStatus } from './schema.js';

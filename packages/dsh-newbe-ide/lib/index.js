@@ -14591,6 +14591,12 @@ var runSnapshotListSchema = external_exports.array(runSnapshotSchema);
 function defaultState() {
   return { projects: [], activeWorkspaceId: "", showOverview: false };
 }
+function pickActiveConfig(project, preferredId) {
+  const preferred = project.configs.find((c) => c.id === preferredId);
+  if (preferred !== void 0) return preferred;
+  const remembered = project.configs.find((c) => c.id === project.activeConfigId);
+  return remembered ?? project.configs[0];
+}
 function runKeyOf(target) {
   return `${target.workspaceId}/${target.configId}`;
 }
@@ -14941,6 +14947,7 @@ export {
   isSecretName,
   maskSecrets,
   name,
+  pickActiveConfig,
   runKeyOf,
   splitLines
 };
