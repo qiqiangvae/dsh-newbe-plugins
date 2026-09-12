@@ -21,13 +21,11 @@ export { DEFAULT_HISTORY_LINES, defaultState, pickActiveConfig, runKeyOf } from 
 export { cleanLine, isSecretName, maskSecrets, splitLines } from './lines.js';
 export { DEFAULT_LEVELS, LEVELS, compileMatcher, filterLines, levelOf } from './filter.js';
 export { createFileLogSink } from './logsink.js';
+// 只导出有消费者的东西：测试是 .mjs（导入值），客户端直接从各自模块取类型，
+// 因此这里不再转发类型（曾经转发过一批，0 个消费者）。
 export { aggregateStatus, formatUptime, parsePort } from './rundisplay.js';
 export { buildLaunchConfig, parseSpringBootConfigurations, plannedConfigName } from './ideaconfig.js';
-export type { BuiltLaunchConfig, IdeaCandidate } from './ideaconfig.js';
-export type { LogSink, TailResult } from './logsink.js';
-export type { FilteredLine, FilterState, Matcher, MatcherSpec, RunLevel } from './filter.js';
 export { createRunRegistry } from './runtime.js';
-export type { RunRead, RunSnapshot, RunStatus } from './schema.js';
 
 /** 持久化文件：$DSH_HOME/storages/dsh-newbe-ide.json。 */
 export const STORAGE_PATH = dshHomePath('storages', 'dsh-newbe-ide.json');

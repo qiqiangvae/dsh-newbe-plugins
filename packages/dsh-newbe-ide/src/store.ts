@@ -13,7 +13,7 @@ import { defaultState, ideStateSchema, type IdeState } from './schema.js';
  * 原子整文件替换：同目录临时文件（wx 独占创建，0600）→ fsync → rename → 目录 fsync（尽力而为）。
  * 读取方只会看到旧内容或完整的新内容；失败时清理临时文件并重新抛出。
  */
-export function writeFileAtomic(file: string, text: string): void {
+function writeFileAtomic(file: string, text: string): void {
   mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
   const tmp = join(dirname(file), `.${randomUUID()}.tmp`);
   const fd = openSync(tmp, 'wx', 0o600);
@@ -40,7 +40,7 @@ export function writeFileAtomic(file: string, text: string): void {
 }
 
 /** 读取磁盘状态；文件缺失返回空配置，损坏则降级并给出告警（原文件保持不动）。 */
-export function loadState(file: string): { state: IdeState; warning: string } {
+function loadState(file: string): { state: IdeState; warning: string } {
   let text: string;
   try {
     text = readFileSync(file, 'utf8');
@@ -62,7 +62,7 @@ function safeJson(text: string): unknown {
   }
 }
 
-export interface ConfigStore {
+interface ConfigStore {
   /** 加载期告警（'' 表示无）；用于面板上的可见提示。 */
   readonly warning: string;
   getState(): IdeState;

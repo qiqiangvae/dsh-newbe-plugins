@@ -14878,7 +14878,6 @@ function ensureStyles() {
 .ide-body{display:flex;flex-direction:column;flex:1;min-height:0;padding:12px 16px;gap:10px;overflow:auto}
 /* \u89C6\u56FE\u8981\u586B\u6EE1\u9762\u677F\uFF1A\u6EDA\u52A8\u4EA4\u7ED9\u65E5\u5FD7\u533A\u81EA\u5DF1\uFF0C\u5176\u4F59\u4E0D\u6EDA */
 .ide-fill{overflow:hidden}
-.ide-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .ide-cmd{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;color:var(--dsw-alias-label-secondary,#697586);word-break:break-all}
 .ide-cmdline{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
 .ide-configtitle{font-size:15px;font-weight:600}
@@ -14901,10 +14900,9 @@ function ensureStyles() {
 .ide-err{color:var(--dsw-alias-state-error-primary,#d83931);font-size:12px}
 .ide-logbox{display:flex;flex-direction:column;gap:4px;flex:1;min-height:0}
 .ide-log{flex:1;min-height:120px;overflow:auto;background:rgba(128,128,128,.10);border:1px solid var(--dsw-alias-border-l2,#d9dce1);border-radius:9px;padding:8px 10px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;line-height:1.5;white-space:pre-wrap;word-break:break-all}
-.ide-section{display:flex;flex-direction:column;gap:10px}
-.ide-sectiontitle{font-size:13px;font-weight:600;margin-top:4px}
 .ide-card{border:1px solid var(--dsw-alias-border-l2,#d9dce1);border-radius:9px;background:var(--dsw-alias-bg-module-platform,#fff);padding:10px 12px;display:flex;flex-direction:column;gap:8px}
 .ide-cardhead{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.ide-cfg{border:1px solid var(--dsw-alias-border-l2,#d9dce1);border-radius:9px;background:var(--dsw-alias-bg-module-platform,#fff);padding:10px 12px;display:flex;flex-direction:column;gap:8px}
 .ide-form{display:flex;flex-direction:column;gap:8px;border-top:1px solid var(--dsw-alias-border-l2,#d9dce1);padding-top:8px}
 .ide-line{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .ide-label{color:var(--dsw-alias-label-secondary,#697586);font-size:12px;width:64px;flex:none}
@@ -14998,7 +14996,6 @@ function IdeView({ api, ctx }) {
   const [onlyRunning, setOnlyRunning] = (0, import_react.useState)(false);
   const panelReady = config2 !== null;
   const [overview, setOverview] = (0, import_react.useState)(false);
-  const [overviewTab, setOverviewTab] = (0, import_react.useState)(false);
   const tabRowRef = (0, import_react.useRef)(null);
   const [discovery, setDiscovery] = (0, import_react.useState)(null);
   const [discoveryBusy, setDiscoveryBusy] = (0, import_react.useState)(false);
@@ -15026,7 +15023,6 @@ function IdeView({ api, ctx }) {
     setConfig(load.config);
     setProjects(load.projects);
     setWarning(load.warning);
-    setOverviewTab(load.config.showOverview);
     setActiveProjectId((current) => {
       if (load.config.projects.some((p) => p.workspaceId === current)) return current;
       if (load.config.activeWorkspaceId !== "") return load.config.activeWorkspaceId;
@@ -15158,7 +15154,7 @@ function IdeView({ api, ctx }) {
       } catch {
       }
     }
-  }, [activeProjectId, overview, overviewTab, onlyRunning]);
+  }, [activeProjectId, overview, cfg.showOverview, onlyRunning]);
   (0, import_react.useEffect)(() => {
     const el = logRef.current;
     if (el === null || !pinnedRef.current) return;
@@ -15230,7 +15226,6 @@ function IdeView({ api, ctx }) {
     setActiveConfigIds((prev) => ({ ...prev, [workspaceId]: configId }));
   };
   const toggleOverviewTab = (next) => {
-    setOverviewTab(next);
     if (!next) setOverview(false);
     void commit({ ...cfg, showOverview: next }, false);
   };
@@ -15368,7 +15363,7 @@ function IdeView({ api, ctx }) {
   }
   return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-root ide-view", children: [
     /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-tabrow", ref: tabRowRef, children: [
-      overviewTab ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-tab", "data-sel": overview, onClick: () => setOverview(true), children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "\u603B\u89C8" }) }) : null,
+      cfg.showOverview ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-tab", "data-sel": overview, onClick: () => setOverview(true), children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "\u603B\u89C8" }) }) : null,
       visibleProjects.map((p) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
         "button",
         {
@@ -15401,7 +15396,7 @@ function IdeView({ api, ctx }) {
       )),
       /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "ide-tools", children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-chip", "data-sel": onlyRunning, onClick: () => setOnlyRunning((v) => !v), children: "\u53EA\u770B\u8FD0\u884C\u4E2D" }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-chip", "data-sel": overviewTab, onClick: () => toggleOverviewTab(!overviewTab), children: "\u603B\u89C8" }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-chip", "data-sel": cfg.showOverview, onClick: () => toggleOverviewTab(!cfg.showOverview), children: "\u603B\u89C8" }),
         /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("details", { className: "ide-overflow", children: [
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("summary", { title: "\u5168\u90E8\u9879\u76EE", children: "\xBB" }),
           /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("ul", { children: [

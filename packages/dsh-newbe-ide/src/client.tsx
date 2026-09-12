@@ -206,7 +206,6 @@ function ensureStyles(): () => void {
 .ide-body{display:flex;flex-direction:column;flex:1;min-height:0;padding:12px 16px;gap:10px;overflow:auto}
 /* 视图要填满面板：滚动交给日志区自己，其余不滚 */
 .ide-fill{overflow:hidden}
-.ide-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .ide-cmd{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;color:var(--dsw-alias-label-secondary,#697586);word-break:break-all}
 .ide-cmdline{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
 .ide-configtitle{font-size:15px;font-weight:600}
@@ -229,10 +228,9 @@ function ensureStyles(): () => void {
 .ide-err{color:var(--dsw-alias-state-error-primary,#d83931);font-size:12px}
 .ide-logbox{display:flex;flex-direction:column;gap:4px;flex:1;min-height:0}
 .ide-log{flex:1;min-height:120px;overflow:auto;background:rgba(128,128,128,.10);border:1px solid var(--dsw-alias-border-l2,#d9dce1);border-radius:9px;padding:8px 10px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;line-height:1.5;white-space:pre-wrap;word-break:break-all}
-.ide-section{display:flex;flex-direction:column;gap:10px}
-.ide-sectiontitle{font-size:13px;font-weight:600;margin-top:4px}
 .ide-card{border:1px solid var(--dsw-alias-border-l2,#d9dce1);border-radius:9px;background:var(--dsw-alias-bg-module-platform,#fff);padding:10px 12px;display:flex;flex-direction:column;gap:8px}
 .ide-cardhead{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.ide-cfg{border:1px solid var(--dsw-alias-border-l2,#d9dce1);border-radius:9px;background:var(--dsw-alias-bg-module-platform,#fff);padding:10px 12px;display:flex;flex-direction:column;gap:8px}
 .ide-form{display:flex;flex-direction:column;gap:8px;border-top:1px solid var(--dsw-alias-border-l2,#d9dce1);padding-top:8px}
 .ide-line{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .ide-label{color:var(--dsw-alias-label-secondary,#697586);font-size:12px;width:64px;flex:none}
@@ -344,7 +342,6 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
   /** 面板是否已渲染出 tab 行；横向滑动的监听要等它出现后才挂得上。 */
   const panelReady = config !== null;
   const [overview, setOverview] = useState(false);
-  const [overviewTab, setOverviewTab] = useState(false);
   const tabRowRef = useRef<HTMLDivElement | null>(null);
   const [discovery, setDiscovery] = useState<IdeaDiscovery | null>(null);
   const [discoveryBusy, setDiscoveryBusy] = useState(false);
@@ -380,7 +377,6 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
     setConfig(load.config);
     setProjects(load.projects);
     setWarning(load.warning);
-    setOverviewTab(load.config.showOverview);
     setActiveProjectId((current) => {
       if (load.config.projects.some((p) => p.workspaceId === current)) return current;
       if (load.config.activeWorkspaceId !== '') return load.config.activeWorkspaceId;
@@ -520,7 +516,7 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
         selected.scrollIntoView({ inline: 'nearest', block: 'nearest' });
       } catch { /* 老旧实现忽略参数即可 */ }
     }
-  }, [activeProjectId, overview, overviewTab, onlyRunning]);
+  }, [activeProjectId, overview, cfg.showOverview, onlyRunning]);
 
   // 贴底就跟随到底；用户上滚（scroll 事件把 pinned 置 false）后不再打扰他。
   useEffect(() => {
@@ -602,7 +598,6 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
     setActiveConfigIds((prev) => ({ ...prev, [workspaceId]: configId }));
   };
   const toggleOverviewTab = (next: boolean) => {
-    setOverviewTab(next);
     if (!next) setOverview(false);
     void commit({ ...cfg, showOverview: next }, false);
   };
@@ -753,7 +748,7 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
   return (
     <div className="ide-root ide-view">
       <div className="ide-tabrow" ref={tabRowRef}>
-        {overviewTab ? (
+        {cfg.showOverview ? (
           <button type="button" className="ide-tab" data-sel={overview} onClick={() => setOverview(true)}>
             <span>总览</span>
           </button>
@@ -780,7 +775,7 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
         ))}
         <span className="ide-tools">
           <button type="button" className="ide-chip" data-sel={onlyRunning} onClick={() => setOnlyRunning((v) => !v)}>只看运行中</button>
-          <button type="button" className="ide-chip" data-sel={overviewTab} onClick={() => toggleOverviewTab(!overviewTab)}>总览</button>
+          <button type="button" className="ide-chip" data-sel={cfg.showOverview} onClick={() => toggleOverviewTab(!cfg.showOverview)}>总览</button>
           <details className="ide-overflow">
             <summary title="全部项目">»</summary>
             <ul>

@@ -9,12 +9,12 @@ import { parsePort } from './rundisplay.js';
 import type { LogSink } from './logsink.js';
 import type { RunRead, RunSnapshot, RunStatus } from './schema.js';
 
-export interface ShellOutputDelta {
+interface ShellOutputDelta {
   delta: string;
   lossy: boolean;
 }
 
-export interface ShellProcessLike {
+interface ShellProcessLike {
   status: string;
   exitCode: number | null;
   done: Promise<void>;
@@ -22,7 +22,7 @@ export interface ShellProcessLike {
   kill(): boolean;
 }
 
-export interface ShellServiceLike {
+interface ShellServiceLike {
   resolve(request: { command: string; workdir?: string; env?: Record<string, string> }): unknown;
   start(spec: unknown): ShellProcessLike;
 }
@@ -33,7 +33,7 @@ export interface RunSpec {
   envs: readonly { name: string; value: string }[];
 }
 
-export interface RunRegistry {
+interface RunRegistry {
   start(key: string, spec: RunSpec): RunSnapshot;
   stop(key: string): RunSnapshot;
   read(key: string, from: number): RunRead;
@@ -71,9 +71,9 @@ interface RunRecord {
 }
 
 /** shell 服务可能后到（cordis 服务可增可减），因此用取值函数而不是实例。 */
-export type ShellProvider = () => ShellServiceLike | undefined;
+type ShellProvider = () => ShellServiceLike | undefined;
 
-export interface RunRegistryOptions {
+interface RunRegistryOptions {
   maxLines?: number;
   /** 落盘去处；不传就只在内存里留（测试与无盘环境）。 */
   sink?: LogSink;
