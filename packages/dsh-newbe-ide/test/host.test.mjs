@@ -184,11 +184,26 @@ test('discover 扫 .idea/workspace.xml 与 .run/*.xml，只留 Spring Boot 配�
 
   // 从真实工程路径生成命令（不带 -am）
   const built = mod.buildLaunchConfig(found.candidates[0], root);
-  assert.equal(built.command, 'mvn -pl kun-ai-web spring-boot:run -Dspring-boot.run.main-class=com.pingpongx.kun.ai.web.KunAiApplication');
+  assert.equal(built.command, 'mvn -o -pl kun-ai-web spring-boot:run -Dspring-boot.run.main-class=com.pingpongx.kun.ai.web.KunAiApplication');
 });
 
 test('discover 对不在面板里的项目给出可读错误', () => {
   const { ctx, provided } = makeCtx(null, makeShell());
   mod.apply(ctx);
   assert.throws(() => provided.ideConfig.discover({ workspaceId: '不存在' }), /不在面板配置里/);
+});
+
+test('一个配置文件都没扫到时给出可读原因', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'dsh-newbe-ide-empty-'));
+  const { ctx, provided } = makeCtx(null, makeShell());
+  mod.apply(ctx);
+  await provided.ideConfig.submit({
+    projects: [{ workspaceId: 'w1', path: root, title: 'p', activeConfigId: '', configs: [], hidden: false }],
+    activeWorkspaceId: 'w1',
+    showOverview: false,
+  });
+  const found = provided.ideConfig.discover({ workspaceId: 'w1' });
+  assert.deepEqual([...found.scanned], []);
+  assert.equal(found.errors.length, 1);
+  assert.match(found.errors[0], /没找到/);
 });

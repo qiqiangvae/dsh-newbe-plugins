@@ -1,12 +1,18 @@
 /**
- * dsh-newbe-ide Web 客户端，两个面：
+ * dsh-newbe-ide Web 客户端：只注册一个面——会话视图 tab「IDE」
+ * （`conversation.view`，紧随 对话 / 轨迹 / 上下文）。
  *
- * 1. 会话视图 tab「IDE」（`conversation.view`，紧随 对话 / 轨迹 / 上下文）：
- *    **只读控制台**——项目 tab、启动配置、启停按钮、日志。这里不出现任何输入控件，
- *    与 `dsh-context` 的做法一致（它的视图里同样没有输入框）。
- * 2. 配置页（`settings.plugins.tab`，设置 → 插件 → IDE）：项目与启动配置的增删改，
- *    包括名称、启动命令、工作目录、环境变量。配置存宿主侧
- *    `$DSH_HOME/storages/dsh-newbe-ide.json`，不进 settings.yaml。
+ * 面板里从上到下：
+ *   - 项目 tab 行（横向滑动、可收起、`»` 里是全部项目、`只看运行中` 过滤）
+ *   - 二级 tab 行：当前项目下的多条启动配置（状态点 + 名称 + 端口）
+ *   - 运行控制行：启动 / 停止 / 重启 / ⚙ 配置（配置块收起时零占位）
+ *   - 过滤条 + 日志区（日志区吃掉剩余高度，滚动只发生在它内部）
+ *
+ * 「⚙ 配置」展开的配置块承担项目与启动配置的增删改，以及从 IDEA 导入。
+ * 配置存宿主侧 `$DSH_HOME/storages/dsh-newbe-ide.json`，不进 settings.yaml；
+ * **面板是唯一的写者**——曾经短暂另注册过一个设置页，已删除：两个面都整份写盘会互相覆盖。
+ *
+ * 与 上下文 tab 一致的行为：本视图在场时收起底部消息输入框，并让视图占满面板。
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -52,7 +58,7 @@ const LOG_LIMIT = 4000;
 /** 单帧最多渲染多少行：过滤是全量的，渲染要封顶，否则长日志会卡。 */
 const RENDER_LIMIT = 2000;
 const POLL_MS = 800;
-/** 每 N 次轮询顺带重读一次配置，让设置页里的改动近乎即时地反映到视图。 */
+/** 每 N 次轮询顺带重读一次配置，外部改动（另开一个会话/浏览器）能跟着更新。 */
 const CONFIG_REFRESH_EVERY = 3;
 
 type RemoteEnvelope<T> = { ok: true; value: T } | { ok: false; error?: { message?: string } };
@@ -198,7 +204,7 @@ function ensureStyles(): () => void {
 .ide-cardrow .ide-name{font-weight:600;cursor:pointer}
 .ide-cardrow .ide-last{flex:1;min-width:0;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;color:var(--dsw-alias-label-secondary,#697586);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ide-body{display:flex;flex-direction:column;flex:1;min-height:0;padding:12px 16px;gap:10px;overflow:auto}
-/* 视图要填满面板：滚动交给日志区自己，其余不滚；设置页仍用上面的 overflow:auto */
+/* 视图要填满面板：滚动交给日志区自己，其余不滚 */
 .ide-fill{overflow:hidden}
 .ide-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .ide-cmd{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;color:var(--dsw-alias-label-secondary,#697586);word-break:break-all}
@@ -263,7 +269,7 @@ function ensureStyles(): () => void {
    composer overlay 模式下才夹成 flex:1 1 0 + min-height:0），所以视图高度由内容决定：
    日志一长，整页跟着变长，得把页面拖到底才能看到最新一行。
    这里照 DSH 自己的做法，把包住本视图的那层夹到确定高度——不碰它的哈希类名，
-   用 :has(.ide-root) 定位包含本视图的直接子层。 */
+   用 :has(.ide-view) 定位包含本视图的直接子层。 */
 [data-conversation-scroll]:has(.ide-view)>[data-slot="conversation.session"]>*:has(.ide-view),
 [data-conversation-scroll]:has(.ide-view)>[data-slot="conversation.session"]:has(.ide-view){
   flex:1 1 0;
@@ -281,7 +287,12 @@ function patchProject(config: IdeState, workspaceId: string, mutate: (project: P
   return { ...config, projects: config.projects.map((p) => (p.workspaceId === workspaceId ? mutate(p) : p)) };
 }
 
-/** 运行态文案：状态机到人话只在这一处翻译。 */
+/** "这条配置正在跑吗"——判定只在这一处。 */
+function isRunning(status: RunStatus | undefined): boolean {
+  return status === 'running';
+}
+
+/** 运行态文案：状态机到人话只在这一处翻译；与 isRunning、aggregateStatus 的分工是"文案 / 判定 / 排序"。 */
 function describeRun(run: RunSnapshot | undefined): string {
   if (run === undefined || run.status === 'idle') return '未启动';
   if (run.status === 'running') return '运行中';
@@ -301,7 +312,7 @@ function activeOf(config: IdeState, projects: IdeProjectView[], activeProjectId:
 }
 
 /* ------------------------------------------------------------------ *
- * 会话视图：只读控制台
+ * 会话视图：运行控制台 + 面板内的配置块
  * ------------------------------------------------------------------ */
 
 interface ViewProps {
@@ -330,6 +341,8 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
   const [drafts, setDrafts] = useState<Record<string, LaunchConfig>>({});
   const [flash, setFlash] = useState('');
   const [onlyRunning, setOnlyRunning] = useState(false);
+  /** 面板是否已渲染出 tab 行；横向滑动的监听要等它出现后才挂得上。 */
+  const panelReady = config !== null;
   const [overview, setOverview] = useState(false);
   const [overviewTab, setOverviewTab] = useState(false);
   const tabRowRef = useRef<HTMLDivElement | null>(null);
@@ -406,8 +419,11 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
   }, [ctx, reload]);
 
   useEffect(() => {
-    if (api === undefined || runKey === '' || active === undefined || activeConfig === undefined) return;
-    const target = { workspaceId: active.workspaceId, configId: activeConfig.id };
+    if (api === undefined) return;
+    // 注意：不能因为"没选配置"就整个不轮询——总览卡片与一级 tab 的状态点、端口、
+    // 时长、最后一行都来自 runs()，刚加进来还没建配置的项目正是这种情况。
+    const hasTarget = runKey !== '' && active !== undefined && activeConfig !== undefined;
+    const target = hasTarget ? { workspaceId: active.workspaceId, configId: activeConfig.id } : null;
     let stopped = false;
     const tick = async () => {
       const gen = genRef.current; // 这一轮属于哪一代
@@ -419,6 +435,7 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
         setRuns(map);
         if (tickRef.current % CONFIG_REFRESH_EVERY === 0) void reload();
         tickRef.current += 1;
+        if (target === null) return;
         const chunk = envelopeValue(await api.read({ ...target, from: offsetRef.current }), '读取日志') as RunRead;
         if (stopped || genRef.current !== gen) return;
         offsetRef.current = chunk.next;
@@ -489,7 +506,9 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
     };
-  }, []);
+    // 依赖"面板是否已渲染"：首帧 config 还是 null，tab 行不在 DOM 里，ref 为 null；
+    // 用 [] 的话这个 effect 永远不会重跑，整段滚动逻辑就是死代码。
+  }, [panelReady]);
 
   // 选中的 tab 自己滚进视野（项目多了以后必须有）
   useEffect(() => {
@@ -537,7 +556,7 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
   }, [api, reload]);
 
   // 选中项是视图状态，不落盘。
-  // 两个面都整份写盘的话，并发保存会互相覆盖；保持"单写者"就没有这个窗口。
+  // 单一写者：只有这一处写配置，不存在两个面互相覆盖的窗口。
   const selectProject = (workspaceId: string) => {
     setActiveProjectId(workspaceId);
   };
@@ -548,9 +567,31 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
   };
 
   const available = projects.filter((p) => !cfg.projects.some((entry) => entry.workspaceId === p.workspaceId));
-  const statusOfProject = (workspaceId: string, configs: readonly LaunchConfig[]) =>
-    aggregateStatus(configs.map((c) => runs[runKeyOf({ workspaceId, configId: c.id })]?.status ?? 'idle'));
-  const visibleProjects = registered.filter((p) => !p.hidden && (!onlyRunning || statusOfProject(p.workspaceId, p.configs) === 'running'));
+  const statusOfProject = (project: ProjectEntry) =>
+    aggregateStatus(project.configs.map((c) => runs[runKeyOf({ workspaceId: project.workspaceId, configId: c.id })]?.status ?? 'idle'));
+  const visibleProjects = registered.filter((p) => !p.hidden && (!onlyRunning || statusOfProject(p) === 'running'));
+
+  /** 「添加项目」控件只有这一份实现，两处用不同标签调用（tab 行与配置块）。 */
+  const addProjectControl = (label: string) => {
+    if (!projects.length) return <span className="ide-note">DSH 工作区注册表暂不可用</span>;
+    if (available.length === 0) return <span className="ide-note">所有工作区都已加入</span>;
+    return (
+      <select className="ide-field" value="" onChange={(event) => { if (event.target.value !== '') addProject(event.target.value); }}>
+        <option value="">{label}（{available.length}）</option>
+        {available.map((p) => <option key={p.workspaceId} value={p.workspaceId}>{p.title} · {p.path}</option>)}
+      </select>
+    );
+  };
+
+  const visibleKey = visibleProjects.map((p) => p.workspaceId).join('|');
+  // 选中的项目被过滤掉时（收起、或"只看运行中"把它滤掉），body 不能还停在它上面：
+  // 那样 tab 行里没有任何选中项，也没法用 » 修复。切回第一个仍可见的项目。
+  useEffect(() => {
+    if (config === null || overview) return;
+    if (visibleProjects.length === 0) return;
+    if (visibleProjects.some((p) => p.workspaceId === activeProjectId)) return;
+    setActiveProjectId(visibleProjects[0].workspaceId);
+  }, [config, overview, visibleKey, activeProjectId]);
 
   const setHidden = (workspaceId: string, hidden: boolean) => {
     void commit(patchProject(cfg, workspaceId, (p) => ({ ...p, hidden })), false);
@@ -575,9 +616,14 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
   };
 
   const removeProject = (workspaceId: string) => {
-    const next: IdeState = { ...cfg, projects: cfg.projects.filter((p) => p.workspaceId !== workspaceId) };
-    setActiveProjectId(next.projects[0]?.workspaceId ?? '');
-    void commit(next, false);
+    const project = cfg.projects.find((p) => p.workspaceId === workspaceId);
+    void (async () => {
+      // 移除项目会连它的配置一起删掉，先把它名下的进程都停掉
+      for (const config of project?.configs ?? []) await stopRun(workspaceId, config.id);
+      const next: IdeState = { ...cfg, projects: cfg.projects.filter((p) => p.workspaceId !== workspaceId) };
+      setActiveProjectId(next.projects[0]?.workspaceId ?? '');
+      await commit(next, false);
+    })();
   };
 
   const addConfig = (project: ProjectEntry) => {
@@ -597,12 +643,23 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
     })), false);
   };
 
+  /** 删掉一条配置前先停掉它的进程：否则进程没了主人、端口要占到 DSH 退出。 */
+  const stopRun = async (workspaceId: string, configId: string) => {
+    if (api === undefined) return;
+    try {
+      await api.stop({ workspaceId, configId });
+    } catch { /* 本来就没在跑 */ }
+  };
+
   const removeConfig = (project: ProjectEntry, configId: string) => {
     setDrafts((prev) => { const copy = { ...prev }; delete copy[configId]; return copy; });
-    void commit(patchProject(cfg, project.workspaceId, (p) => {
-      const kept = p.configs.filter((c) => c.id !== configId);
-      return { ...p, configs: kept, activeConfigId: p.activeConfigId === configId ? (kept[0]?.id ?? '') : p.activeConfigId };
-    }), false);
+    void (async () => {
+      await stopRun(project.workspaceId, configId);
+      await commit(patchProject(cfg, project.workspaceId, (p) => {
+        const kept = p.configs.filter((c) => c.id !== configId);
+        return { ...p, configs: kept, activeConfigId: p.activeConfigId === configId ? (kept[0]?.id ?? '') : p.activeConfigId };
+      }), false);
+    })();
   };
 
   const patchDraft = (draft: LaunchConfig, patch: Partial<LaunchConfig>) => {
@@ -635,10 +692,9 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
   };
 
   /** 导入一条候选：同名不覆盖，自动让路到「名字 (2)」。 */
-  const importCandidate = (candidate: IdeaCandidateView) => {
+  const importCandidate = (candidate: IdeaCandidateView, name: string) => {
     if (active === undefined) return;
     const built = buildLaunchConfig(candidate, active.path);
-    const name = plannedConfigName(built.name, active.configs.map((c) => c.name));
     const fresh: LaunchConfig = {
       id: `c${crypto.randomUUID()}`,
       name,
@@ -663,7 +719,8 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
     if (api === undefined || target === undefined) return;
     setError('');
     try {
-      if (action === 'start' && explicit === undefined) {
+      const startedViewedOne = explicit === undefined || runKey === runKeyOf(explicit);
+      if (action === 'start' && startedViewedOne) {
         genRef.current += 1; // 让上一代在飞的读取结果失效
         offsetRef.current = 0;
         pinnedRef.current = true;
@@ -709,7 +766,7 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
             data-sel={!overview && p.workspaceId === active?.workspaceId}
             onClick={() => { setOverview(false); selectProject(p.workspaceId); }}
           >
-            <span className="ide-dot" data-state={statusOfProject(p.workspaceId, p.configs)} title="任一条配置在跑就是绿的" />
+            <span className="ide-dot" data-state={statusOfProject(p)} title="任一条配置在跑就是绿的" />
             <span>{p.title}</span>
             {p.configs.length > 0 ? <span className="ide-note">{p.configs.length}</span> : null}
             <span
@@ -732,7 +789,7 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
                   key={p.workspaceId}
                   onClick={() => { setOverview(false); selectProject(p.workspaceId); if (p.hidden) setHidden(p.workspaceId, false); }}
                 >
-                  <span className="ide-dot" data-state={statusOfProject(p.workspaceId, p.configs)} />
+                  <span className="ide-dot" data-state={statusOfProject(p)} />
                   <span>{p.title}</span>
                   <span className="ide-note" style={{ marginLeft: 'auto' }}>
                     {p.hidden ? '已收起' : `${p.configs.length} 条配置`}
@@ -742,14 +799,7 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
               {cfg.projects.length === 0 ? <li className="ide-note">还没有项目</li> : null}
             </ul>
           </details>
-          {!projects.length ? (
-            <span className="ide-note">工作区注册表暂不可用</span>
-          ) : available.length > 0 ? (
-            <select className="ide-field" value="" onChange={(event) => { if (event.target.value !== '') addProject(event.target.value); }}>
-              <option value="">＋ 添加项目（{available.length}）</option>
-              {available.map((p) => <option key={p.workspaceId} value={p.workspaceId}>{p.title} · {p.path}</option>)}
-            </select>
-          ) : null}
+          {addProjectControl('＋ 添加项目')}
         </span>
       </div>
 
@@ -767,7 +817,7 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
             {cfg.projects.map((p) => (
               <div className="ide-card" key={p.workspaceId}>
                 <div className="ide-cardhead">
-                  <span className="ide-dot" data-state={statusOfProject(p.workspaceId, p.configs)} />
+                  <span className="ide-dot" data-state={statusOfProject(p)} />
                   <span className="ide-title">{p.title}</span>
                   {p.hidden ? <span className="ide-note">已收起</span> : null}
                   <span style={{ flex: 1 }} />
@@ -784,10 +834,10 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
                       {snapshot !== undefined && snapshot.port !== '' ? <span className="ide-port">:{snapshot.port}</span> : null}
                       <span className="ide-note">
                         {describeRun(snapshot)}
-                        {snapshot !== undefined && snapshot.status === 'running' ? ` · ${formatUptime(snapshot.startedAtMs, Date.now())}` : ''}
+                        {isRunning(snapshot?.status) ? ` · ${formatUptime(snapshot?.startedAtMs ?? 0, Date.now())}` : ''}
                       </span>
                       <span className="ide-last" title={snapshot?.lastLine ?? ''}>{snapshot?.lastLine ?? '（无输出）'}</span>
-                      {snapshot?.status === 'running' ? (
+                      {isRunning(snapshot?.status) ? (
                         <button type="button" className="ide-btn" onClick={() => { void runAction('stop', { workspaceId: p.workspaceId, configId: c.id }); }}>停止</button>
                       ) : (
                         <button type="button" className="ide-btn" data-kind="primary" onClick={() => { void runAction('start', { workspaceId: p.workspaceId, configId: c.id }); }}>启动</button>
@@ -839,15 +889,15 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
                   <span className="ide-configtitle">{activeConfig.name}</span>
                   <span className="ide-note">{runText}</span>
                   {runState !== undefined && runState.port !== '' ? <span className="ide-port">:{runState.port}</span> : null}
-                  {runState !== undefined && runState.status === 'running'
-                    ? <span className="ide-note">{formatUptime(runState.startedAtMs, Date.now())}</span>
+                  {isRunning(runState?.status)
+                    ? <span className="ide-note">{formatUptime(runState?.startedAtMs ?? 0, Date.now())}</span>
                     : null}
                   <span style={{ flex: 1 }} />
                   <button
                     type="button"
                     className="ide-btn"
                     data-kind="primary"
-                    disabled={runState?.status === 'running'}
+                    disabled={isRunning(runState?.status)}
                     onClick={() => { void runAction('start'); }}
                   >
                     启动
@@ -929,7 +979,7 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
                                 data-kind="primary"
                                 disabled={blocked}
                                 title={blocked ? candidate.problem : candidate.source}
-                                onClick={() => importCandidate(candidate)}
+                                onClick={() => importCandidate(candidate, planned)}
                               >
                                 {planned === candidate.name ? '导入' : `导入为「${planned}」`}
                               </button>
@@ -1004,16 +1054,7 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
 
                     <div className="ide-toolbar">
                       <span className="ide-note">添加项目</span>
-                      {!projects.length ? (
-                        <span className="ide-note">DSH 工作区注册表暂不可用</span>
-                      ) : available.length > 0 ? (
-                        <select className="ide-field" value="" onChange={(event) => { if (event.target.value !== '') addProject(event.target.value); }}>
-                          <option value="">＋ 选择工作区（{available.length} 个可选）</option>
-                          {available.map((p) => <option key={p.workspaceId} value={p.workspaceId}>{p.title} · {p.path}</option>)}
-                        </select>
-                      ) : (
-                        <span className="ide-note">所有工作区都已加入</span>
-                      )}
+                      {addProjectControl('＋ 选择工作区')}
                       <span style={{ flex: 1 }} />
                       <span className="ide-note">存于 ~/.dsh/storages/dsh-newbe-ide.json（0600，不在项目目录里）</span>
                     </div>
@@ -1057,7 +1098,7 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
                         <span className="ide-note">
                           {logLines.length > 0
                             ? '没有匹配的日志'
-                            : runState?.status === 'running' ? '等待输出…' : '点「启动」运行这条启动配置'}
+                            : isRunning(runState?.status) ? '等待输出…' : '点「启动」运行这条启动配置'}
                         </span>
                       )
                       : shown.map((row, index) => (
@@ -1099,7 +1140,7 @@ export async function apply(ctx: any): Promise<void> {
   const api = ctx.get('remote.ideConfig') as RemoteIde | undefined;
   if (api === undefined) console.warn('[dsh-newbe-ide] remote.ideConfig 不可用，面板无法读写启动配置');
 
-  // 会话视图：只读控制台，不出现输入控件。
+  // 会话视图：运行控制台 + 面板内的配置块，不出现输入控件。
   ctx.slots.inject('conversation.view', () => ctx.slots.register(
     { name: 'conversation.view', id: VIEW_ID, order: VIEW_ORDER, label: 'IDE' },
     () => <IdeView api={api} ctx={ctx} />,

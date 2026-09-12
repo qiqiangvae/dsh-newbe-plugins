@@ -14763,13 +14763,9 @@ function formatUptime(startedAtMs, nowMs) {
   if (minutes < 60) return `${minutes}m ${seconds % 60}s`;
   return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
 }
-function parsePortFromLines(lines) {
-  let found = "";
-  for (const line of lines) {
-    const matched = /\bport\s+(\d{2,5})\b/i.exec(line);
-    if (matched !== null) found = matched[1];
-  }
-  return found;
+function parsePort(line) {
+  const matched = /\bport\s+(\d{2,5})\b/i.exec(line);
+  return matched === null ? "" : matched[1];
 }
 var SEVERITY = { idle: 0, stopped: 1, exited: 2, failed: 3, running: 4 };
 function aggregateStatus(statuses) {
@@ -14814,7 +14810,7 @@ function createRunRegistry(provideShell, options = {}) {
   function emit(run, line) {
     pushLine(run, line);
     run.pendingAppend.push(line);
-    const port = parsePortFromLines([line]);
+    const port = parsePort(line);
     if (port !== "") run.port = port;
     if (line.trim() !== "") run.lastLine = line;
   }
@@ -15111,7 +15107,7 @@ function parseSpringBootConfigurations(xml) {
   return candidates;
 }
 function buildLaunchConfig(candidate, projectPath) {
-  const parts = ["mvn"];
+  const parts = ["mvn", "-o"];
   if (candidate.module !== "") parts.push("-pl", candidate.module);
   parts.push("spring-boot:run");
   if (candidate.mainClass !== "") parts.push(`-Dspring-boot.run.main-class=${candidate.mainClass}`);
@@ -15255,6 +15251,9 @@ function apply(ctx) {
           errors.push(`${file2}\uFF1A${String(error51?.message ?? error51)}`);
         }
       }
+      if (scanned.length === 0) {
+        errors.push("\u6CA1\u627E\u5230 .idea/workspace.xml \u6216 .run/*.xml \u2014\u2014 \u5BFC\u5165\u53EA\u8BA4 IDEA \u5DE5\u7A0B\u6839\u76EE\u5F55\uFF08\u591A\u6A21\u5757 Maven \u5DE5\u7A0B\u7684\u6839\uFF0C\u4E0D\u662F\u67D0\u4E00\u4E2A\u6A21\u5757\uFF09");
+      }
       return { candidates, errors, scanned };
     },
     history(request) {
@@ -15292,7 +15291,7 @@ export {
   levelOf,
   maskSecrets,
   name,
-  parsePortFromLines,
+  parsePort,
   parseSpringBootConfigurations,
   pickActiveConfig,
   plannedConfigName,

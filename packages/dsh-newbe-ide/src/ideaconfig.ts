@@ -10,26 +10,13 @@
  * 于是先在没有主类的聚合工程上失败：Unable to find a suitable main class。
  */
 
-export interface IdeaEnv {
-  name: string;
-  value: string;
-}
+import type { EnvVar, IdeaCandidateView, LaunchConfig } from './schema.js';
 
-export interface IdeaCandidate {
-  name: string;
-  module: string;
-  mainClass: string;
-  envs: IdeaEnv[];
-  /** 字段不全时的可读原因；非空表示这条不能直接导入（不是产生半截配置）。 */
-  problem: string;
-}
+/** 解析结果就是 wire 候选去掉 `source`（那是扫描时补的）。 */
+export type IdeaCandidate = Omit<IdeaCandidateView, 'source'>;
 
-export interface BuiltLaunchConfig {
-  name: string;
-  command: string;
-  cwd: string;
-  envs: IdeaEnv[];
-}
+/** 生成的启动配置 = 启动配置去掉 id（id 由调用方发）。 */
+export type BuiltLaunchConfig = Omit<LaunchConfig, 'id'>;
 
 const SPRING_BOOT_TYPE = 'SpringBootApplicationConfigurationType';
 
@@ -67,7 +54,7 @@ export function parseSpringBootConfigurations(xml: string): IdeaCandidate[] {
       'value',
     );
 
-    const envs: IdeaEnv[] = [];
+    const envs: EnvVar[] = [];
     for (const envTag of block.match(/<env\b[^>]*?\/?>/g) ?? []) {
       const key = attribute(envTag, 'name');
       if (key === '') continue;
@@ -95,7 +82,8 @@ export function parseSpringBootConfigurations(xml: string): IdeaCandidate[] {
 
 /** 把候选配置变成启动配置：模块 → `-pl <模块>`，主类 → run 目标参数。 */
 export function buildLaunchConfig(candidate: IdeaCandidate, projectPath: string): BuiltLaunchConfig {
-  const parts = ['mvn'];
+  // `-o`（离线）：与规格一致，也是本项目一贯的跑法——依赖都已在本机仓库里。
+  const parts = ['mvn', '-o'];
   if (candidate.module !== '') parts.push('-pl', candidate.module);
   parts.push('spring-boot:run');
   if (candidate.mainClass !== '') parts.push(`-Dspring-boot.run.main-class=${candidate.mainClass}`);

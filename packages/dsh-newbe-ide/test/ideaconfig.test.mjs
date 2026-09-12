@@ -90,7 +90,7 @@ test('生成命令：不带 -am，带主类，目录与模块正确', () => {
   const config = buildLaunchConfig(first, '/Users/me/Code/kun-ai');
   assert.equal(
     config.command,
-    'mvn -pl kun-ai-web spring-boot:run -Dspring-boot.run.main-class=com.pingpongx.kun.ai.web.KunAiApplication',
+    'mvn -o -pl kun-ai-web spring-boot:run -Dspring-boot.run.main-class=com.pingpongx.kun.ai.web.KunAiApplication',
   );
   assert.ok(!config.command.includes('-am'), '不能带 -am：run 目标会先作用在没有主类的聚合工程上');
   assert.equal(config.cwd, '/Users/me/Code/kun-ai');

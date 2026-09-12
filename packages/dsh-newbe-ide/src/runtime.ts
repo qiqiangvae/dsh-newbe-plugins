@@ -5,7 +5,7 @@
  * 因此可以用假 shell 完整验证；真实进程组回收另有实测覆盖。
  */
 import { cleanLine, isSecretName, maskSecrets, splitLines } from './lines.js';
-import { parsePortFromLines } from './rundisplay.js';
+import { parsePort } from './rundisplay.js';
 import type { LogSink } from './logsink.js';
 import type { RunRead, RunSnapshot, RunStatus } from './schema.js';
 
@@ -99,7 +99,7 @@ export function createRunRegistry(provideShell: ShellProvider, options: RunRegis
   function emit(run: RunRecord, line: string): void {
     pushLine(run, line);
     run.pendingAppend.push(line);
-    const port = parsePortFromLines([line]);
+    const port = parsePort(line);
     if (port !== '') run.port = port;
     if (line.trim() !== '') run.lastLine = line;
   }

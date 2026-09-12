@@ -14663,7 +14663,7 @@ function isSecretName(name) {
 
 // src/ideaconfig.ts
 function buildLaunchConfig(candidate, projectPath) {
-  const parts = ["mvn"];
+  const parts = ["mvn", "-o"];
   if (candidate.module !== "") parts.push("-pl", candidate.module);
   parts.push("spring-boot:run");
   if (candidate.mainClass !== "") parts.push(`-Dspring-boot.run.main-class=${candidate.mainClass}`);
@@ -14876,7 +14876,7 @@ function ensureStyles() {
 .ide-cardrow .ide-name{font-weight:600;cursor:pointer}
 .ide-cardrow .ide-last{flex:1;min-width:0;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;color:var(--dsw-alias-label-secondary,#697586);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ide-body{display:flex;flex-direction:column;flex:1;min-height:0;padding:12px 16px;gap:10px;overflow:auto}
-/* \u89C6\u56FE\u8981\u586B\u6EE1\u9762\u677F\uFF1A\u6EDA\u52A8\u4EA4\u7ED9\u65E5\u5FD7\u533A\u81EA\u5DF1\uFF0C\u5176\u4F59\u4E0D\u6EDA\uFF1B\u8BBE\u7F6E\u9875\u4ECD\u7528\u4E0A\u9762\u7684 overflow:auto */
+/* \u89C6\u56FE\u8981\u586B\u6EE1\u9762\u677F\uFF1A\u6EDA\u52A8\u4EA4\u7ED9\u65E5\u5FD7\u533A\u81EA\u5DF1\uFF0C\u5176\u4F59\u4E0D\u6EDA */
 .ide-fill{overflow:hidden}
 .ide-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .ide-cmd{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;color:var(--dsw-alias-label-secondary,#697586);word-break:break-all}
@@ -14941,7 +14941,7 @@ function ensureStyles() {
    composer overlay \u6A21\u5F0F\u4E0B\u624D\u5939\u6210 flex:1 1 0 + min-height:0\uFF09\uFF0C\u6240\u4EE5\u89C6\u56FE\u9AD8\u5EA6\u7531\u5185\u5BB9\u51B3\u5B9A\uFF1A
    \u65E5\u5FD7\u4E00\u957F\uFF0C\u6574\u9875\u8DDF\u7740\u53D8\u957F\uFF0C\u5F97\u628A\u9875\u9762\u62D6\u5230\u5E95\u624D\u80FD\u770B\u5230\u6700\u65B0\u4E00\u884C\u3002
    \u8FD9\u91CC\u7167 DSH \u81EA\u5DF1\u7684\u505A\u6CD5\uFF0C\u628A\u5305\u4F4F\u672C\u89C6\u56FE\u7684\u90A3\u5C42\u5939\u5230\u786E\u5B9A\u9AD8\u5EA6\u2014\u2014\u4E0D\u78B0\u5B83\u7684\u54C8\u5E0C\u7C7B\u540D\uFF0C
-   \u7528 :has(.ide-root) \u5B9A\u4F4D\u5305\u542B\u672C\u89C6\u56FE\u7684\u76F4\u63A5\u5B50\u5C42\u3002 */
+   \u7528 :has(.ide-view) \u5B9A\u4F4D\u5305\u542B\u672C\u89C6\u56FE\u7684\u76F4\u63A5\u5B50\u5C42\u3002 */
 [data-conversation-scroll]:has(.ide-view)>[data-slot="conversation.session"]>*:has(.ide-view),
 [data-conversation-scroll]:has(.ide-view)>[data-slot="conversation.session"]:has(.ide-view){
   flex:1 1 0;
@@ -14957,6 +14957,9 @@ function ensureStyles() {
 }
 function patchProject(config2, workspaceId, mutate) {
   return { ...config2, projects: config2.projects.map((p) => p.workspaceId === workspaceId ? mutate(p) : p) };
+}
+function isRunning(status) {
+  return status === "running";
 }
 function describeRun(run) {
   if (run === void 0 || run.status === "idle") return "\u672A\u542F\u52A8";
@@ -14993,6 +14996,7 @@ function IdeView({ api, ctx }) {
   const [drafts, setDrafts] = (0, import_react.useState)({});
   const [flash, setFlash] = (0, import_react.useState)("");
   const [onlyRunning, setOnlyRunning] = (0, import_react.useState)(false);
+  const panelReady = config2 !== null;
   const [overview, setOverview] = (0, import_react.useState)(false);
   const [overviewTab, setOverviewTab] = (0, import_react.useState)(false);
   const tabRowRef = (0, import_react.useRef)(null);
@@ -15058,8 +15062,9 @@ function IdeView({ api, ctx }) {
     });
   }, [ctx, reload]);
   (0, import_react.useEffect)(() => {
-    if (api === void 0 || runKey === "" || active === void 0 || activeConfig === void 0) return;
-    const target = { workspaceId: active.workspaceId, configId: activeConfig.id };
+    if (api === void 0) return;
+    const hasTarget = runKey !== "" && active !== void 0 && activeConfig !== void 0;
+    const target = hasTarget ? { workspaceId: active.workspaceId, configId: activeConfig.id } : null;
     let stopped = false;
     const tick = async () => {
       const gen = genRef.current;
@@ -15071,6 +15076,7 @@ function IdeView({ api, ctx }) {
         setRuns(map2);
         if (tickRef.current % CONFIG_REFRESH_EVERY === 0) void reload();
         tickRef.current += 1;
+        if (target === null) return;
         const chunk = envelopeValue(await api.read({ ...target, from: offsetRef.current }), "\u8BFB\u53D6\u65E5\u5FD7");
         if (stopped || genRef.current !== gen) return;
         offsetRef.current = chunk.next;
@@ -15141,7 +15147,7 @@ function IdeView({ api, ctx }) {
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
     };
-  }, []);
+  }, [panelReady]);
   (0, import_react.useEffect)(() => {
     const row = tabRowRef.current;
     if (row === null) return;
@@ -15187,8 +15193,34 @@ function IdeView({ api, ctx }) {
     setActiveConfigIds((prev) => ({ ...prev, [active.workspaceId]: configId }));
   };
   const available = projects.filter((p) => !cfg.projects.some((entry) => entry.workspaceId === p.workspaceId));
-  const statusOfProject = (workspaceId, configs) => aggregateStatus(configs.map((c) => runs[runKeyOf({ workspaceId, configId: c.id })]?.status ?? "idle"));
-  const visibleProjects = registered.filter((p) => !p.hidden && (!onlyRunning || statusOfProject(p.workspaceId, p.configs) === "running"));
+  const statusOfProject = (project) => aggregateStatus(project.configs.map((c) => runs[runKeyOf({ workspaceId: project.workspaceId, configId: c.id })]?.status ?? "idle"));
+  const visibleProjects = registered.filter((p) => !p.hidden && (!onlyRunning || statusOfProject(p) === "running"));
+  const addProjectControl = (label) => {
+    if (!projects.length) return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-note", children: "DSH \u5DE5\u4F5C\u533A\u6CE8\u518C\u8868\u6682\u4E0D\u53EF\u7528" });
+    if (available.length === 0) return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-note", children: "\u6240\u6709\u5DE5\u4F5C\u533A\u90FD\u5DF2\u52A0\u5165" });
+    return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("select", { className: "ide-field", value: "", onChange: (event) => {
+      if (event.target.value !== "") addProject(event.target.value);
+    }, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("option", { value: "", children: [
+        label,
+        "\uFF08",
+        available.length,
+        "\uFF09"
+      ] }),
+      available.map((p) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("option", { value: p.workspaceId, children: [
+        p.title,
+        " \xB7 ",
+        p.path
+      ] }, p.workspaceId))
+    ] });
+  };
+  const visibleKey = visibleProjects.map((p) => p.workspaceId).join("|");
+  (0, import_react.useEffect)(() => {
+    if (config2 === null || overview) return;
+    if (visibleProjects.length === 0) return;
+    if (visibleProjects.some((p) => p.workspaceId === activeProjectId)) return;
+    setActiveProjectId(visibleProjects[0].workspaceId);
+  }, [config2, overview, visibleKey, activeProjectId]);
   const setHidden = (workspaceId, hidden) => {
     void commit(patchProject(cfg, workspaceId, (p) => ({ ...p, hidden })), false);
   };
@@ -15210,9 +15242,13 @@ function IdeView({ api, ctx }) {
     void commit({ ...cfg, activeWorkspaceId: source.workspaceId, projects: [...cfg.projects, entry] }, false);
   };
   const removeProject = (workspaceId) => {
-    const next = { ...cfg, projects: cfg.projects.filter((p) => p.workspaceId !== workspaceId) };
-    setActiveProjectId(next.projects[0]?.workspaceId ?? "");
-    void commit(next, false);
+    const project = cfg.projects.find((p) => p.workspaceId === workspaceId);
+    void (async () => {
+      for (const config3 of project?.configs ?? []) await stopRun(workspaceId, config3.id);
+      const next = { ...cfg, projects: cfg.projects.filter((p) => p.workspaceId !== workspaceId) };
+      setActiveProjectId(next.projects[0]?.workspaceId ?? "");
+      await commit(next, false);
+    })();
   };
   const addConfig = (project) => {
     const fresh = {
@@ -15230,16 +15266,26 @@ function IdeView({ api, ctx }) {
       activeConfigId: p.activeConfigId === "" ? fresh.id : p.activeConfigId
     })), false);
   };
+  const stopRun = async (workspaceId, configId) => {
+    if (api === void 0) return;
+    try {
+      await api.stop({ workspaceId, configId });
+    } catch {
+    }
+  };
   const removeConfig = (project, configId) => {
     setDrafts((prev) => {
       const copy = { ...prev };
       delete copy[configId];
       return copy;
     });
-    void commit(patchProject(cfg, project.workspaceId, (p) => {
-      const kept = p.configs.filter((c) => c.id !== configId);
-      return { ...p, configs: kept, activeConfigId: p.activeConfigId === configId ? kept[0]?.id ?? "" : p.activeConfigId };
-    }), false);
+    void (async () => {
+      await stopRun(project.workspaceId, configId);
+      await commit(patchProject(cfg, project.workspaceId, (p) => {
+        const kept = p.configs.filter((c) => c.id !== configId);
+        return { ...p, configs: kept, activeConfigId: p.activeConfigId === configId ? kept[0]?.id ?? "" : p.activeConfigId };
+      }), false);
+    })();
   };
   const patchDraft = (draft, patch) => {
     setDrafts((prev) => ({ ...prev, [draft.id]: { ...draft, ...patch } }));
@@ -15271,10 +15317,9 @@ function IdeView({ api, ctx }) {
       setDiscoveryBusy(false);
     }
   };
-  const importCandidate = (candidate) => {
+  const importCandidate = (candidate, name) => {
     if (active === void 0) return;
     const built = buildLaunchConfig(candidate, active.path);
-    const name = plannedConfigName(built.name, active.configs.map((c) => c.name));
     const fresh = {
       id: `c${crypto.randomUUID()}`,
       name,
@@ -15296,7 +15341,8 @@ function IdeView({ api, ctx }) {
     if (api === void 0 || target === void 0) return;
     setError("");
     try {
-      if (action === "start" && explicit === void 0) {
+      const startedViewedOne = explicit === void 0 || runKey === runKeyOf(explicit);
+      if (action === "start" && startedViewedOne) {
         genRef.current += 1;
         offsetRef.current = 0;
         pinnedRef.current = true;
@@ -15334,7 +15380,7 @@ function IdeView({ api, ctx }) {
             selectProject(p.workspaceId);
           },
           children: [
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-dot", "data-state": statusOfProject(p.workspaceId, p.configs), title: "\u4EFB\u4E00\u6761\u914D\u7F6E\u5728\u8DD1\u5C31\u662F\u7EFF\u7684" }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-dot", "data-state": statusOfProject(p), title: "\u4EFB\u4E00\u6761\u914D\u7F6E\u5728\u8DD1\u5C31\u662F\u7EFF\u7684" }),
             /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: p.title }),
             p.configs.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-note", children: p.configs.length }) : null,
             /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
@@ -15368,7 +15414,7 @@ function IdeView({ api, ctx }) {
                   if (p.hidden) setHidden(p.workspaceId, false);
                 },
                 children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-dot", "data-state": statusOfProject(p.workspaceId, p.configs) }),
+                  /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-dot", "data-state": statusOfProject(p) }),
                   /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: p.title }),
                   /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-note", style: { marginLeft: "auto" }, children: p.hidden ? "\u5DF2\u6536\u8D77" : `${p.configs.length} \u6761\u914D\u7F6E` })
                 ]
@@ -15378,20 +15424,7 @@ function IdeView({ api, ctx }) {
             cfg.projects.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("li", { className: "ide-note", children: "\u8FD8\u6CA1\u6709\u9879\u76EE" }) : null
           ] })
         ] }),
-        !projects.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-note", children: "\u5DE5\u4F5C\u533A\u6CE8\u518C\u8868\u6682\u4E0D\u53EF\u7528" }) : available.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("select", { className: "ide-field", value: "", onChange: (event) => {
-          if (event.target.value !== "") addProject(event.target.value);
-        }, children: [
-          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("option", { value: "", children: [
-            "\uFF0B \u6DFB\u52A0\u9879\u76EE\uFF08",
-            available.length,
-            "\uFF09"
-          ] }),
-          available.map((p) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("option", { value: p.workspaceId, children: [
-            p.title,
-            " \xB7 ",
-            p.path
-          ] }, p.workspaceId))
-        ] }) : null
+        addProjectControl("\uFF0B \u6DFB\u52A0\u9879\u76EE")
       ] })
     ] }),
     /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-body ide-fill", children: [
@@ -15405,7 +15438,7 @@ function IdeView({ api, ctx }) {
       ] }) : null,
       overview ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-board", children: cfg.projects.map((p) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-card", children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-cardhead", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-dot", "data-state": statusOfProject(p.workspaceId, p.configs) }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-dot", "data-state": statusOfProject(p) }),
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-title", children: p.title }),
           p.hidden ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-note", children: "\u5DF2\u6536\u8D77" }) : null,
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { flex: 1 } }),
@@ -15427,10 +15460,10 @@ function IdeView({ api, ctx }) {
             ] }) : null,
             /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "ide-note", children: [
               describeRun(snapshot),
-              snapshot !== void 0 && snapshot.status === "running" ? ` \xB7 ${formatUptime(snapshot.startedAtMs, Date.now())}` : ""
+              isRunning(snapshot?.status) ? ` \xB7 ${formatUptime(snapshot?.startedAtMs ?? 0, Date.now())}` : ""
             ] }),
             /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-last", title: snapshot?.lastLine ?? "", children: snapshot?.lastLine ?? "\uFF08\u65E0\u8F93\u51FA\uFF09" }),
-            snapshot?.status === "running" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-btn", onClick: () => {
+            isRunning(snapshot?.status) ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-btn", onClick: () => {
               void runAction("stop", { workspaceId: p.workspaceId, configId: c.id });
             }, children: "\u505C\u6B62" }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-btn", "data-kind": "primary", onClick: () => {
               void runAction("start", { workspaceId: p.workspaceId, configId: c.id });
@@ -15481,7 +15514,7 @@ function IdeView({ api, ctx }) {
               ":",
               runState.port
             ] }) : null,
-            runState !== void 0 && runState.status === "running" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-note", children: formatUptime(runState.startedAtMs, Date.now()) }) : null,
+            isRunning(runState?.status) ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-note", children: formatUptime(runState?.startedAtMs ?? 0, Date.now()) }) : null,
             /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { flex: 1 } }),
             /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
               "button",
@@ -15489,7 +15522,7 @@ function IdeView({ api, ctx }) {
                 type: "button",
                 className: "ide-btn",
                 "data-kind": "primary",
-                disabled: runState?.status === "running",
+                disabled: isRunning(runState?.status),
                 onClick: () => {
                   void runAction("start");
                 },
@@ -15587,7 +15620,7 @@ function IdeView({ api, ctx }) {
                       "data-kind": "primary",
                       disabled: blocked,
                       title: blocked ? candidate.problem : candidate.source,
-                      onClick: () => importCandidate(candidate),
+                      onClick: () => importCandidate(candidate, planned),
                       children: planned === candidate.name ? "\u5BFC\u5165" : `\u5BFC\u5165\u4E3A\u300C${planned}\u300D`
                     }
                   )
@@ -15655,20 +15688,7 @@ function IdeView({ api, ctx }) {
             }),
             /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-toolbar", children: [
               /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-note", children: "\u6DFB\u52A0\u9879\u76EE" }),
-              !projects.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-note", children: "DSH \u5DE5\u4F5C\u533A\u6CE8\u518C\u8868\u6682\u4E0D\u53EF\u7528" }) : available.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("select", { className: "ide-field", value: "", onChange: (event) => {
-                if (event.target.value !== "") addProject(event.target.value);
-              }, children: [
-                /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("option", { value: "", children: [
-                  "\uFF0B \u9009\u62E9\u5DE5\u4F5C\u533A\uFF08",
-                  available.length,
-                  " \u4E2A\u53EF\u9009\uFF09"
-                ] }),
-                available.map((p) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("option", { value: p.workspaceId, children: [
-                  p.title,
-                  " \xB7 ",
-                  p.path
-                ] }, p.workspaceId))
-              ] }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-note", children: "\u6240\u6709\u5DE5\u4F5C\u533A\u90FD\u5DF2\u52A0\u5165" }),
+              addProjectControl("\uFF0B \u9009\u62E9\u5DE5\u4F5C\u533A"),
               /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { flex: 1 } }),
               /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-note", children: "\u5B58\u4E8E ~/.dsh/storages/dsh-newbe-ide.json\uFF080600\uFF0C\u4E0D\u5728\u9879\u76EE\u76EE\u5F55\u91CC\uFF09" })
             ] })
@@ -15708,7 +15728,7 @@ function IdeView({ api, ctx }) {
                   const el = event.currentTarget;
                   pinnedRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
                 },
-                children: shown.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-note", children: logLines.length > 0 ? "\u6CA1\u6709\u5339\u914D\u7684\u65E5\u5FD7" : runState?.status === "running" ? "\u7B49\u5F85\u8F93\u51FA\u2026" : "\u70B9\u300C\u542F\u52A8\u300D\u8FD0\u884C\u8FD9\u6761\u542F\u52A8\u914D\u7F6E" }) : shown.map((row, index) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: (row.hit ? "ide-hit " : "") + "ide-lv-" + row.level, children: row.line }, index))
+                children: shown.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-note", children: logLines.length > 0 ? "\u6CA1\u6709\u5339\u914D\u7684\u65E5\u5FD7" : isRunning(runState?.status) ? "\u7B49\u5F85\u8F93\u51FA\u2026" : "\u70B9\u300C\u542F\u52A8\u300D\u8FD0\u884C\u8FD9\u6761\u542F\u52A8\u914D\u7F6E" }) : shown.map((row, index) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: (row.hit ? "ide-hit " : "") + "ide-lv-" + row.level, children: row.line }, index))
               }
             ),
             /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-note", children: [

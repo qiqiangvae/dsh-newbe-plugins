@@ -1,10 +1,11 @@
 /**
  * dsh-newbe-ide Host 侧：
  * 1. 启动配置持久化到 `$DSH_HOME/storages/dsh-newbe-ide.json`（原子写、0600）。
- * 2. 提供 `ideConfig` 服务（load / submit），经手写 Typert 清单
+ * 2. 提供 `ideConfig` 服务，经手写 Typert 清单
  *    （./typert → lib/typert.host.js，由 typert-loader 自动注册）暴露给 Web 客户端。
  *
- * 这一版只做"存得住、读得回"：不启动任何进程，进程与日志见后续票。
+ * 3. 运行受管进程：`start` / `stop` / `read` / `runs`（输出实时泵入环形缓冲并落盘，
+ *    跨 DSH 重启可用 `history` 读回），以及 `discover`（扫项目里的 IDEA 运行配置）。
  */
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -20,9 +21,9 @@ export { DEFAULT_HISTORY_LINES, defaultState, pickActiveConfig, runKeyOf } from 
 export { cleanLine, isSecretName, maskSecrets, splitLines } from './lines.js';
 export { DEFAULT_LEVELS, LEVELS, compileMatcher, filterLines, levelOf } from './filter.js';
 export { createFileLogSink } from './logsink.js';
-export { aggregateStatus, formatUptime, parsePortFromLines } from './rundisplay.js';
+export { aggregateStatus, formatUptime, parsePort } from './rundisplay.js';
 export { buildLaunchConfig, parseSpringBootConfigurations, plannedConfigName } from './ideaconfig.js';
-export type { BuiltLaunchConfig, IdeaCandidate, IdeaEnv } from './ideaconfig.js';
+export type { BuiltLaunchConfig, IdeaCandidate } from './ideaconfig.js';
 export type { LogSink, TailResult } from './logsink.js';
 export type { FilteredLine, FilterState, Matcher, MatcherSpec, RunLevel } from './filter.js';
 export { createRunRegistry } from './runtime.js';
@@ -118,6 +119,9 @@ export function apply(ctx: any): void {
         } catch (error) {
           errors.push(`${file}：${String((error as Error)?.message ?? error)}`);
         }
+      }
+      if (scanned.length === 0) {
+        errors.push('没找到 .idea/workspace.xml 或 .run/*.xml —— 导入只认 IDEA 工程根目录（多模块 Maven 工程的根，不是某一个模块）');
       }
       return { candidates, errors, scanned };
     },

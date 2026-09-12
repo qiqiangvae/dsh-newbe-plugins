@@ -15,16 +15,13 @@ export function formatUptime(startedAtMs: number, nowMs: number): string {
 }
 
 /**
- * 从日志里认监听端口：只认 `port <数字>` 这种明确写法。
+ * 从一行输出里认监听端口：只认 `port <数字>` 这种明确写法。
  * 不拿 `:8083` 这类裸冒号去猜——时间戳里全是冒号，猜错比不显示更糟。
+ * 只做单行：调用方是逐行喂进来的，行的先后由调用方决定（后出现的覆盖先出现的）。
  */
-export function parsePortFromLines(lines: readonly string[]): string {
-  let found = '';
-  for (const line of lines) {
-    const matched = /\bport\s+(\d{2,5})\b/i.exec(line);
-    if (matched !== null) found = matched[1];
-  }
-  return found;
+export function parsePort(line: string): string {
+  const matched = /\bport\s+(\d{2,5})\b/i.exec(line);
+  return matched === null ? '' : matched[1];
 }
 
 const SEVERITY: Record<RunStatus, number> = { idle: 0, stopped: 1, exited: 2, failed: 3, running: 4 };

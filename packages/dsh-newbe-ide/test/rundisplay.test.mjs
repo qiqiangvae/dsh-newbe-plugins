@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-const { formatUptime, parsePortFromLines, aggregateStatus } = await import('../lib/index.js');
+const { formatUptime, parsePort, aggregateStatus } = await import('../lib/index.js');
 
 test('时长文案：秒 / 分秒 / 时分', () => {
   assert.equal(formatUptime(0, 1000), '');
@@ -19,18 +19,13 @@ test('时长文案：时间倒流（时钟回拨）不显示负数', () => {
 });
 
 test('从 Spring Boot 日志里认出端口', () => {
-  assert.equal(parsePortFromLines(['2026-09-12 10:12:36.904  INFO 1 --- [main] o.s.b.w.e.t.TomcatWebServer : Tomcat started on port 8083 (http)']), '8083');
-  assert.equal(parsePortFromLines(['Netty started on port 8080']), '8080');
+  assert.equal(parsePort('2026-09-12 10:12:36.904  INFO 1 --- [main] o.s.b.w.e.t.TomcatWebServer : Tomcat started on port 8083 (http)'), '8083');
+  assert.equal(parsePort('Netty started on port 8080'), '8080');
 });
 
 test('认不出端口就返回空串，不猜时间戳里的数字', () => {
-  assert.equal(parsePortFromLines(['2026-09-12 10:12:36.904  INFO 1 --- [nio-8083-exec-2] X : hi']), '');
-  assert.equal(parsePortFromLines([]), '');
-  assert.equal(parsePortFromLines(['nothing here']), '');
-});
-
-test('端口取最后一条（重启后以最新一次为准）', () => {
-  assert.equal(parsePortFromLines(['started on port 8083', 'started on port 9090']), '9090');
+  assert.equal(parsePort('2026-09-12 10:12:36.904  INFO 1 --- [nio-8083-exec-2] X : hi'), '');
+  assert.equal(parsePort('nothing here'), '');
 });
 
 test('聚合状态优先级：运行中 > 启动失败 > 已退出 > 已停止 > 未启动', () => {
