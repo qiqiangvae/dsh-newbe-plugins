@@ -14712,6 +14712,8 @@ function ensureStyles() {
 .ide-tab:hover{color:var(--dsw-alias-label-primary,#1f2329)}
 .ide-tab[data-sel=true]{color:var(--dsw-alias-label-primary,#1f2329);border-bottom-color:var(--dsw-alias-brand-primary,#3370ff)}
 .ide-body{display:flex;flex-direction:column;flex:1;min-height:0;padding:12px 16px;gap:10px;overflow:auto}
+/* \u89C6\u56FE\u8981\u586B\u6EE1\u9762\u677F\uFF1A\u6EDA\u52A8\u4EA4\u7ED9\u65E5\u5FD7\u533A\u81EA\u5DF1\uFF0C\u5176\u4F59\u4E0D\u6EDA\uFF1B\u8BBE\u7F6E\u9875\u4ECD\u7528\u4E0A\u9762\u7684 overflow:auto */
+.ide-fill{overflow:hidden}
 .ide-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .ide-cmd{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;color:var(--dsw-alias-label-secondary,#697586);word-break:break-all}
 .ide-cmdline{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
@@ -14734,7 +14736,7 @@ function ensureStyles() {
 .ide-warn{border:1px dashed var(--dsw-alias-state-warn-primary,#e7a100);color:var(--dsw-alias-state-warn-primary,#e7a100);border-radius:8px;padding:7px 10px;font-size:12px}
 .ide-err{color:var(--dsw-alias-state-error-primary,#d83931);font-size:12px}
 .ide-logbox{display:flex;flex-direction:column;gap:4px;flex:1;min-height:0}
-.ide-log{flex:1;min-height:160px;max-height:56vh;overflow:auto;background:rgba(128,128,128,.10);border:1px solid var(--dsw-alias-border-l2,#d9dce1);border-radius:9px;padding:8px 10px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;line-height:1.5;white-space:pre-wrap;word-break:break-all}
+.ide-log{flex:1;min-height:120px;overflow:auto;background:rgba(128,128,128,.10);border:1px solid var(--dsw-alias-border-l2,#d9dce1);border-radius:9px;padding:8px 10px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;line-height:1.5;white-space:pre-wrap;word-break:break-all}
 .ide-section{display:flex;flex-direction:column;gap:10px}
 .ide-sectiontitle{font-size:13px;font-weight:600;margin-top:4px}
 .ide-card{border:1px solid var(--dsw-alias-border-l2,#d9dce1);border-radius:9px;background:var(--dsw-alias-bg-module-platform,#fff);padding:10px 12px;display:flex;flex-direction:column;gap:8px}
@@ -14926,7 +14928,7 @@ function IdeView({ api, ctx }) {
       },
       p.workspaceId
     )) }) : null,
-    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-body", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-body ide-fill", children: [
       warning !== "" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-warn", children: warning }) : null,
       error51 !== "" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-err", children: error51 }) : null,
       stale.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-warn", children: [
