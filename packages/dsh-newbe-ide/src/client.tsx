@@ -134,7 +134,8 @@ function ensureStyles(): () => void {
 .ide-tab:hover{color:var(--dsw-alias-label-primary,#1f2329)}
 .ide-tab[data-sel=true]{color:var(--dsw-alias-label-primary,#1f2329);border-bottom-color:var(--dsw-alias-brand-primary,#3370ff)}
 .ide-body{display:flex;flex-direction:column;flex:1;min-height:0;padding:12px 16px;gap:10px;overflow:auto}
-.ide-head{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--dsw-alias-border-l2,#d9dce1);border-radius:9px;background:var(--dsw-alias-bg-module-platform,#fff);flex-wrap:wrap}
+.ide-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.ide-cmd{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;color:var(--dsw-alias-label-secondary,#697586);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:56%}
 .ide-title{font-size:14px;font-weight:600}
 .ide-path{color:var(--dsw-alias-label-secondary,#697586);font-size:11px;word-break:break-all}
 .ide-chip{border:1px solid var(--dsw-alias-border-l2,#d9dce1);border-radius:999px;padding:2px 9px;font-size:12px;color:var(--dsw-alias-label-secondary,#697586);background:none;font:inherit;cursor:pointer;white-space:nowrap}
@@ -393,7 +394,7 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
           </div>
         ) : (
           <>
-            <div className="ide-head">
+            <div className="ide-toolbar">
               <span className="ide-title">{active.title}</span>
               <span className="ide-path">{active.path}</span>
               <span style={{ flex: 1 }} />
@@ -408,8 +409,8 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
               <div className="ide-note">这个项目还没有启动配置 —— 在 设置 → 插件 → IDE 里添加</div>
             ) : (
               <>
-                <div className="ide-head">
-                  <span className="ide-note ide-mono">{activeConfig.command === '' ? '（启动命令为空）' : activeConfig.command}</span>
+                <div className="ide-toolbar">
+                  <span className="ide-note">{runText}</span>
                   <span style={{ flex: 1 }} />
                   <button
                     type="button"
@@ -444,9 +445,15 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
                       ? <span className="ide-note">{runState?.status === 'running' ? '等待输出…' : '点「启动」运行这条启动配置'}</span>
                       : logLines.map((line, index) => <div key={index}>{line}</div>)}
                   </div>
-                  <div className="ide-note">
-                    {runText} · 已缓存 {logLines.length} 行
-                    {runState?.lossy === true || truncated ? '（输出过快或过长，早期日志已被丢弃）' : ''}
+                  <div className="ide-note" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span>
+                      已缓存 {logLines.length} 行
+                      {runState?.lossy === true || truncated ? '（输出过快或过长，早期日志已被丢弃）' : ''}
+                    </span>
+                    <span style={{ flex: 1 }} />
+                    <span className="ide-cmd" title={activeConfig.command}>
+                      {activeConfig.command === '' ? '（未设置启动命令）' : activeConfig.command}
+                    </span>
                   </div>
                 </div>
               </>

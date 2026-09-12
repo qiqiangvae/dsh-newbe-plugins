@@ -14706,7 +14706,8 @@ function ensureStyles() {
 .ide-tab:hover{color:var(--dsw-alias-label-primary,#1f2329)}
 .ide-tab[data-sel=true]{color:var(--dsw-alias-label-primary,#1f2329);border-bottom-color:var(--dsw-alias-brand-primary,#3370ff)}
 .ide-body{display:flex;flex-direction:column;flex:1;min-height:0;padding:12px 16px;gap:10px;overflow:auto}
-.ide-head{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--dsw-alias-border-l2,#d9dce1);border-radius:9px;background:var(--dsw-alias-bg-module-platform,#fff);flex-wrap:wrap}
+.ide-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.ide-cmd{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;color:var(--dsw-alias-label-secondary,#697586);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:56%}
 .ide-title{font-size:14px;font-weight:600}
 .ide-path{color:var(--dsw-alias-label-secondary,#697586);font-size:11px;word-break:break-all}
 .ide-chip{border:1px solid var(--dsw-alias-border-l2,#d9dce1);border-radius:999px;padding:2px 9px;font-size:12px;color:var(--dsw-alias-label-secondary,#697586);background:none;font:inherit;cursor:pointer;white-space:nowrap}
@@ -14930,15 +14931,15 @@ function IdeView({ api, ctx }) {
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { children: "\u8FD8\u6CA1\u6709\u9879\u76EE" }),
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-note", children: "\u5728 \u8BBE\u7F6E \u2192 \u63D2\u4EF6 \u2192 IDE \u91CC\u6DFB\u52A0\u9879\u76EE\u4E0E\u542F\u52A8\u914D\u7F6E" })
       ] }) : /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
-        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-head", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-toolbar", children: [
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-title", children: active.title }),
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-path", children: active.path }),
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { flex: 1 } }),
           active.configs.map((c) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-chip", "data-sel": c.id === activeConfig?.id, onClick: () => selectConfig(c.id), children: c.name }, c.id))
         ] }),
         activeConfig === void 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-note", children: "\u8FD9\u4E2A\u9879\u76EE\u8FD8\u6CA1\u6709\u542F\u52A8\u914D\u7F6E \u2014\u2014 \u5728 \u8BBE\u7F6E \u2192 \u63D2\u4EF6 \u2192 IDE \u91CC\u6DFB\u52A0" }) : /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
-          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-head", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-note ide-mono", children: activeConfig.command === "" ? "\uFF08\u542F\u52A8\u547D\u4EE4\u4E3A\u7A7A\uFF09" : activeConfig.command }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-toolbar", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-note", children: runText }),
             /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { flex: 1 } }),
             /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
               "button",
@@ -14985,12 +14986,15 @@ function IdeView({ api, ctx }) {
                 children: logLines.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-note", children: runState?.status === "running" ? "\u7B49\u5F85\u8F93\u51FA\u2026" : "\u70B9\u300C\u542F\u52A8\u300D\u8FD0\u884C\u8FD9\u6761\u542F\u52A8\u914D\u7F6E" }) : logLines.map((line, index) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { children: line }, index))
               }
             ),
-            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-note", children: [
-              runText,
-              " \xB7 \u5DF2\u7F13\u5B58 ",
-              logLines.length,
-              " \u884C",
-              runState?.lossy === true || truncated ? "\uFF08\u8F93\u51FA\u8FC7\u5FEB\u6216\u8FC7\u957F\uFF0C\u65E9\u671F\u65E5\u5FD7\u5DF2\u88AB\u4E22\u5F03\uFF09" : ""
+            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-note", style: { display: "flex", alignItems: "center", gap: 8 }, children: [
+              /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [
+                "\u5DF2\u7F13\u5B58 ",
+                logLines.length,
+                " \u884C",
+                runState?.lossy === true || truncated ? "\uFF08\u8F93\u51FA\u8FC7\u5FEB\u6216\u8FC7\u957F\uFF0C\u65E9\u671F\u65E5\u5FD7\u5DF2\u88AB\u4E22\u5F03\uFF09" : ""
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { flex: 1 } }),
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-cmd", title: activeConfig.command, children: activeConfig.command === "" ? "\uFF08\u672A\u8BBE\u7F6E\u542F\u52A8\u547D\u4EE4\uFF09" : activeConfig.command })
             ] })
           ] })
         ] })
