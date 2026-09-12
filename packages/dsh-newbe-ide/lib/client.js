@@ -14755,6 +14755,19 @@ function ensureStyles() {
    \u5BA1\u6279 / \u8FFD\u95EE / \u8BA1\u5212\u590D\u6838\uFF0C\u5FC5\u987B\u7559\u7740\uFF0C\u5426\u5219\u7528\u6237\u6CA1\u6CD5\u56DE\u7B54\u3002 */
 [data-conversation-scroll]:has(.ide-root)>[data-composer-seat]:not(:has([data-approval-key],[data-question-key],[data-plan-review-key])){display:none}
 [data-conversation-scroll]:has(.ide-root)~[data-width-handle]{display:none}
+/* \u8BA9\u65E5\u5FD7\u533A\u6B63\u597D\u7B49\u4E8E\u9762\u677F\u9AD8\u5EA6\uFF0C\u800C\u4E0D\u662F\u968F\u5185\u5BB9\u65E0\u9650\u53D8\u9AD8\u3002
+   DSH \u7684\u4F1A\u8BDD\u9AA8\u67B6\u5728 active \u9636\u6BB5\u628A\u89C6\u56FE\u533A\u8BBE\u6210 flex:1 0 auto + min-height:auto\uFF08\u53EA\u5728
+   composer overlay \u6A21\u5F0F\u4E0B\u624D\u5939\u6210 flex:1 1 0 + min-height:0\uFF09\uFF0C\u6240\u4EE5\u89C6\u56FE\u9AD8\u5EA6\u7531\u5185\u5BB9\u51B3\u5B9A\uFF1A
+   \u65E5\u5FD7\u4E00\u957F\uFF0C\u6574\u9875\u8DDF\u7740\u53D8\u957F\uFF0C\u5F97\u628A\u9875\u9762\u62D6\u5230\u5E95\u624D\u80FD\u770B\u5230\u6700\u65B0\u4E00\u884C\u3002
+   \u8FD9\u91CC\u7167 DSH \u81EA\u5DF1\u7684\u505A\u6CD5\uFF0C\u628A\u5305\u4F4F\u672C\u89C6\u56FE\u7684\u90A3\u5C42\u5939\u5230\u786E\u5B9A\u9AD8\u5EA6\u2014\u2014\u4E0D\u78B0\u5B83\u7684\u54C8\u5E0C\u7C7B\u540D\uFF0C
+   \u7528 :has(.ide-root) \u5B9A\u4F4D\u5305\u542B\u672C\u89C6\u56FE\u7684\u76F4\u63A5\u5B50\u5C42\u3002 */
+[data-conversation-scroll]:has(.ide-root)>[data-slot="conversation.session"]>*:has(.ide-root),
+[data-conversation-scroll]:has(.ide-root)>[data-slot="conversation.session"]:has(.ide-root){
+  flex:1 1 0;
+  min-height:0;
+  overflow:hidden;
+}
+.ide-root{height:100%;min-height:0}
 `;
   document.head.appendChild(style);
   return () => {

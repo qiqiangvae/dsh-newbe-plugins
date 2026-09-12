@@ -178,6 +178,19 @@ function ensureStyles(): () => void {
    审批 / 追问 / 计划复核，必须留着，否则用户没法回答。 */
 [data-conversation-scroll]:has(.ide-root)>[data-composer-seat]:not(:has([data-approval-key],[data-question-key],[data-plan-review-key])){display:none}
 [data-conversation-scroll]:has(.ide-root)~[data-width-handle]{display:none}
+/* 让日志区正好等于面板高度，而不是随内容无限变高。
+   DSH 的会话骨架在 active 阶段把视图区设成 flex:1 0 auto + min-height:auto（只在
+   composer overlay 模式下才夹成 flex:1 1 0 + min-height:0），所以视图高度由内容决定：
+   日志一长，整页跟着变长，得把页面拖到底才能看到最新一行。
+   这里照 DSH 自己的做法，把包住本视图的那层夹到确定高度——不碰它的哈希类名，
+   用 :has(.ide-root) 定位包含本视图的直接子层。 */
+[data-conversation-scroll]:has(.ide-root)>[data-slot="conversation.session"]>*:has(.ide-root),
+[data-conversation-scroll]:has(.ide-root)>[data-slot="conversation.session"]:has(.ide-root){
+  flex:1 1 0;
+  min-height:0;
+  overflow:hidden;
+}
+.ide-root{height:100%;min-height:0}
 `;
   document.head.appendChild(style);
   return () => { style.remove(); };
