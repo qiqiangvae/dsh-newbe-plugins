@@ -14802,6 +14802,13 @@ var REMOTE_CONTRIBUTION = {
     }
   ]
 };
+function describeRpcFailure(action, error51) {
+  const message = String(error51?.message ?? error51);
+  if (/\b404\b|transport failure/i.test(message)) {
+    return `${action}\u5931\u8D25\uFF1A\u5BBF\u4E3B\u4FA7\u8FD8\u6CA1\u6709\u8FD9\u4E2A\u63A5\u53E3\uFF0C\u91CD\u542F dsh web \u540E\u751F\u6548`;
+  }
+  return message;
+}
 function envelopeValue(result, action) {
   if (result !== null && typeof result === "object" && result.ok === true) return result.value;
   const message = result?.error?.message;
@@ -14968,7 +14975,7 @@ function IdeView({ api, ctx }) {
       applyLoad(envelopeValue(await api.load(), "\u8BFB\u53D6\u542F\u52A8\u914D\u7F6E"));
       setError("");
     } catch (e) {
-      setError(String(e?.message ?? e));
+      setError(describeRpcFailure("\u8BFB\u53D6\u542F\u52A8\u914D\u7F6E", e));
     }
   }, [api, applyLoad]);
   (0, import_react.useEffect)(() => {
@@ -15029,7 +15036,7 @@ function IdeView({ api, ctx }) {
           }
         }
       } catch (e) {
-        if (!stopped && genRef.current === gen) setError(String(e?.message ?? e));
+        if (!stopped && genRef.current === gen) setError(describeRpcFailure("\u8BFB\u53D6\u8FD0\u884C\u6001", e));
       }
     };
     void tick();
@@ -15062,7 +15069,7 @@ function IdeView({ api, ctx }) {
       }
       return true;
     } catch (e) {
-      setError(String(e?.message ?? e));
+      setError(describeRpcFailure("\u4FDD\u5B58\u542F\u52A8\u914D\u7F6E", e));
       await reload();
       return false;
     }
@@ -15139,7 +15146,7 @@ function IdeView({ api, ctx }) {
     try {
       setDiscovery(envelopeValue(await api.discover({ workspaceId: active.workspaceId }), "\u8BFB\u53D6 IDEA \u914D\u7F6E"));
     } catch (e) {
-      setError(String(e?.message ?? e));
+      setError(describeRpcFailure("\u8BFB\u53D6 IDEA \u914D\u7F6E", e));
     } finally {
       setDiscoveryBusy(false);
     }
@@ -15183,7 +15190,7 @@ function IdeView({ api, ctx }) {
       const snap = envelopeValue(await call, action === "start" ? "\u542F\u52A8" : "\u505C\u6B62");
       setRuns((prev) => ({ ...prev, [snap.key]: snap }));
     } catch (e) {
-      setError(String(e?.message ?? e));
+      setError(describeRpcFailure(action === "start" ? "\u542F\u52A8" : "\u505C\u6B62", e));
     }
   };
   if (config2 === null) {

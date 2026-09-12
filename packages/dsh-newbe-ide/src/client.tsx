@@ -146,6 +146,18 @@ const REMOTE_CONTRIBUTION = {
   ],
 };
 
+/**
+ * 宿主侧端点是在**启动时**装配的：老进程遇到新端点只会 404。
+ * 这种失败必须自己说清"重启 dsh web"，否则看起来像插件坏了。
+ */
+function describeRpcFailure(action: string, error: unknown): string {
+  const message = String((error as Error)?.message ?? error);
+  if (/\b404\b|transport failure/i.test(message)) {
+    return `${action}失败：宿主侧还没有这个接口，重启 dsh web 后生效`;
+  }
+  return message;
+}
+
 function envelopeValue(result: RemoteEnvelope<unknown>, action: string): unknown {
   if (result !== null && typeof result === 'object' && result.ok === true) return result.value;
   const message = (result as { error?: { message?: string } })?.error?.message;
@@ -337,7 +349,7 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
       applyLoad(envelopeValue(await api.load(), '读取启动配置') as IdeLoad);
       setError('');
     } catch (e) {
-      setError(String((e as Error)?.message ?? e));
+      setError(describeRpcFailure('读取启动配置', e));
     }
   }, [api, applyLoad]);
 
@@ -402,7 +414,7 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
           }
         }
       } catch (e) {
-        if (!stopped && genRef.current === gen) setError(String((e as Error)?.message ?? e));
+        if (!stopped && genRef.current === gen) setError(describeRpcFailure('读取运行态', e));
       }
     };
     void tick();
@@ -437,7 +449,7 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
       }
       return true;
     } catch (e) {
-      setError(String((e as Error)?.message ?? e));
+      setError(describeRpcFailure('保存启动配置', e));
       await reload();
       return false;
     }
@@ -518,7 +530,7 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
     try {
       setDiscovery(envelopeValue(await api.discover({ workspaceId: active.workspaceId }), '读取 IDEA 配置') as IdeaDiscovery);
     } catch (e) {
-      setError(String((e as Error)?.message ?? e));
+      setError(describeRpcFailure('读取 IDEA 配置', e));
     } finally {
       setDiscoveryBusy(false);
     }
@@ -565,7 +577,7 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
       const snap = envelopeValue(await call, action === 'start' ? '启动' : '停止') as RunSnapshot;
       setRuns((prev) => ({ ...prev, [snap.key]: snap }));
     } catch (e) {
-      setError(String((e as Error)?.message ?? e));
+      setError(describeRpcFailure(action === 'start' ? '启动' : '停止', e));
     }
   };
 
