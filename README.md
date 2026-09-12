@@ -6,6 +6,7 @@
 
 | 插件 | 目录 | 说明 | 版本 |
 | --- | --- | --- | --- |
+| [dsh-newbe-ide](./packages/dsh-newbe-ide) | `packages/dsh-newbe-ide` | 会话视图 tab「IDE」：按项目组织启动配置，一键启停、重启（进程组回收），日志实时滚动 + 过滤 + 落盘（跨重启可读回），可从 `.idea` 导入 Spring Boot 运行配置 | 0.1.0 |
 | [dsh-newbe-response-window](./packages/dsh-newbe-response-window) | `packages/dsh-newbe-response-window` | 每轮响应窗口：把 think/工具调用收进有限高度的可滚动 slide，文字回复原生展示；流式 think 支持出盒/盒内/关闭三模式 | 0.3.0 |
 | [dsh-newbe-input-enhancer](./packages/dsh-newbe-input-enhancer) | `packages/dsh-newbe-input-enhancer` | 增强输入框：Enter 锁定防误发、三击发送、字数统计、长文本提醒、草稿交换 | 1.1.0 |
 | [dsh-newbe-my-favorites](./packages/dsh-newbe-my-favorites) | `packages/dsh-newbe-my-favorites` | 会话与网址的本机快捷收藏（标题栏星标 + 侧栏收藏入口 + 快捷切换） | 0.5.4 |
@@ -15,6 +16,9 @@
 每个插件从 monorepo 的对应子目录独立安装（`#path:` 语法）：
 
 ```bash
+# ide（npm）
+dsh plugin --profile web add dsh-newbe-ide
+
 # response-window（Git 子目录）
 dsh plugin --profile web add github:qiqiangvae/dsh-newbe-plugins#path:packages/dsh-newbe-response-window
 # response-window（npm）
