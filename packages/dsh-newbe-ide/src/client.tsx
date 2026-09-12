@@ -167,6 +167,7 @@ function describeRun(run: RunSnapshot | undefined): string {
   if (run.status === 'running') return '运行中';
   if (run.status === 'stopped') return '已停止';
   if (run.status === 'failed' && run.error !== '') return `启动失败：${run.error}`;
+  if (run.exitCode === 127) return '命令不存在（码 127）';
   return `已退出（码 ${run.exitCode ?? '?'}）`;
 }
 
@@ -266,10 +267,18 @@ function Panel({ api, ctx }: PanelProps): React.ReactElement {
   const [logLines, setLogLines] = useState<string[]>([]);
   const offsetRef = useRef(0);
   const logRef = useRef<HTMLDivElement | null>(null);
+  /** 是否贴底：由 scroll 事件维护。追加后量高度会把"一次涌入多行"误判成用户上滚。 */
+  const pinnedRef = useRef(true);
+  /** 运行代次：重启后自增，用来丢弃上一代进程还在飞的读取结果。 */
+  const genRef = useRef(0);
+  const [truncated, setTruncated] = useState(false);
 
   // 日志按启动配置分家：切换配置就清空缓冲，否则会把上一条的输出串过来。
   useEffect(() => {
     offsetRef.current = 0;
+    genRef.current += 1;
+    pinnedRef.current = true;
+    setTruncated(false);
     setLogLines([]);
   }, [runKey]);
 
@@ -278,17 +287,27 @@ function Panel({ api, ctx }: PanelProps): React.ReactElement {
     const target = { workspaceId: active.workspaceId, configId: activeConfig.id };
     let stopped = false;
     const tick = async () => {
+      const gen = genRef.current; // 这一轮属于哪一代
       try {
         const list = envelopeValue(await api.runs(), '读取运行态') as RunSnapshot[];
         const map: Record<string, RunSnapshot> = {};
         for (const item of list) map[item.key] = item;
-        if (!stopped) setRuns(map);
+        if (stopped || genRef.current !== gen) return;
+        setRuns(map);
         const chunk = envelopeValue(await api.read({ ...target, from: offsetRef.current }), '读取日志') as RunRead;
-        if (stopped) return;
+        if (stopped || genRef.current !== gen) return;
         offsetRef.current = chunk.next;
-        if (chunk.lines.length > 0) setLogLines((prev) => [...prev, ...chunk.lines].slice(-4000));
+        if (chunk.dropped) setTruncated(true);
+        if (chunk.lines.length > 0) {
+          setLogLines((prev) => {
+            const merged = [...prev, ...chunk.lines];
+            if (merged.length <= 4000) return merged;
+            setTruncated(true);
+            return merged.slice(merged.length - 4000);
+          });
+        }
       } catch (e) {
-        if (!stopped) setError(String((e as Error)?.message ?? e));
+        if (!stopped && genRef.current === gen) setError(String((e as Error)?.message ?? e));
       }
     };
     void tick();
@@ -296,11 +315,11 @@ function Panel({ api, ctx }: PanelProps): React.ReactElement {
     return () => { stopped = true; window.clearInterval(timer); };
   }, [api, runKey, active, activeConfig]);
 
-  // 只有贴底时才自动跟随：用户上滚看历史时不要把他拽回去。
+  // 贴底就跟随到底；用户上滚（scroll 事件把 pinned 置 false）后不再打扰他。
   useEffect(() => {
     const el = logRef.current;
-    if (el === null) return;
-    if (el.scrollHeight - el.scrollTop - el.clientHeight < 80) el.scrollTop = el.scrollHeight;
+    if (el === null || !pinnedRef.current) return;
+    el.scrollTop = el.scrollHeight;
   }, [logLines]);
 
   const selectProject = (workspaceId: string) => {
@@ -380,7 +399,13 @@ function Panel({ api, ctx }: PanelProps): React.ReactElement {
     setFlash('');
     try {
       const target = { workspaceId: active.workspaceId, configId: activeConfig.id };
-      if (action === 'start') { offsetRef.current = 0; setLogLines([]); }
+      if (action === 'start') {
+        genRef.current += 1;   // 让上一代在飞的读取结果失效
+        offsetRef.current = 0;
+        pinnedRef.current = true;
+        setTruncated(false);
+        setLogLines([]);
+      }
       const call = action === 'start' ? api.start(target) : api.stop(target);
       const snap = envelopeValue(await call, action === 'start' ? '启动' : '停止') as RunSnapshot;
       setRuns((prev) => ({ ...prev, [snap.key]: snap }));
@@ -570,13 +595,21 @@ function Panel({ api, ctx }: PanelProps): React.ReactElement {
             ) : null}
 
             <div className="ide-logbox">
-              <div className="ide-log" ref={logRef}>
+              <div
+                className="ide-log"
+                ref={logRef}
+                onScroll={(event) => {
+                  const el = event.currentTarget;
+                  pinnedRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+                }}
+              >
                 {logLines.length === 0
                   ? <span className="ide-note">{runState?.status === 'running' ? '等待输出…' : '点「启动」运行这条启动配置'}</span>
                   : logLines.map((line, index) => <div key={index}>{line}</div>)}
               </div>
               <div className="ide-note">
-                {runText} · 已缓存 {logLines.length} 行{runState?.lossy === true ? '（输出过快，宿主侧有截断）' : ''}
+                {runText} · 已缓存 {logLines.length} 行
+                {runState?.lossy === true || truncated ? '（输出过快或过长，早期日志已被丢弃）' : ''}
               </div>
             </div>
           </>

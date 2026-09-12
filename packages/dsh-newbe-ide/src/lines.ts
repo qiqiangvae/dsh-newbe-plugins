@@ -1,11 +1,17 @@
 /** 日志行切分与脱敏：纯函数，便于单独验证。 */
 const ANSI = /\u001b\[[0-9;?]*[A-Za-z]/g;
 
-/** 单行清理：剥 ANSI 转义；`\r` 覆写只保留最后一次内容（Maven 进度行）。 */
+/**
+ * 单行清理：剥 ANSI 转义，并把 `\r` 覆写收敛成最后一次内容（Maven/curl 进度行）。
+ * 行尾的 `\r`（CRLF 或"进度刷新到此为止"）不是覆写，要取它前面的内容——
+ * 直接取最后一段会把它变成空行。
+ */
 export function cleanLine(line: string): string {
   const stripped = line.replace(ANSI, '');
-  const carriage = stripped.lastIndexOf('\r');
-  return carriage >= 0 ? stripped.slice(carriage + 1) : stripped;
+  const segments = stripped.split('\r');
+  const last = segments[segments.length - 1];
+  if (last !== '') return last;
+  return segments.length >= 2 ? segments[segments.length - 2] : '';
 }
 
 /** 把新到的文本块接到半行后面，切出完整行，返回剩余半行。 */

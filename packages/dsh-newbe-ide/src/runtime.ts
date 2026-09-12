@@ -43,6 +43,7 @@ export interface RunRegistry {
 }
 
 const DEFAULT_MAX_LINES = 5000;
+const MAX_PENDING_CHARS = 65536;
 
 interface RunRecord {
   key: string;
@@ -55,6 +56,8 @@ interface RunRecord {
   pending: string;
   secrets: string[];
   proc: ShellProcessLike | null;
+  /** 是我们主动停的，还是进程自己没起来就死了——决定 killed 该记「已停止」还是「启动失败」。 */
+  stopRequested: boolean;
 }
 
 /** shell 服务可能后到（cordis 服务可增可减），因此用取值函数而不是实例。 */
@@ -68,7 +71,7 @@ export function createRunRegistry(provideShell: ShellProvider, maxLines: number 
     if (existing !== undefined) return existing;
     const fresh: RunRecord = {
       key, status: 'idle', exitCode: null, error: '', lossy: false,
-      lines: [], base: 0, pending: '', secrets: [], proc: null,
+      lines: [], base: 0, pending: '', secrets: [], proc: null, stopRequested: false,
     };
     runs.set(key, fresh);
     return fresh;
@@ -99,6 +102,16 @@ export function createRunRegistry(provideShell: ShellProvider, maxLines: number 
       }
       if (output.lossy === true) run.lossy = true;
     }
+    // 裸 \r 刷新（进度条）不产生 \n，若一直攒在 pending 里就既看不见又会无界增长：
+    // 每轮泵把它收成一行（只保留最后一次覆写），面板因此每轮最多多出一行。
+    if (run.pending.includes('\r')) {
+      const progress = cleanLine(run.pending);
+      if (progress !== '') pushLine(run, maskSecrets(progress, run.secrets));
+      run.pending = '';
+    } else if (run.pending.length > MAX_PENDING_CHARS) {
+      pushLine(run, maskSecrets(run.pending.slice(0, MAX_PENDING_CHARS) + ' …（超长行已截断）', run.secrets));
+      run.pending = '';
+    }
     if (proc.status === 'running') {
       run.status = 'running';
       return;
@@ -109,17 +122,31 @@ export function createRunRegistry(provideShell: ShellProvider, maxLines: number 
       run.pending = '';
     }
     run.exitCode = proc.exitCode ?? null;
-    if (proc.status === 'killed') run.status = 'stopped';
-    else run.status = run.exitCode === 0 ? 'exited' : 'failed';
+    if (proc.status === 'killed') {
+      // shell 契约里 spawn 失败也以 killed 收场，所以只有"我们主动停的"才算已停止。
+      if (run.stopRequested) {
+        run.status = 'stopped';
+      } else {
+        run.status = 'failed';
+        run.error = '进程未能启动（命令或工作目录不可用，详见日志）';
+      }
+    } else {
+      // 自然退出：非 0 退出码不是"启动失败"，退出码本身已经说明问题（如 127 = 命令不存在）。
+      run.status = 'exited';
+    }
   }
 
-  /** 收尾后再判断：已经自然退出的进程不该再被杀。 */
+  /**
+   * 收尾后再判断：已经自然退出的进程不该再被杀。
+   * 不在这里把状态改成「已停止」——SIGTERM 到真正退出之间有宽限期，
+   * 抢报会让面板在进程还活着时说已停；由下一次泵看到 killed 再翻转。
+   */
   function killIfRunning(run: RunRecord): boolean {
     drain(run);
     if (run.proc === null || run.status !== 'running') return false;
+    run.stopRequested = true;
     try { run.proc.kill(); } catch { /* 已退出 */ }
     drain(run);
-    if (run.status === 'running') run.status = 'stopped';
     return true;
   }
 
@@ -131,13 +158,14 @@ export function createRunRegistry(provideShell: ShellProvider, maxLines: number 
     start(key: string, spec: RunSpec): RunSnapshot {
       const shell = provideShell();
       const run = record(key);
-      if (run.status === 'running') throw new Error('该启动配置已在运行');
+      if (run.status === 'running' && !run.stopRequested) throw new Error('该启动配置已在运行');
       if (shell === undefined) throw new Error('shell 服务不可用，无法启动进程');
       if (spec.command.trim() === '') throw new Error('启动命令为空，先在「⚙ 启动配置」里填好');
       run.lines = [];
       run.base = 0;
       run.pending = '';
       run.lossy = false;
+      run.stopRequested = false;
       run.exitCode = null;
       run.error = '';
       run.secrets = spec.envs.filter((e) => isSecretName(e.name) && e.value !== '').map((e) => e.value);
@@ -166,12 +194,15 @@ export function createRunRegistry(provideShell: ShellProvider, maxLines: number 
       const run = record(key);
       drain(run);
       const offset = Number.isFinite(from) ? Math.max(0, from) : 0;
-      const start = Math.max(0, Math.min(run.lines.length, offset - run.base));
+      const end = run.base + run.lines.length;
+      // offset 超前于当前缓冲 = 客户端还拿着上一代进程的偏移（重启竞态）：整份重发。
+      const ahead = offset > end;
+      const start = ahead ? 0 : Math.max(0, Math.min(run.lines.length, offset - run.base));
       return {
         ...snapshotOf(run),
         lines: run.lines.slice(start),
-        next: run.base + run.lines.length,
-        dropped: offset < run.base,
+        next: end,
+        dropped: ahead || offset < run.base,
       };
     },
 

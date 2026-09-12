@@ -21,6 +21,11 @@ test('\\r 覆写只保留最后一次内容（Maven 进度行）', () => {
   assert.equal(cleanLine('Downloading 50% \rDownloading 100% done'), 'Downloading 100% done');
 });
 
+test('行尾 CR（CRLF 输出）不会被当成空行', () => {
+  assert.equal(cleanLine('Started KunAiApplication\r'), 'Started KunAiApplication');
+  assert.deepEqual(splitLines('', 'a\r\nb\r\n'), { lines: ['a', 'b'], pending: '' });
+});
+
 test('ANSI 转义被剥离', () => {
   assert.equal(cleanLine('\u001b[32mINFO\u001b[0m started'), 'INFO started');
 });

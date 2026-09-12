@@ -14744,6 +14744,7 @@ function describeRun(run) {
   if (run.status === "running") return "\u8FD0\u884C\u4E2D";
   if (run.status === "stopped") return "\u5DF2\u505C\u6B62";
   if (run.status === "failed" && run.error !== "") return `\u542F\u52A8\u5931\u8D25\uFF1A${run.error}`;
+  if (run.exitCode === 127) return "\u547D\u4EE4\u4E0D\u5B58\u5728\uFF08\u7801 127\uFF09";
   return `\u5DF2\u9000\u51FA\uFF08\u7801 ${run.exitCode ?? "?"}\uFF09`;
 }
 function patchProject(config2, workspaceId, mutate) {
@@ -14822,8 +14823,14 @@ function Panel({ api, ctx }) {
   const [logLines, setLogLines] = (0, import_react.useState)([]);
   const offsetRef = (0, import_react.useRef)(0);
   const logRef = (0, import_react.useRef)(null);
+  const pinnedRef = (0, import_react.useRef)(true);
+  const genRef = (0, import_react.useRef)(0);
+  const [truncated, setTruncated] = (0, import_react.useState)(false);
   (0, import_react.useEffect)(() => {
     offsetRef.current = 0;
+    genRef.current += 1;
+    pinnedRef.current = true;
+    setTruncated(false);
     setLogLines([]);
   }, [runKey]);
   (0, import_react.useEffect)(() => {
@@ -14831,17 +14838,27 @@ function Panel({ api, ctx }) {
     const target = { workspaceId: active.workspaceId, configId: activeConfig.id };
     let stopped = false;
     const tick = async () => {
+      const gen = genRef.current;
       try {
         const list = envelopeValue(await api.runs(), "\u8BFB\u53D6\u8FD0\u884C\u6001");
         const map2 = {};
         for (const item of list) map2[item.key] = item;
-        if (!stopped) setRuns(map2);
+        if (stopped || genRef.current !== gen) return;
+        setRuns(map2);
         const chunk = envelopeValue(await api.read({ ...target, from: offsetRef.current }), "\u8BFB\u53D6\u65E5\u5FD7");
-        if (stopped) return;
+        if (stopped || genRef.current !== gen) return;
         offsetRef.current = chunk.next;
-        if (chunk.lines.length > 0) setLogLines((prev) => [...prev, ...chunk.lines].slice(-4e3));
+        if (chunk.dropped) setTruncated(true);
+        if (chunk.lines.length > 0) {
+          setLogLines((prev) => {
+            const merged = [...prev, ...chunk.lines];
+            if (merged.length <= 4e3) return merged;
+            setTruncated(true);
+            return merged.slice(merged.length - 4e3);
+          });
+        }
       } catch (e) {
-        if (!stopped) setError(String(e?.message ?? e));
+        if (!stopped && genRef.current === gen) setError(String(e?.message ?? e));
       }
     };
     void tick();
@@ -14855,8 +14872,8 @@ function Panel({ api, ctx }) {
   }, [api, runKey, active, activeConfig]);
   (0, import_react.useEffect)(() => {
     const el = logRef.current;
-    if (el === null) return;
-    if (el.scrollHeight - el.scrollTop - el.clientHeight < 80) el.scrollTop = el.scrollHeight;
+    if (el === null || !pinnedRef.current) return;
+    el.scrollTop = el.scrollHeight;
   }, [logLines]);
   const selectProject = (workspaceId) => {
     setActiveProjectId(workspaceId);
@@ -14928,7 +14945,10 @@ function Panel({ api, ctx }) {
     try {
       const target = { workspaceId: active.workspaceId, configId: activeConfig.id };
       if (action === "start") {
+        genRef.current += 1;
         offsetRef.current = 0;
+        pinnedRef.current = true;
+        setTruncated(false);
         setLogLines([]);
       }
       const call = action === "start" ? api.start(target) : api.stop(target);
@@ -15125,13 +15145,24 @@ function Panel({ api, ctx }) {
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-note", children: "\u6301\u4E45\u5316\u5230 ~/.dsh/storages/dsh-newbe-ide.json\uFF08\u6743\u9650 0600\uFF0C\u4E0D\u5728\u9879\u76EE\u76EE\u5F55\u91CC\u3001\u4E0D\u4F1A\u88AB git \u63D0\u4EA4\uFF09" })
         ] }) : null,
         /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-logbox", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-log", ref: logRef, children: logLines.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-note", children: runState?.status === "running" ? "\u7B49\u5F85\u8F93\u51FA\u2026" : "\u70B9\u300C\u542F\u52A8\u300D\u8FD0\u884C\u8FD9\u6761\u542F\u52A8\u914D\u7F6E" }) : logLines.map((line, index) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { children: line }, index)) }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+            "div",
+            {
+              className: "ide-log",
+              ref: logRef,
+              onScroll: (event) => {
+                const el = event.currentTarget;
+                pinnedRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+              },
+              children: logLines.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-note", children: runState?.status === "running" ? "\u7B49\u5F85\u8F93\u51FA\u2026" : "\u70B9\u300C\u542F\u52A8\u300D\u8FD0\u884C\u8FD9\u6761\u542F\u52A8\u914D\u7F6E" }) : logLines.map((line, index) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { children: line }, index))
+            }
+          ),
           /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-note", children: [
             runText,
             " \xB7 \u5DF2\u7F13\u5B58 ",
             logLines.length,
             " \u884C",
-            runState?.lossy === true ? "\uFF08\u8F93\u51FA\u8FC7\u5FEB\uFF0C\u5BBF\u4E3B\u4FA7\u6709\u622A\u65AD\uFF09" : ""
+            runState?.lossy === true || truncated ? "\uFF08\u8F93\u51FA\u8FC7\u5FEB\u6216\u8FC7\u957F\uFF0C\u65E9\u671F\u65E5\u5FD7\u5DF2\u88AB\u4E22\u5F03\uFF09" : ""
           ] })
         ] })
       ] })

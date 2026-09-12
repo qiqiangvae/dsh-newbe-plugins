@@ -14685,8 +14685,10 @@ function createConfigStore(file2) {
 var ANSI = /\u001b\[[0-9;?]*[A-Za-z]/g;
 function cleanLine(line) {
   const stripped = line.replace(ANSI, "");
-  const carriage = stripped.lastIndexOf("\r");
-  return carriage >= 0 ? stripped.slice(carriage + 1) : stripped;
+  const segments = stripped.split("\r");
+  const last = segments[segments.length - 1];
+  if (last !== "") return last;
+  return segments.length >= 2 ? segments[segments.length - 2] : "";
 }
 function splitLines(pending, chunk) {
   const parts = (pending + chunk).split("\n");
@@ -14708,6 +14710,7 @@ function isSecretName(name2) {
 
 // src/runtime.ts
 var DEFAULT_MAX_LINES = 5e3;
+var MAX_PENDING_CHARS = 65536;
 function createRunRegistry(provideShell, maxLines = DEFAULT_MAX_LINES) {
   const runs = /* @__PURE__ */ new Map();
   function record2(key) {
@@ -14723,7 +14726,8 @@ function createRunRegistry(provideShell, maxLines = DEFAULT_MAX_LINES) {
       base: 0,
       pending: "",
       secrets: [],
-      proc: null
+      proc: null,
+      stopRequested: false
     };
     runs.set(key, fresh);
     return fresh;
@@ -14752,6 +14756,14 @@ function createRunRegistry(provideShell, maxLines = DEFAULT_MAX_LINES) {
       }
       if (output.lossy === true) run.lossy = true;
     }
+    if (run.pending.includes("\r")) {
+      const progress = cleanLine(run.pending);
+      if (progress !== "") pushLine(run, maskSecrets(progress, run.secrets));
+      run.pending = "";
+    } else if (run.pending.length > MAX_PENDING_CHARS) {
+      pushLine(run, maskSecrets(run.pending.slice(0, MAX_PENDING_CHARS) + " \u2026\uFF08\u8D85\u957F\u884C\u5DF2\u622A\u65AD\uFF09", run.secrets));
+      run.pending = "";
+    }
     if (proc.status === "running") {
       run.status = "running";
       return;
@@ -14761,18 +14773,26 @@ function createRunRegistry(provideShell, maxLines = DEFAULT_MAX_LINES) {
       run.pending = "";
     }
     run.exitCode = proc.exitCode ?? null;
-    if (proc.status === "killed") run.status = "stopped";
-    else run.status = run.exitCode === 0 ? "exited" : "failed";
+    if (proc.status === "killed") {
+      if (run.stopRequested) {
+        run.status = "stopped";
+      } else {
+        run.status = "failed";
+        run.error = "\u8FDB\u7A0B\u672A\u80FD\u542F\u52A8\uFF08\u547D\u4EE4\u6216\u5DE5\u4F5C\u76EE\u5F55\u4E0D\u53EF\u7528\uFF0C\u8BE6\u89C1\u65E5\u5FD7\uFF09";
+      }
+    } else {
+      run.status = "exited";
+    }
   }
   function killIfRunning(run) {
     drain(run);
     if (run.proc === null || run.status !== "running") return false;
+    run.stopRequested = true;
     try {
       run.proc.kill();
     } catch {
     }
     drain(run);
-    if (run.status === "running") run.status = "stopped";
     return true;
   }
   function snapshotOf(run) {
@@ -14782,13 +14802,14 @@ function createRunRegistry(provideShell, maxLines = DEFAULT_MAX_LINES) {
     start(key, spec) {
       const shell = provideShell();
       const run = record2(key);
-      if (run.status === "running") throw new Error("\u8BE5\u542F\u52A8\u914D\u7F6E\u5DF2\u5728\u8FD0\u884C");
+      if (run.status === "running" && !run.stopRequested) throw new Error("\u8BE5\u542F\u52A8\u914D\u7F6E\u5DF2\u5728\u8FD0\u884C");
       if (shell === void 0) throw new Error("shell \u670D\u52A1\u4E0D\u53EF\u7528\uFF0C\u65E0\u6CD5\u542F\u52A8\u8FDB\u7A0B");
       if (spec.command.trim() === "") throw new Error("\u542F\u52A8\u547D\u4EE4\u4E3A\u7A7A\uFF0C\u5148\u5728\u300C\u2699 \u542F\u52A8\u914D\u7F6E\u300D\u91CC\u586B\u597D");
       run.lines = [];
       run.base = 0;
       run.pending = "";
       run.lossy = false;
+      run.stopRequested = false;
       run.exitCode = null;
       run.error = "";
       run.secrets = spec.envs.filter((e) => isSecretName(e.name) && e.value !== "").map((e) => e.value);
@@ -14815,12 +14836,14 @@ function createRunRegistry(provideShell, maxLines = DEFAULT_MAX_LINES) {
       const run = record2(key);
       drain(run);
       const offset = Number.isFinite(from) ? Math.max(0, from) : 0;
-      const start = Math.max(0, Math.min(run.lines.length, offset - run.base));
+      const end = run.base + run.lines.length;
+      const ahead = offset > end;
+      const start = ahead ? 0 : Math.max(0, Math.min(run.lines.length, offset - run.base));
       return {
         ...snapshotOf(run),
         lines: run.lines.slice(start),
-        next: run.base + run.lines.length,
-        dropped: offset < run.base
+        next: end,
+        dropped: ahead || offset < run.base
       };
     },
     snapshot(key) {
