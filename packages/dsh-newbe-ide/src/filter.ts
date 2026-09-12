@@ -4,6 +4,9 @@
  */
 export type RunLevel = 'ERROR' | 'WARN' | 'INFO' | 'DEBUG' | 'OTHER';
 
+/** 级别的展示顺序：UI 的徽章、渲染用的 CSS 类都从这一份派生。 */
+export const LEVELS: readonly RunLevel[] = ['ERROR', 'WARN', 'INFO', 'DEBUG', 'OTHER'];
+
 /** 默认开哪几级：DEBUG 默认关（量最大、平时不需要）。 */
 export const DEFAULT_LEVELS: Record<RunLevel, boolean> = {
   ERROR: true, WARN: true, INFO: true, DEBUG: false, OTHER: true,
@@ -22,8 +25,6 @@ export function levelOf(line: string): RunLevel {
 
 export interface Matcher {
   test(line: string): boolean;
-  /** true 表示这是字面匹配（关键字为空以外的原因，例如正则非法而退回）。 */
-  literal: boolean;
 }
 
 export interface MatcherSpec {
@@ -38,13 +39,13 @@ export function compileMatcher(spec: MatcherSpec): Matcher | null {
   if (spec.regex) {
     try {
       const re = new RegExp(q, 'i');
-      return { test: (line) => re.test(line), literal: false };
+      return { test: (line) => re.test(line) };
     } catch {
       /* 非法正则退回字面匹配 */
     }
   }
   const lowered = q.toLowerCase();
-  return { test: (line) => line.toLowerCase().includes(lowered), literal: true };
+  return { test: (line) => line.toLowerCase().includes(lowered) };
 }
 
 export interface FilteredLine {

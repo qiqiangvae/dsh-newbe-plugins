@@ -50,9 +50,12 @@ test('正则开关生效；非法正则退回字面匹配且不抛', () => {
   const hits = filterLines(BOOT, { matcher: ok, onlyMatch: true, levels: DEFAULT_LEVELS });
   assert.equal(hits.length, 2);
   assert.ok(hits.every((r) => r.line.includes('RuleLoader')));
-  const bad = compileMatcher({ q: '([unclosed', regex: true });
-  assert.equal(bad.literal, true, '非法正则应当退回字面匹配');
-  assert.equal(filterLines(BOOT, { matcher: bad, onlyMatch: true, levels: DEFAULT_LEVELS }).length, 0);
+  // 非法正则不抛错，按字面理解：把同样的字符当普通文本，能匹配到就命中。
+  const fellBack = compileMatcher({ q: 'RuleLoader(', regex: true });
+  assert.ok(fellBack !== null);
+  assert.equal(filterLines(['see RuleLoader( now'], { matcher: fellBack, onlyMatch: true, levels: DEFAULT_LEVELS }).length, 1);
+  const noMatch = compileMatcher({ q: '([unclosed', regex: true });
+  assert.equal(filterLines(BOOT, { matcher: noMatch, onlyMatch: true, levels: DEFAULT_LEVELS }).length, 0);
 });
 
 test('级别徽章：关掉 WARN 后 WARN 行消失', () => {

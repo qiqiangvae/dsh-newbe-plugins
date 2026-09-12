@@ -89,6 +89,9 @@ export const runReadSchema = z.object({
 
 export const runSnapshotListSchema = z.array(runSnapshotSchema);
 
+/** 客户端补历史时默认要多少行；宿主在请求未给数值时用同一个默认。 */
+export const DEFAULT_HISTORY_LINES = 2000;
+
 /** 读历史日志的请求：要最后多少行。 */
 export const logHistoryRequestSchema = z.object({
   workspaceId: z.string(),

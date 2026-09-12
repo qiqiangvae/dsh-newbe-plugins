@@ -14589,6 +14589,7 @@ var runReadSchema = external_exports.object({
   dropped: external_exports.boolean()
 });
 var runSnapshotListSchema = external_exports.array(runSnapshotSchema);
+var DEFAULT_HISTORY_LINES = 2e3;
 var logHistoryRequestSchema = external_exports.object({
   workspaceId: external_exports.string(),
   configId: external_exports.string(),
@@ -14773,6 +14774,13 @@ function createRunRegistry(provideShell, options = {}) {
     run.base += drop;
   }
   function drain(run) {
+    try {
+      drainInto(run);
+    } finally {
+      flushAppend(run);
+    }
+  }
+  function drainInto(run) {
     const proc = run.proc;
     if (proc === null) return;
     let output;
@@ -14799,7 +14807,6 @@ function createRunRegistry(provideShell, options = {}) {
     }
     if (proc.status === "running") {
       run.status = "running";
-      flushAppend(run);
       return;
     }
     if (run.pending !== "") {
@@ -14817,7 +14824,6 @@ function createRunRegistry(provideShell, options = {}) {
     } else {
       run.status = "exited";
     }
-    flushAppend(run);
   }
   function killIfRunning(run) {
     drain(run);
@@ -14973,6 +14979,7 @@ function createFileLogSink(dir, options = {}) {
 }
 
 // src/filter.ts
+var LEVELS = ["ERROR", "WARN", "INFO", "DEBUG", "OTHER"];
 var DEFAULT_LEVELS = {
   ERROR: true,
   WARN: true,
@@ -14994,12 +15001,12 @@ function compileMatcher(spec) {
   if (spec.regex) {
     try {
       const re = new RegExp(q, "i");
-      return { test: (line) => re.test(line), literal: false };
+      return { test: (line) => re.test(line) };
     } catch {
     }
   }
   const lowered = q.toLowerCase();
-  return { test: (line) => line.toLowerCase().includes(lowered), literal: true };
+  return { test: (line) => line.toLowerCase().includes(lowered) };
 }
 function filterLines(lines, state) {
   const out = [];
@@ -15070,7 +15077,7 @@ function apply(ctx) {
     },
     history(request) {
       const key = runKeyOf(request);
-      const tail = Number.isFinite(request.tail) && request.tail > 0 ? Math.floor(request.tail) : 2e3;
+      const tail = Number.isFinite(request.tail) && request.tail > 0 ? Math.floor(request.tail) : DEFAULT_HISTORY_LINES;
       const result = sink.tail(key, tail);
       return { lines: result.lines, truncated: result.truncated, path: sink.path(key) };
     }
@@ -15084,7 +15091,9 @@ function apply(ctx) {
   ctx.provide("ideConfig", service);
 }
 export {
+  DEFAULT_HISTORY_LINES,
   DEFAULT_LEVELS,
+  LEVELS,
   STORAGE_PATH,
   apply,
   cleanLine,

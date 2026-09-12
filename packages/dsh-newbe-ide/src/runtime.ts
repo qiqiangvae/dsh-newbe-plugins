@@ -114,6 +114,16 @@ export function createRunRegistry(provideShell: ShellProvider, options: RunRegis
   }
 
   function drain(run: RunRecord): void {
+    try {
+      drainInto(run);
+    } finally {
+      // 无论从哪个分支返回，本轮的输出都要落盘——放在 finally 里，
+      // 将来给 drainInto 加早退也不会悄悄丢掉排队的那批行。
+      flushAppend(run);
+    }
+  }
+
+  function drainInto(run: RunRecord): void {
     const proc = run.proc;
     if (proc === null) return;
     let output: ShellOutputDelta | undefined;
@@ -142,7 +152,6 @@ export function createRunRegistry(provideShell: ShellProvider, options: RunRegis
     }
     if (proc.status === 'running') {
       run.status = 'running';
-      flushAppend(run);
       return;
     }
     // 进程已结束：把最后半行补成一行，再落状态。
@@ -163,7 +172,6 @@ export function createRunRegistry(provideShell: ShellProvider, options: RunRegis
       // 自然退出：非 0 退出码不是"启动失败"，退出码本身已经说明问题（如 127 = 命令不存在）。
       run.status = 'exited';
     }
-    flushAppend(run);
   }
 
   /**

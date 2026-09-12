@@ -11,12 +11,12 @@ import { dshHomePath } from '@deepseek-ai/dsh-home-paths';
 import { createConfigStore } from './store.js';
 import { createRunRegistry, type RunSpec } from './runtime.js';
 import { createFileLogSink } from './logsink.js';
-import { runKeyOf, type IdeLoad, type IdeProjectView, type IdeState, type LogHistory, type RunRead, type RunSnapshot } from './schema.js';
+import { DEFAULT_HISTORY_LINES, runKeyOf, type IdeLoad, type IdeProjectView, type IdeState, type LogHistory, type LogHistoryRequest, type RunRead, type RunSnapshot } from './schema.js';
 
 export { createConfigStore } from './store.js';
-export { defaultState, pickActiveConfig, runKeyOf } from './schema.js';
+export { DEFAULT_HISTORY_LINES, defaultState, pickActiveConfig, runKeyOf } from './schema.js';
 export { cleanLine, isSecretName, maskSecrets, splitLines } from './lines.js';
-export { DEFAULT_LEVELS, compileMatcher, filterLines, levelOf } from './filter.js';
+export { DEFAULT_LEVELS, LEVELS, compileMatcher, filterLines, levelOf } from './filter.js';
 export { createFileLogSink } from './logsink.js';
 export type { LogSink, TailResult } from './logsink.js';
 export type { FilteredLine, FilterState, Matcher, MatcherSpec, RunLevel } from './filter.js';
@@ -88,9 +88,9 @@ export function apply(ctx: any): void {
     runs(): RunSnapshot[] {
       return registry.snapshots();
     },
-    history(request: { workspaceId: string; configId: string; tail: number }): LogHistory {
+    history(request: LogHistoryRequest): LogHistory {
       const key = runKeyOf(request);
-      const tail = Number.isFinite(request.tail) && request.tail > 0 ? Math.floor(request.tail) : 2000;
+      const tail = Number.isFinite(request.tail) && request.tail > 0 ? Math.floor(request.tail) : DEFAULT_HISTORY_LINES;
       const result = sink.tail(key, tail);
       return { lines: result.lines, truncated: result.truncated, path: sink.path(key) };
     },

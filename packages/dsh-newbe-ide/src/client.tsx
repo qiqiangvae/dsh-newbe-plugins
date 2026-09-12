@@ -14,6 +14,7 @@ import {
   ideLoadSchema,
   logHistoryRequestSchema,
   logHistorySchema,
+  DEFAULT_HISTORY_LINES,
   pickActiveConfig,
   ideStateSchema,
   runKeyOf,
@@ -33,7 +34,7 @@ import {
   type RunTarget,
 } from './schema.js';
 import { isSecretName } from './lines.js';
-import { DEFAULT_LEVELS, compileMatcher, filterLines, type RunLevel } from './filter.js';
+import { DEFAULT_LEVELS, LEVELS, compileMatcher, filterLines, type RunLevel } from './filter.js';
 
 export const NS = 'dsh-newbe-ide';
 const VIEW_ID = 'dsh-newbe-ide';
@@ -44,8 +45,6 @@ const SETTINGS_TAB_ORDER = 30;
 const LOG_LIMIT = 4000;
 /** 单帧最多渲染多少行：过滤是全量的，渲染要封顶，否则长日志会卡。 */
 const RENDER_LIMIT = 2000;
-/** 补历史时最多捞多少行。 */
-const HISTORY_LINES = 2000;
 const POLL_MS = 800;
 /** 每 N 次轮询顺带重读一次配置，让设置页里的改动近乎即时地反映到视图。 */
 const CONFIG_REFRESH_EVERY = 3;
@@ -193,6 +192,7 @@ function ensureStyles(): () => void {
 .ide-filterbar .ide-field{padding:3px 8px;min-width:180px}
 .ide-hit{background:rgba(255,196,0,.18)}
 .ide-lv-ERROR{color:var(--dsw-alias-state-error-primary,#d83931)}
+.ide-lv-INFO{color:var(--dsw-alias-label-primary,#1f2329)}
 .ide-lv-WARN{color:var(--dsw-alias-state-warn-primary,#e7a100)}
 .ide-lv-DEBUG,.ide-lv-OTHER{color:var(--dsw-alias-label-secondary,#697586)}
 /* IDE 视图占满面板：本视图在场时收起底部的消息输入框。
@@ -364,7 +364,7 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
         } else if (!historyTriedRef.current) {
           // 本次进程没有输出 → 把上次运行落盘的尾巴捞回来（DSH 重启后仍能看上次为什么挂的）。
           historyTriedRef.current = true;
-          const history = envelopeValue(await api.history({ ...target, tail: HISTORY_LINES }), '读取历史日志') as LogHistory;
+          const history = envelopeValue(await api.history({ ...target, tail: DEFAULT_HISTORY_LINES }), '读取历史日志') as LogHistory;
           if (stopped || genRef.current !== gen) return;
           if (history.lines.length > 0) {
             setLogLines(history.lines);
@@ -522,7 +522,7 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
                   <button type="button" className="ide-chip" data-sel={filterRegex} onClick={() => setFilterRegex((v) => !v)}>正则</button>
                   <button type="button" className="ide-chip" data-sel={onlyMatch} onClick={() => setOnlyMatch((v) => !v)}>仅看匹配</button>
                   <span style={{ flex: 1 }} />
-                  {(['ERROR', 'WARN', 'INFO', 'DEBUG', 'OTHER'] as RunLevel[]).map((lv) => (
+                  {LEVELS.map((lv) => (
                     <button
                       key={lv}
                       type="button"

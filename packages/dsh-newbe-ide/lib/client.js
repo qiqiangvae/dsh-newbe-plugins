@@ -14604,6 +14604,7 @@ var runReadSchema = external_exports.object({
   dropped: external_exports.boolean()
 });
 var runSnapshotListSchema = external_exports.array(runSnapshotSchema);
+var DEFAULT_HISTORY_LINES = 2e3;
 var logHistoryRequestSchema = external_exports.object({
   workspaceId: external_exports.string(),
   configId: external_exports.string(),
@@ -14634,6 +14635,7 @@ function isSecretName(name) {
 }
 
 // src/filter.ts
+var LEVELS = ["ERROR", "WARN", "INFO", "DEBUG", "OTHER"];
 var DEFAULT_LEVELS = {
   ERROR: true,
   WARN: true,
@@ -14655,12 +14657,12 @@ function compileMatcher(spec) {
   if (spec.regex) {
     try {
       const re = new RegExp(q, "i");
-      return { test: (line) => re.test(line), literal: false };
+      return { test: (line) => re.test(line) };
     } catch {
     }
   }
   const lowered = q.toLowerCase();
-  return { test: (line) => line.toLowerCase().includes(lowered), literal: true };
+  return { test: (line) => line.toLowerCase().includes(lowered) };
 }
 function filterLines(lines, state) {
   const out = [];
@@ -14682,7 +14684,6 @@ var VIEW_ORDER = 30;
 var SETTINGS_TAB_ORDER = 30;
 var LOG_LIMIT = 4e3;
 var RENDER_LIMIT = 2e3;
-var HISTORY_LINES = 2e3;
 var POLL_MS = 800;
 var CONFIG_REFRESH_EVERY = 3;
 var REMOTE_CONTRIBUTION = {
@@ -14814,6 +14815,7 @@ function ensureStyles() {
 .ide-filterbar .ide-field{padding:3px 8px;min-width:180px}
 .ide-hit{background:rgba(255,196,0,.18)}
 .ide-lv-ERROR{color:var(--dsw-alias-state-error-primary,#d83931)}
+.ide-lv-INFO{color:var(--dsw-alias-label-primary,#1f2329)}
 .ide-lv-WARN{color:var(--dsw-alias-state-warn-primary,#e7a100)}
 .ide-lv-DEBUG,.ide-lv-OTHER{color:var(--dsw-alias-label-secondary,#697586)}
 /* IDE \u89C6\u56FE\u5360\u6EE1\u9762\u677F\uFF1A\u672C\u89C6\u56FE\u5728\u573A\u65F6\u6536\u8D77\u5E95\u90E8\u7684\u6D88\u606F\u8F93\u5165\u6846\u3002
@@ -14959,7 +14961,7 @@ function IdeView({ api, ctx }) {
           });
         } else if (!historyTriedRef.current) {
           historyTriedRef.current = true;
-          const history = envelopeValue(await api.history({ ...target, tail: HISTORY_LINES }), "\u8BFB\u53D6\u5386\u53F2\u65E5\u5FD7");
+          const history = envelopeValue(await api.history({ ...target, tail: DEFAULT_HISTORY_LINES }), "\u8BFB\u53D6\u5386\u53F2\u65E5\u5FD7");
           if (stopped || genRef.current !== gen) return;
           if (history.lines.length > 0) {
             setLogLines(history.lines);
@@ -15112,7 +15114,7 @@ function IdeView({ api, ctx }) {
             /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-chip", "data-sel": filterRegex, onClick: () => setFilterRegex((v) => !v), children: "\u6B63\u5219" }),
             /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-chip", "data-sel": onlyMatch, onClick: () => setOnlyMatch((v) => !v), children: "\u4EC5\u770B\u5339\u914D" }),
             /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { flex: 1 } }),
-            ["ERROR", "WARN", "INFO", "DEBUG", "OTHER"].map((lv) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+            LEVELS.map((lv) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
               "button",
               {
                 type: "button",
