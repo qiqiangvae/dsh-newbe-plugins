@@ -17,13 +17,13 @@ import { parseSpringBootConfigurations } from './ideaconfig.js';
 import { DEFAULT_HISTORY_LINES, runKeyOf, type IdeaDiscovery, type IdeLoad, type IdeProjectView, type IdeState, type LogHistory, type LogHistoryRequest, type RunRead, type RunSnapshot } from './schema.js';
 
 export { createConfigStore } from './store.js';
-export { DEFAULT_HISTORY_LINES, defaultState, pickActiveConfig, runKeyOf } from './schema.js';
+export { DEFAULT_HISTORY_LINES, availableWorkspaces, basenameOf, defaultState, pickActiveConfig, runKeyOf, uniqueTitle } from './schema.js';
 export { cleanLine, isSecretName, maskSecrets, splitLines } from './lines.js';
 export { DEFAULT_LEVELS, LEVELS, compileMatcher, filterLines, levelOf } from './filter.js';
 export { createFileLogSink } from './logsink.js';
 // 只导出有消费者的东西：测试是 .mjs（导入值），客户端直接从各自模块取类型，
 // 因此这里不再转发类型（曾经转发过一批，0 个消费者）。
-export { aggregateStatus, formatUptime, parsePort } from './rundisplay.js';
+export { aggregateStatus, formatUptime, parsePort, readLostLines } from './rundisplay.js';
 export { buildLaunchConfig, parseSpringBootConfigurations, plannedConfigName } from './ideaconfig.js';
 export { createRunRegistry } from './runtime.js';
 
@@ -55,6 +55,10 @@ export function apply(ctx: any): void {
   console.log(`[dsh-newbe-ide] 存储文件：${STORAGE_PATH}`);
 
   // 定时把在跑进程的输出读进缓冲：客户端轮询只是取，不负责采集，避免读得太慢丢输出。
+  // **这个间隔不能随便放大**：DSH shell 侧每个流只有 64,000 B 的内存尾窗（实测均值 145.68 B/行
+  // ≈ 439 行），窗口溢出后多出来的部分会被丢掉（就是面板上那个"早期部分已丢弃"）。
+  // 250ms 对应约 1,750 行/秒的安全线，500ms 会掉到约 880 行/秒——比用户假设的峰值还低。
+  // 想省 CPU 应该从"别重复 drain"入手（见 runtime.snapshots），不是放大这个间隔。
   ctx.effect(() => {
     const timer = setInterval(() => registry.pump(), 250);
     return () => {

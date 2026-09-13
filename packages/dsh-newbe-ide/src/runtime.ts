@@ -81,6 +81,8 @@ interface RunRegistryOptions {
 
 export function createRunRegistry(provideShell: ShellProvider, options: RunRegistryOptions = {}): RunRegistry {
   const maxLines = options.maxLines ?? DEFAULT_MAX_LINES;
+  /** 批量丢弃的粒度：见 pushLine。按上限的 1/10 取，小上限时退化成逐行丢弃。 */
+  const trimSlack = Math.max(1, Math.floor(maxLines / 10));
   const sink = options.sink;
   const runs = new Map<string, RunRecord>();
 
@@ -117,10 +119,13 @@ export function createRunRegistry(provideShell: ShellProvider, options: RunRegis
 
   function pushLine(run: RunRecord, line: string): void {
     run.lines.push(line);
-    if (run.lines.length <= maxLines) return;
-    const drop = run.lines.length - maxLines;
-    run.lines.splice(0, drop);
-    run.base += drop;
+    // 饱和后逐行 `splice(0, 1)` 每来一行都要把 5,000 个槽往前搬一次（纯搬移，白烧 CPU）。
+    // 改成攒一批再丢：摊还 O(1)/行，代价是缓冲最多多留 maxLines/10 行（5,000 → 最多 5,500）。
+    // slack 按上限比例取，是为了小上限（测试里的 maxLines=3）保持逐行丢弃的老行为。
+    const excess = run.lines.length - maxLines;
+    if (excess < trimSlack) return;
+    run.lines.splice(0, excess);
+    run.base += excess;
   }
 
   function drain(run: RunRecord): void {
@@ -272,12 +277,14 @@ export function createRunRegistry(provideShell: ShellProvider, options: RunRegis
       return snapshotOf(run);
     },
 
+    /**
+     * 只读当前态，**不 drain**：输出由 250ms 的 pump 抽干，这里再抽一次是纯重复劳动——
+     * 客户端每秒调 1.25 次，每次都会为每个配置做一遍 `Buffer.concat`（O(保留窗口)）。
+     * 代价是这些字段最多旧 250ms，而客户端本来就是 800ms 轮询。
+     */
     snapshots(): RunSnapshot[] {
       const out: RunSnapshot[] = [];
-      for (const run of runs.values()) {
-        drain(run);
-        out.push(snapshotOf(run));
-      }
+      for (const run of runs.values()) out.push(snapshotOf(run));
       return out;
     },
 

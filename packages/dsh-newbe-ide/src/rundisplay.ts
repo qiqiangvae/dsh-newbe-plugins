@@ -35,3 +35,17 @@ export function aggregateStatus(statuses: readonly RunStatus[]): RunStatus {
   }
   return worst;
 }
+
+/**
+ * 这次读取是不是**真的丢了早期行**——决定面板要不要说"早期部分已丢弃"。
+ *
+ * 宿主的 `dropped` 有两种成因，含义完全不同：
+ *   - `offset < base`：环形缓冲滚过了，早期行确实不在内存里 → 丢。
+ *   - `offset > next`（我们手里的偏移超过宿主当前末尾）：进程重启后的重新同步，
+ *     宿主把整份缓冲重发了一遍，**一行没丢**。
+ * 后者也报 `dropped`，照搬就会在"刚重启"时冤枉自己丢了日志（客户端自己就能把两者分开：
+ * 前者 `from <= next`，后者 `from > next`）。
+ */
+export function readLostLines(from: number, chunk: { next: number; dropped: boolean }): boolean {
+  return chunk.dropped && from <= chunk.next;
+}

@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-const { formatUptime, parsePort, aggregateStatus } = await import('../lib/index.js');
+const { formatUptime, parsePort, aggregateStatus, readLostLines } = await import('../lib/index.js');
 
 test('时长文案：秒 / 分秒 / 时分', () => {
   assert.equal(formatUptime(0, 1000), '');
@@ -38,4 +38,13 @@ test('聚合状态优先级：运行中 > 启动失败 > 已退出 > 已停止 >
   assert.equal(aggregateStatus(['failed', 'running']), 'running');
   assert.equal(aggregateStatus(['idle', 'failed', 'running']), 'running');
   assert.equal(aggregateStatus([]), 'idle');
+});
+
+test('重启后的重新同步不算丢行（dropped 的两种成因要分开）', () => {
+  // offset 超过宿主当前末尾 = 进程重启后整份重发，一行没丢
+  assert.equal(readLostLines(40, { next: 2, dropped: true }), false);
+  // offset 落在环形缓冲已丢弃的区间 = 早期行确实不在内存里了
+  assert.equal(readLostLines(1, { next: 9, dropped: true }), true);
+  // 没丢就是没丢
+  assert.equal(readLostLines(9, { next: 9, dropped: false }), false);
 });

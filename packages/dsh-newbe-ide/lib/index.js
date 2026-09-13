@@ -14642,6 +14642,27 @@ function pickActiveConfig(project, preferredId) {
   const remembered = project.configs.find((c) => c.id === project.activeConfigId);
   return remembered ?? project.configs[0];
 }
+function basenameOf(path) {
+  const parts = path.replace(/[/\\]+$/, "").split(/[/\\]/).filter((x) => x !== "");
+  return parts.length === 0 ? path : parts[parts.length - 1];
+}
+function uniqueTitle(base, taken) {
+  if (!taken.includes(base)) return base;
+  for (let n = 2; ; n += 1) {
+    const candidate = `${base} (${n})`;
+    if (!taken.includes(candidate)) return candidate;
+  }
+}
+function availableWorkspaces(registry2, usedPaths) {
+  const seen = new Set(usedPaths);
+  const out = [];
+  for (const row of registry2) {
+    if (seen.has(row.path)) continue;
+    seen.add(row.path);
+    out.push(row);
+  }
+  return out;
+}
 function runKeyOf(target) {
   return `${target.workspaceId}/${target.configId}`;
 }
@@ -14781,12 +14802,16 @@ function aggregateStatus(statuses) {
   }
   return worst;
 }
+function readLostLines(from, chunk) {
+  return chunk.dropped && from <= chunk.next;
+}
 
 // src/runtime.ts
 var DEFAULT_MAX_LINES = 5e3;
 var MAX_PENDING_CHARS = 65536;
 function createRunRegistry(provideShell, options = {}) {
   const maxLines = options.maxLines ?? DEFAULT_MAX_LINES;
+  const trimSlack = Math.max(1, Math.floor(maxLines / 10));
   const sink = options.sink;
   const runs = /* @__PURE__ */ new Map();
   function record2(key) {
@@ -14830,10 +14855,10 @@ function createRunRegistry(provideShell, options = {}) {
   }
   function pushLine(run, line) {
     run.lines.push(line);
-    if (run.lines.length <= maxLines) return;
-    const drop = run.lines.length - maxLines;
-    run.lines.splice(0, drop);
-    run.base += drop;
+    const excess = run.lines.length - maxLines;
+    if (excess < trimSlack) return;
+    run.lines.splice(0, excess);
+    run.base += excess;
   }
   function drain(run) {
     try {
@@ -14966,12 +14991,14 @@ function createRunRegistry(provideShell, options = {}) {
       drain(run);
       return snapshotOf(run);
     },
+    /**
+     * 只读当前态，**不 drain**：输出由 250ms 的 pump 抽干，这里再抽一次是纯重复劳动——
+     * 客户端每秒调 1.25 次，每次都会为每个配置做一遍 `Buffer.concat`（O(保留窗口)）。
+     * 代价是这些字段最多旧 250ms，而客户端本来就是 800ms 轮询。
+     */
     snapshots() {
       const out = [];
-      for (const run of runs.values()) {
-        drain(run);
-        out.push(snapshotOf(run));
-      }
+      for (const run of runs.values()) out.push(snapshotOf(run));
       return out;
     },
     pump() {
@@ -15164,12 +15191,13 @@ function compileMatcher(spec) {
 }
 function filterLines(lines, state) {
   const out = [];
-  for (const line of lines) {
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
     const level = levelOf(line);
     if (state.levels[level] !== true) continue;
     const hit = state.matcher !== null && state.matcher.test(line);
     if (state.onlyMatch && state.matcher !== null && !hit) continue;
-    out.push({ line, level, hit });
+    out.push({ line, level, hit, index });
   }
   return out;
 }
@@ -15283,6 +15311,8 @@ export {
   STORAGE_PATH,
   aggregateStatus,
   apply,
+  availableWorkspaces,
+  basenameOf,
   buildLaunchConfig,
   cleanLine,
   compileMatcher,
@@ -15300,6 +15330,8 @@ export {
   parseSpringBootConfigurations,
   pickActiveConfig,
   plannedConfigName,
+  readLostLines,
   runKeyOf,
-  splitLines
+  splitLines,
+  uniqueTitle
 };

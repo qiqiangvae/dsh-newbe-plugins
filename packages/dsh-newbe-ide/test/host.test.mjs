@@ -133,7 +133,9 @@ test('history 读回落盘的日志：进程输出 → 落盘 → 重启后再�
   });
   service.start({ workspaceId: 'w1', configId: 'c1' });
   shell.started[0].proc.emit('hello\nworld\n');
-  service.runs(); // 一次 drain：入内存缓冲并落盘
+  // 用 read() 触发一次 drain：它按契约会采集（`runs()` 只读当前态、不再顺手 drain——真实宿主里
+  // 采集由 250ms 的 pump 负责，客户端每秒 1.25 次调 runs() 时重复采集是白烧 CPU）。
+  service.read({ workspaceId: 'w1', configId: 'c1', from: 0 });
 
   const history = service.history({ workspaceId: 'w1', configId: 'c1', tail: 100 });
   assert.deepEqual([...history.lines], ['hello', 'world']);

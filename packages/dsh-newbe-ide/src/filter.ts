@@ -59,6 +59,8 @@ export interface FilteredLine {
   level: RunLevel;
   /** 是否命中关键字（无关键字时恒为 false）。 */
   hit: boolean;
+  /** 该行在**入参数组**里的下标：渲染拿它算绝对序号（滑动窗口下标会整体前移，不能当 key）。 */
+  index: number;
 }
 
 export interface FilterState {
@@ -70,12 +72,13 @@ export interface FilterState {
 /** 过滤但不改动原数组，保持原顺序；无关键字时 onlyMatch 不生效。 */
 export function filterLines(lines: readonly string[], state: FilterState): FilteredLine[] {
   const out: FilteredLine[] = [];
-  for (const line of lines) {
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
     const level = levelOf(line);
     if (state.levels[level] !== true) continue;
     const hit = state.matcher !== null && state.matcher.test(line);
     if (state.onlyMatch && state.matcher !== null && !hit) continue;
-    out.push({ line, level, hit });
+    out.push({ line, level, hit, index });
   }
   return out;
 }

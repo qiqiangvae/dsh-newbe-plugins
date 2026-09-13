@@ -1,6 +1,6 @@
 {
   "name": "dsh-newbe-ide",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "IDE panel for DeepSeek Harness: launch configurations per workspace, start/stop, logs kept inside the browser",
   "license": "MIT",
   "repository": {

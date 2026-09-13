@@ -160,6 +160,44 @@ export function pickActiveConfig(project: ProjectEntry, preferredId: string): La
   return remembered ?? project.configs[0];
 }
 
+/** 路径末段，用作"任意路径"新建项目配置时的默认标题（空路径返回空串）。 */
+export function basenameOf(path: string): string {
+  const parts = path.replace(/[/\\]+$/, '').split(/[/\\]/).filter((x) => x !== '');
+  return parts.length === 0 ? path : parts[parts.length - 1];
+}
+
+/**
+ * 同名标题自动让路：`kun-ai` → `kun-ai (2)` → `kun-ai (3)`。
+ * 同一路径可以有多条项目配置，而一级 tab 只显示标题 + 配置数——不去重就是两个一模一样的 tab。
+ */
+export function uniqueTitle(base: string, taken: readonly string[]): string {
+  if (!taken.includes(base)) return base;
+  for (let n = 2; ; n += 1) {
+    const candidate = `${base} (${n})`;
+    if (!taken.includes(candidate)) return candidate;
+  }
+}
+
+/**
+ * 新增卡片要列出的 DSH 工作区：按**路径**排除已经有项目配置的那些，列表内再按路径去重。
+ *
+ * 判重只能用路径：项目配置的 `id` 是它自己的（与工作区 id 无关），同路径可以有多条、
+ * id 各不相同——按 id 比就是当年那个"存的是旧工作区 id"的坑（已加入的项目又被列成可加入）。
+ */
+export function availableWorkspaces(
+  registry: readonly z.infer<typeof ideProjectViewSchema>[],
+  usedPaths: readonly string[],
+): z.infer<typeof ideProjectViewSchema>[] {
+  const seen = new Set(usedPaths);
+  const out: z.infer<typeof ideProjectViewSchema>[] = [];
+  for (const row of registry) {
+    if (seen.has(row.path)) continue;      // 已有项目配置占了这个路径
+    seen.add(row.path);                     // 同一个路径在注册表里登记了多次 → 只留第一条
+    out.push(row);
+  }
+  return out;
+}
+
 /** 一条启动配置的进程键：宿主与客户端必须用同一种拼法。 */
 export function runKeyOf(target: RunTarget): string {
   return `${target.workspaceId}/${target.configId}`;

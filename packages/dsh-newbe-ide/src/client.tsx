@@ -19,6 +19,8 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  availableWorkspaces,
+  basenameOf,
   defaultState,
   ideaDiscoveryRequestSchema,
   ideaDiscoverySchema,
@@ -27,6 +29,7 @@ import {
   logHistorySchema,
   DEFAULT_HISTORY_LINES,
   pickActiveConfig,
+  uniqueTitle,
   ideStateSchema,
   runKeyOf,
   runReadRequestSchema,
@@ -49,7 +52,7 @@ import {
 } from './schema.js';
 import { isSecretName } from './lines.js';
 import { buildLaunchConfig, plannedConfigName } from './ideaconfig.js';
-import { aggregateStatus, formatUptime } from './rundisplay.js';
+import { aggregateStatus, formatUptime, readLostLines } from './rundisplay.js';
 import { DEFAULT_LEVELS, LEVELS, compileMatcher, filterLines, type RunLevel } from './filter.js';
 
 export const NS = 'dsh-newbe-ide';
@@ -206,6 +209,10 @@ function ensureStyles(): () => void {
 .ide-cardrow .ide-name{font-weight:600;cursor:pointer;flex:none;max-width:9.5em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ide-cardrow .ide-note{flex:none;white-space:nowrap}
 .ide-cardrow .ide-btn{flex:none;white-space:nowrap;padding:2px 9px}
+.ide-addpath{display:flex;align-items:center;gap:6px}
+.ide-addpath .ide-field{flex:1;min-width:0}
+.ide-addlist{display:flex;flex-direction:column;gap:6px;max-height:224px;overflow:auto}
+.ide-addcard .ide-name{max-width:15em}
 .ide-cardrow .ide-last{flex:1;min-width:0;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;color:var(--dsw-alias-label-secondary,#697586);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ide-body{display:flex;flex-direction:column;flex:1;min-height:0;padding:12px 16px;gap:10px;overflow:auto}
 /* 视图要填满面板：滚动交给日志区自己，其余不滚 */
@@ -221,6 +228,8 @@ function ensureStyles(): () => void {
 .ide-btn[data-kind=primary]{background:var(--dsw-alias-brand-primary,#3370ff);border-color:transparent;color:#fff}
 .ide-btn[data-kind=danger]:hover{color:var(--dsw-alias-state-error-primary,#d83931);border-color:var(--dsw-alias-state-error-primary,#d83931)}
 .ide-btn:disabled{opacity:.5;cursor:default}
+/* data-on = 按钮处于「已按下 / 已开启」态（⚙ 配置展开、日志跟随暂停）。此前只有属性没有样式，等于没反馈。 */
+.ide-btn[data-on=true]{background:var(--dsw-alias-interactive-bg-hover,rgba(51,112,255,.12));border-color:var(--dsw-alias-brand-primary,#3370ff);color:var(--dsw-alias-brand-primary,#3370ff)}
 .ide-field{background:var(--dsw-alias-bg-module-platform,#fff);border:1px solid var(--dsw-alias-border-l2,#d9dce1);border-radius:7px;padding:5px 9px;font:inherit;font-size:12px;color:var(--dsw-alias-label-primary,#1f2329);outline:none}
 .ide-field:focus{border-color:var(--dsw-alias-brand-primary,#3370ff)}
 .ide-mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
@@ -229,6 +238,9 @@ function ensureStyles(): () => void {
 .ide-warn{border:1px dashed var(--dsw-alias-state-warn-primary,#e7a100);color:var(--dsw-alias-state-warn-primary,#e7a100);border-radius:8px;padding:7px 10px;font-size:12px}
 .ide-err{color:var(--dsw-alias-state-error-primary,#d83931);font-size:12px}
 .ide-logbox{display:flex;flex-direction:column;gap:4px;flex:1;min-height:0}
+.ide-logfoot{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.ide-logstats{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.ide-logfoot .ide-btn{flex:none}
 .ide-log{flex:1;min-height:120px;overflow:auto;background:rgba(128,128,128,.10);border:1px solid var(--dsw-alias-border-l2,#d9dce1);border-radius:9px;padding:8px 10px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;line-height:1.5;white-space:pre-wrap;word-break:break-all}
 .ide-card{border:1px solid var(--dsw-alias-border-l2,#d9dce1);border-radius:9px;background:var(--dsw-alias-bg-module-platform,#fff);padding:10px 12px;display:flex;flex-direction:column;gap:8px}
 .ide-cardhead{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
@@ -244,6 +256,16 @@ function ensureStyles(): () => void {
 .ide-master{display:flex;flex:none;max-height:240px;overflow:hidden;border:1px solid var(--dsw-alias-border-l2,#d9dce1);border-radius:10px;background:var(--dsw-alias-bg-module-platform,#fff)}
 .ide-mlist{width:224px;flex:none;display:flex;flex-direction:column;gap:2px;padding:8px;overflow:auto;border-right:1px solid var(--dsw-alias-border-l2,#d9dce1)}
 .ide-mhead{padding:2px 6px 6px;min-width:0}
+.ide-mheadtop{display:flex;align-items:center;gap:6px;min-width:0}
+.ide-mheadtop .ide-title{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ide-mheadtop .ide-btn{flex:none;padding:2px 9px}
+/* 折叠后的紧凑行：一行放"这条配置是谁 + 能干什么"，高度让给日志 */
+/* flex:1 是必须的：.ide-master 是横向 flex 容器，子元素默认 flex:0 1 auto ⇒ 宽度只等于内容宽，
+   里面的 spacer 撑不开、按钮就到不了最右（展开态没这个问题，因为 .ide-detail 有 flex:1）。 */
+.ide-foldrow{flex:1;display:flex;align-items:center;gap:8px;padding:6px 11px;min-width:0}
+.ide-foldrow .ide-btn{flex:none;padding:2px 9px}
+.ide-mdot-title{display:flex;align-items:center;gap:7px;min-width:0;cursor:default}
+.ide-foldrow .ide-mname{max-width:18em}
 .ide-mpath{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ide-mitem{display:flex;align-items:center;gap:7px;width:100%;padding:6px 7px;border:1px solid transparent;border-radius:7px;background:none;font:inherit;font-size:12px;color:inherit;text-align:left;cursor:pointer;min-width:0}
 .ide-mitem:hover{background:var(--dsw-alias-interactive-bg-hover,rgba(0,0,0,.07))}
@@ -315,13 +337,15 @@ function describeRun(run: RunSnapshot | undefined): string {
   return `已退出（码 ${run.exitCode ?? '?'}）`;
 }
 
-function activeOf(config: IdeState, projects: IdeProjectView[], activeProjectId: string) {
-  const registryKnown = projects.length > 0;
-  const isRegistered = (workspaceId: string) => projects.some((w) => w.workspaceId === workspaceId);
-  const registered = registryKnown ? config.projects.filter((p) => isRegistered(p.workspaceId)) : config.projects;
-  const stale = registryKnown ? config.projects.filter((p) => !isRegistered(p.workspaceId)) : [];
-  const active = registered.find((p) => p.workspaceId === activeProjectId) ?? registered[0];
-  return { registryKnown, registered, stale, active };
+/**
+ * 选出当前项目配置。**不再看 DSH 工作区注册表**：项目配置和注册表已经解耦
+ * （任意路径都能建、同一路径可以有多条），"不在注册表里"是常态而不是异常——
+ * 旧实现据此隐藏 tab 并弹警告，等于把自定义路径的项目判成二等公民。
+ */
+function activeOf(config: IdeState, activeProjectId: string) {
+  const projects = config.projects;
+  const active = projects.find((p) => p.workspaceId === activeProjectId) ?? projects[0];
+  return { projects, active };
 }
 
 /* ------------------------------------------------------------------ *
@@ -342,6 +366,12 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
   const [activeProjectId, setActiveProjectId] = useState('');
   const [runs, setRuns] = useState<Record<string, RunSnapshot>>({});
   const [logLines, setLogLines] = useState<string[]>([]);
+  /**
+   * 缓冲首行的**绝对序号**：滑动窗口里行的身份只能靠它——下标会整体前移，
+   * 拿下标当 React key 会让每次追加都把复用节点全部改写一遍。
+   * （第 2 步会把这里的客户端计数换成宿主给的 `base`，届时跨分页也稳定。）
+   */
+  const [seqBase, setSeqBase] = useState(0);
   const [truncated, setTruncated] = useState(false);
   const [error, setError] = useState('');
   const [filterQ, setFilterQ] = useState('');
@@ -360,13 +390,47 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
   const tabRowRef = useRef<HTMLDivElement | null>(null);
   const [discovery, setDiscovery] = useState<IdeaDiscovery | null>(null);
   const [discoveryBusy, setDiscoveryBusy] = useState(false);
-  const offsetRef = useRef(0);
+  /**
+   * 每个启动配置自己的读取偏移（键 = runKey）。
+   * 以前是一个全局 ref、切配置就归零：切回来时只要宿主 ring 已经滚过，就会整段重发（最多 5,000 行 ≈ 728KB）。
+   */
+  const offsetsRef = useRef<Map<string, number>>(new Map());
+  /** logLines 的镜像：读缓冲时要拿到"当前值"而不是 updater 里的闭包值（副作用不能写在 updater 里）。 */
+  const logLinesRef = useRef<string[]>([]);
+  /** following 的镜像：tick 是同一个闭包，读 state 会读到旧值。 */
+  const followingRef = useRef(true);
+  /** 上一次观察到的 scrollTop：用来区分「用户往下滚」与「布局变化把 scrollTop 夹小了」。 */
+  const lastTopRef = useRef(0);
+  /** 上一轮 runs() 的签名：没变就不 setState，免掉"零输出也整面板重渲染"。 */
+  const runsSigRef = useRef('');
+  /** 轮询 effect 只依赖 runKey，所以目标配置要从这里取（见该 effect 的依赖注释）。 */
+  const targetRef = useRef<RunTarget | null>(null);
   const logRef = useRef<HTMLDivElement | null>(null);
   const historyTriedRef = useRef(false);
+  /**
+   * 本次运行**有没有读到过实时行**。历史兜底只能服务于"这一代进程从没产出过"，
+   * 不能用"上一次读取没拿到新行"当条件——那还包括"我已经追平、进程这几百毫秒没吐东西"，
+   * 照那个条件会把已经拿到的实时行整段换成磁盘历史（曾经就这么干过）。
+   */
+  const sawLiveRef = useRef(false);
   /** 当前缓冲里显示的是上一次运行的输出（本进程一旦有输出就让位）。 */
   const fromHistoryRef = useRef(false);
-  /** 是否贴底：由 scroll 事件维护。追加后量高度会把"一次涌入多行"误判成用户上滚。 */
-  const pinnedRef = useRef(true);
+  /**
+   * 是否跟随最新日志。以前是一个看不见的 ref（贴底 80px 内自动跟随），用户没有任何控制权，
+   * 也没有"暂停期间积了多少行"的概念；现在它是显式状态：上滚即暂停、回到底部即恢复、
+   * 「跟随/暂停」按钮可以主动冻结，暂停时日志底部的按钮告诉你积压了多少行。
+   */
+  const [following, setFollowing] = useState(true);
+  /** 暂停以来新到的行数（点「跳到最新」归零）。 */
+  const [pendingLines, setPendingLines] = useState(0);
+  /**
+   * 控制区是否折叠成一行。**面板级**（切配置保持折叠——折叠的动机是"给日志腾地方"，
+   * 与看哪条配置无关；按配置记会让日志区忽高忽低），**视图本地**（刷新即恢复展开）。
+   */
+  const [folded, setFolded] = useState(false);
+  /** 新增卡片里"任意路径"输入框的内容。 */
+  const [newPath, setNewPath] = useState('');
+  followingRef.current = following;
   /** 运行代次：重启后自增，用来丢弃上一代进程还在飞的读取结果。 */
   const genRef = useRef(0);
   const tickRef = useRef(0);
@@ -374,11 +438,14 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
   /** 局部选中项：切换启动配置只动这里，不等磁盘回读（回读会把它盖回去）。 */
   const [activeConfigIds, setActiveConfigIds] = useState<Record<string, string>>({});
   const cfg: IdeState = config ?? defaultState();
-  const { registered, stale, active } = activeOf(cfg, projects, activeProjectId);
+  const { projects: entries, active } = activeOf(cfg, activeProjectId);
   const activeConfig = active !== undefined ? pickActiveConfig(active, activeConfigIds[active.workspaceId] ?? '') : undefined;
   const runKey = active !== undefined && activeConfig !== undefined
     ? runKeyOf({ workspaceId: active.workspaceId, configId: activeConfig.id })
     : '';
+  targetRef.current = active !== undefined && activeConfig !== undefined
+    ? { workspaceId: active.workspaceId, configId: activeConfig.id }
+    : null;
   const runState = runKey !== '' ? runs[runKey] : undefined;
   const runText = describeRun(runState);
   /**
@@ -391,7 +458,11 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
     () => filterLines(logLines, { matcher, onlyMatch, levels }),
     [logLines, matcher, onlyMatch, levels],
   );
-  const shown = filtered.length > RENDER_LIMIT ? filtered.slice(filtered.length - RENDER_LIMIT) : filtered;
+  // 每一帧都重算一次 2,000 槽的切片是白花：只在过滤结果变了才重切。
+  const shown = useMemo(
+    () => (filtered.length > RENDER_LIMIT ? filtered.slice(filtered.length - RENDER_LIMIT) : filtered),
+    [filtered],
+  );
 
   const applyLoad = useCallback((load: IdeLoad) => {
     setConfig(load.config);
@@ -418,14 +489,18 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
   }, [api, applyLoad]);
 
   // 日志按启动配置分家：切换配置就清空缓冲，否则会把上一条的输出串过来。
+  // **偏移不在这里清**——它按配置各记一份，切回来接着上次的位置读（见 offsetsRef）。
   useEffect(() => {
-    offsetRef.current = 0;
     genRef.current += 1;
-    pinnedRef.current = true;
+    setFollowing(true);
+    setPendingLines(0);
     historyTriedRef.current = false;
+    sawLiveRef.current = false;
     fromHistoryRef.current = false;
+    logLinesRef.current = [];
     setFromHistory(false);
     setTruncated(false);
+    setSeqBase(0);
     setLogLines([]);
   }, [runKey]);
 
@@ -438,8 +513,8 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
     if (api === undefined) return;
     // 注意：不能因为"没选配置"就整个不轮询——总览卡片与一级 tab 的状态点、端口、
     // 时长、最后一行都来自 runs()，刚加进来还没建配置的项目正是这种情况。
-    const hasTarget = runKey !== '' && active !== undefined && activeConfig !== undefined;
-    const target = hasTarget ? { workspaceId: active.workspaceId, configId: activeConfig.id } : null;
+    const hasTarget = runKey !== '' && targetRef.current !== null;
+    const target = hasTarget ? targetRef.current : null;
     let stopped = false;
     const tick = async () => {
       const gen = genRef.current; // 这一轮属于哪一代
@@ -448,36 +523,62 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
         const map: Record<string, RunSnapshot> = {};
         for (const item of list) map[item.key] = item;
         if (stopped || genRef.current !== gen) return;
-        setRuns(map);
+        // 每 tick 塞一个新对象会让整个面板在**零输出**时也重渲染（空转的 800ms 一次）。
+        // 用一个廉价签名挡掉：只有状态/端口/时长/最后一行真的变了才 setState。
+        const signature = list
+          .map((s) => `${s.key}|${s.status}|${s.exitCode}|${s.port}|${s.startedAtMs}|${s.lossy}|${s.error}|${s.lastLine}`)
+          .join('\n');
+        if (signature !== runsSigRef.current) {
+          runsSigRef.current = signature;
+          setRuns(map);
+        }
         if (tickRef.current % CONFIG_REFRESH_EVERY === 0) void reload();
         tickRef.current += 1;
-        if (target === null) return;
-        const chunk = envelopeValue(await api.read({ ...target, from: offsetRef.current }), '读取日志') as RunRead;
+        if (target === null || runKey === '') return;
+        const from = offsetsRef.current.get(runKey) ?? 0;
+        const chunk = envelopeValue(await api.read({ ...target, from }), '读取日志') as RunRead;
         if (stopped || genRef.current !== gen) return;
-        offsetRef.current = chunk.next;
-        if (chunk.dropped) setTruncated(true);
+        offsetsRef.current.set(runKey, chunk.next);
+        // "丢了早期行"要分清：重启后的重新同步（from > next）一行没丢，别冤枉自己。
+        const lost = readLostLines(from, chunk);
+        if (lost) setTruncated(true);
         if (chunk.lines.length > 0) {
-          setLogLines((prev) => {
-            // 历史与本次运行不能混在一个缓冲里：本进程的第一行到达时，历史整段让位。
-            const merged = [...(fromHistoryRef.current ? [] : prev), ...chunk.lines];
-            if (fromHistoryRef.current) {
-              fromHistoryRef.current = false;
-              setFromHistory(false);
-            }
-            if (merged.length <= LOG_LIMIT) return merged;
+          // 历史与本次运行不能混在一个缓冲里：本进程的第一行到达时，历史整段让位。
+          const droppingHistory = fromHistoryRef.current;
+          const merged = [...(droppingHistory ? [] : logLinesRef.current), ...chunk.lines];
+          const over = merged.length - LOG_LIMIT;
+          const next = over > 0 ? merged.slice(over) : merged;
+          // 副作用全在 updater 外面：React 可能重复调用更新函数（StrictMode 下必然），
+          // 写在里面就会重复 setFromHistory/setTruncated。
+          if (droppingHistory) {
+            fromHistoryRef.current = false;
+            setFromHistory(false);
+            setSeqBase(0);                  // 历史整段让位：序号从本进程第一行重新起算
+            // 丢弃标记同时**重算**：旧标记讲的是历史那一段（"只取了最近一段"），
+            // 与实时流无关——不重算就会在实时视图里显示"早期部分已丢弃"，而其实一行没丢。
+            setTruncated(lost || over > 0);
+          } else if (over > 0 || lost) {
             setTruncated(true);
-            return merged.slice(merged.length - LOG_LIMIT);
-          });
-        } else if (!historyTriedRef.current) {
-          // 本次进程没有输出 → 把上次运行落盘的尾巴捞回来（DSH 重启后仍能看上次为什么挂的）。
+            if (over > 0) setSeqBase((base) => base + over);   // 丢掉最老的 over 行，缓冲首行的序号往后挪
+          }
+          logLinesRef.current = next;
+          sawLiveRef.current = true;
+          // 暂停中不打扰用户，但要如实记账：攒了多少行，按钮上直接显示。
+          if (!followingRef.current) setPendingLines((n) => n + chunk.lines.length);
+          setLogLines(next);
+        } else if (!historyTriedRef.current && !sawLiveRef.current) {
+          // **这一代进程从未产出过**（不是"这一次没读到新行"）→ 把上次运行落盘的尾巴捞回来
+          // （DSH 重启后仍能看上次为什么挂的）。追平后进程安静几百毫秒不该触发这一支。
           historyTriedRef.current = true;
           const history = envelopeValue(await api.history({ ...target, tail: DEFAULT_HISTORY_LINES }), '读取历史日志') as LogHistory;
           if (stopped || genRef.current !== gen) return;
           if (history.lines.length > 0) {
+            logLinesRef.current = history.lines;
             setLogLines(history.lines);
             setHistoryPath(history.path);
             fromHistoryRef.current = true;
             setFromHistory(true);
+            setSeqBase(0);
             if (history.truncated) setTruncated(true);
           }
         }
@@ -488,7 +589,10 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
     void tick();
     const timer = window.setInterval(() => { void tick(); }, POLL_MS);
     return () => { stopped = true; window.clearInterval(timer); };
-  }, [api, runKey, active, activeConfig, reload]);
+    // 依赖只放**稳定值**：`active`/`activeConfig` 是每次 reload() 都会换身份的对象，
+    // 挂在依赖里会让这个 effect 每 2.4s 重挂一次，而重挂会立刻多打一发 tick
+    // （实测空转 10s：19 次 runs 而不是 12.5 次）。目标配置从 ref 取。
+  }, [api, runKey, reload]);
 
   // tab 条横向滑动：滚轮 / 触控板横滑 + 按住拖动（主流 IDE 的做法）。
   // 用原生监听而不是 onWheel：React 的 wheel 是被动监听，preventDefault 不生效。
@@ -538,12 +642,12 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
     }
   }, [activeProjectId, overview, onlyRunning]);
 
-  // 贴底就跟随到底；用户上滚（scroll 事件把 pinned 置 false）后不再打扰他。
+  // 跟随中就把视图钉在最底；暂停后（用户上滚或按了暂停）不再打扰他。
   useEffect(() => {
     const el = logRef.current;
-    if (el === null || !pinnedRef.current) return;
+    if (el === null || !following) return;
     el.scrollTop = el.scrollHeight;
-  }, [logLines]);
+  }, [logLines, following]);
 
   /**
    * 写入配置：先本地生效（乐观），再落盘并以宿主返回的状态为准。
@@ -578,22 +682,14 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
     setActiveConfigIds((prev) => ({ ...prev, [active.workspaceId]: configId }));
   };
 
-  const available = projects.filter((p) => !cfg.projects.some((entry) => entry.workspaceId === p.workspaceId));
+  /**
+   * 快捷列表：按**路径**排除已经有项目配置的工作区，并在列表内按路径去重。
+   * 只在"列表展示"这一层去重——数据层仍允许同一路径建多条（用下面的任意路径输入框）。
+   */
+  const registryPaths = availableWorkspaces(projects, entries.map((p) => p.path));
   const statusOfProject = (project: ProjectEntry) =>
     aggregateStatus(project.configs.map((c) => runs[runKeyOf({ workspaceId: project.workspaceId, configId: c.id })]?.status ?? 'idle'));
-  const visibleProjects = registered.filter((p) => !p.hidden && (!onlyRunning || statusOfProject(p) === 'running'));
-
-  /** 「添加项目」控件只有这一份实现，两处用不同标签调用（tab 行与配置块）。 */
-  const addProjectControl = (label: string) => {
-    if (!projects.length) return <span className="ide-note">DSH 工作区注册表暂不可用</span>;
-    if (available.length === 0) return <span className="ide-note">所有工作区都已加入</span>;
-    return (
-      <select className="ide-field" value="" onChange={(event) => { if (event.target.value !== '') addProject(event.target.value); }}>
-        <option value="">{label}（{available.length}）</option>
-        {available.map((p) => <option key={p.workspaceId} value={p.workspaceId}>{p.title} · {p.path}</option>)}
-      </select>
-    );
-  };
+  const visibleProjects = entries.filter((p) => !p.hidden && (!onlyRunning || statusOfProject(p) === 'running'));
 
   const visibleKey = visibleProjects.map((p) => p.workspaceId).join('|');
   // 选中的项目被过滤掉时（收起、或"只看运行中"把它滤掉），body 不能还停在它上面：
@@ -607,6 +703,23 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
 
   const setHidden = (workspaceId: string, hidden: boolean) => {
     void commit(patchProject(cfg, workspaceId, (p) => ({ ...p, hidden })), false);
+  };
+
+  /**
+   * 清空日志**视图**（终端 `clear` 的语义）：宿主缓冲与磁盘上的日志文件都不动，
+   * 所以"上次为什么挂"仍在，刷新页面也还能重新读到宿主缓冲里的内容。
+   * 不动偏移（偏移继续往后走，新行照常追加），也不让编号倒退。
+   */
+  const clearLogView = () => {
+    setSeqBase(seqBase + logLinesRef.current.length);   // 编号接着往下走，清空后不倒退
+    logLinesRef.current = [];
+    // 别让接下来那次"读取返回 0 行"把磁盘历史又灌回空视图（历史兜底只服务"这一代从没产出过"）。
+    historyTriedRef.current = true;
+    fromHistoryRef.current = false;
+    setFromHistory(false);
+    setTruncated(false);
+    setPendingLines(0);
+    setLogLines([]);
   };
 
   /**
@@ -625,12 +738,23 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
     if (onlyRunning && statusOfProject(project) !== 'running') setOnlyRunning(false);
   };
 
-  const addProject = (workspaceId: string) => {
-    const source = projects.find((p) => p.workspaceId === workspaceId);
-    if (source === undefined) return;
-    const entry: ProjectEntry = { workspaceId: source.workspaceId, path: source.path, title: source.title, configs: [], activeConfigId: '', hidden: false };
-    setActiveProjectId(source.workspaceId);
-    void commit({ ...cfg, activeWorkspaceId: source.workspaceId, projects: [...cfg.projects, entry] }, false);
+  /**
+   * 新建一条**项目配置**：只认路径 + 标题，跟 DSH 工作区没有绑定关系
+   * （`workspaceId` 字段从此只是这条记录自己的 id）。同一路径可以建多条。
+   */
+  const addProjectConfig = (path: string, title: string) => {
+    const trimmed = path.trim();
+    if (trimmed === '') return;
+    const entry: ProjectEntry = {
+      workspaceId: `p${crypto.randomUUID()}`,
+      path: trimmed,
+      title: uniqueTitle(title.trim() === '' ? basenameOf(trimmed) : title.trim(), cfg.projects.map((p) => p.title)),
+      configs: [],
+      activeConfigId: '',
+      hidden: false,
+    };
+    setActiveProjectId(entry.workspaceId);
+    void commit({ ...cfg, activeWorkspaceId: entry.workspaceId, projects: [...cfg.projects, entry] }, false);
   };
 
   const removeProject = (workspaceId: string) => {
@@ -738,14 +862,23 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
     setError('');
     try {
       const startedViewedOne = explicit === undefined || runKey === runKeyOf(explicit);
+      const startedKey = runKeyOf(target);
+      if (action === 'start') {
+        // 宿主在 start 时把该配置的缓冲归零，所以这条配置的偏移必须跟着归零
+        // （哪怕启动的不是当前正在看的那条——否则下次切过去会拿着一代前的偏移）。
+        offsetsRef.current.set(startedKey, 0);
+      }
       if (action === 'start' && startedViewedOne) {
         genRef.current += 1; // 让上一代在飞的读取结果失效
-        offsetRef.current = 0;
-        pinnedRef.current = true;
+        setFollowing(true);
+        setPendingLines(0);
         historyTriedRef.current = true; // 新进程的输出从零开始，不再补历史
+        sawLiveRef.current = false;
         fromHistoryRef.current = false;
         setFromHistory(false);
         setTruncated(false);
+        logLinesRef.current = [];
+        setSeqBase(0);
         setLogLines([]);
       }
       const call = action === 'start' ? api.start(target) : api.stop(target);
@@ -811,24 +944,21 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
                   </span>
                 </li>
               ))}
-              {cfg.projects.length === 0 ? <li className="ide-note">还没有项目</li> : null}
+              {cfg.projects.length === 0 ? <li className="ide-note">还没有项目配置</li> : null}
             </ul>
           </details>
-          {addProjectControl('＋ 添加项目')}
         </span>
       </div>
 
       <div className="ide-body ide-fill">
         {warning !== '' ? <div className="ide-warn">{warning}</div> : null}
         {error !== '' ? <div className="ide-err">{error}</div> : null}
-        {stale.length > 0 ? (
-          <div className="ide-warn">
-            有 {stale.length} 个项目的 DSH 工作区已不存在，其 tab 已隐藏（启动配置仍保留）：{stale.map((p) => p.title).join('、')}
-          </div>
-        ) : null}
 
         {overview ? (
           <div className="ide-board">
+            {/* 新增卡片：加项目只在这里做（tab 行的 ＋ 与配置块里的那行都删了）。
+                排在项目卡片之后，加完留在总览——新卡片当场出现在这排里。 */}
+
             {cfg.projects.map((p) => (
               <div className="ide-card" key={p.workspaceId}>
                 <div className="ide-cardhead">
@@ -837,9 +967,11 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
                   {p.hidden ? <span className="ide-note">已收起</span> : null}
                   <span style={{ flex: 1 }} />
                   <span className="ide-note">{p.configs.length} 条配置</span>
+                  {/* 「打开」= 进这个项目配置的面板：0 配置的卡片过去没有任何可点入口（死胡同） */}
+                  <button type="button" className="ide-btn" onClick={() => revealProject(p.workspaceId)}>打开</button>
                 </div>
                 <div className="ide-note ide-mono">{p.path}</div>
-                {p.configs.length === 0 ? <div className="ide-note">这个项目还没有启动配置</div> : null}
+                {p.configs.length === 0 ? <div className="ide-note">还没有启动配置 —— 点右上角「打开」进去加第一条</div> : null}
                 {p.configs.map((c) => {
                   const snapshot = runs[runKeyOf({ workspaceId: p.workspaceId, configId: c.id })];
                   return (
@@ -862,20 +994,99 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
                 })}
               </div>
             ))}
+
+            <div className="ide-card ide-addcard">
+              <div className="ide-cardhead">
+                <span className="ide-title">＋ 添加项目配置</span>
+                <span style={{ flex: 1 }} />
+                <span className="ide-note">同一路径可以建多条</span>
+              </div>
+
+              {/* 任意路径：不是所有项目都在 DSH 工作区里，所以这里只收一个路径字符串，不校验存在性 */}
+              <div className="ide-addpath">
+                <input
+                  className="ide-field ide-mono"
+                  placeholder="/任意/路径（不限于 DSH 工作区）"
+                  value={newPath}
+                  onChange={(e) => setNewPath(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') { addProjectConfig(newPath, ''); setNewPath(''); }
+                  }}
+                />
+                <button
+                  type="button"
+                  className="ide-btn"
+                  data-kind="primary"
+                  disabled={newPath.trim() === ''}
+                  onClick={() => { addProjectConfig(newPath, ''); setNewPath(''); }}
+                >
+                  添加
+                </button>
+              </div>
+
+              {registryPaths.length === 0 ? (
+                projects.length === 0 ? null : (
+                  <div className="ide-note">DSH 工作区都已有项目配置——同一路径想再建一条，用上面的输入框</div>
+                )
+              ) : (
+                <>
+                  <div className="ide-note">或从 DSH 工作区里挑（{registryPaths.length} 个）</div>
+                  <div className="ide-addlist">
+                    {registryPaths.map((p) => (
+                      <div className="ide-cardrow" key={p.path}>
+                        <span className="ide-name" title={p.path}>{p.title}</span>
+                        <span style={{ flex: 1 }} />
+                        <button type="button" className="ide-btn" onClick={() => addProjectConfig(p.path, p.title)}>加入</button>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         ) : active === undefined ? (
           <div className="ide-empty">
-            <div>还没有项目</div>
-            <div className="ide-note">从右上角「＋ 添加项目」里挑一个 DSH 工作区</div>
+            <div>还没有项目配置</div>
+            <div className="ide-note">打开上面的「总览」，在最下面那张卡片里填一个路径</div>
           </div>
         ) : (
           <>
             {/* 主从卡片：左列是这个项目的启动配置（多了就纵向滚），右列是选中那条的详情。
                 项目名与路径从原来的身份行挪进左列卡头——上面的一级 tab 里已经写过一遍项目名。 */}
-            <div className="ide-master">
+            <div className="ide-master" data-folded={folded}>
+              {folded ? (
+                <div className="ide-foldrow">
+                  <span className="ide-mdot-title" onDoubleClick={() => setFolded(false)} title="双击展开">
+                    <span className="ide-dot" data-state={runState?.status ?? 'idle'} />
+                    <span className="ide-mname">{activeConfig === undefined ? '（还没有启动配置）' : activeConfig.name}</span>
+                    {runState !== undefined && runState.port !== '' ? <span className="ide-port">:{runState.port}</span> : null}
+                    {isRunning(runState?.status) ? <span className="ide-note">{formatUptime(runState?.startedAtMs ?? 0, Date.now())}</span> : null}
+                    <span className="ide-note">{activeConfig === undefined ? '' : runText}</span>
+                  </span>
+                  <span style={{ flex: 1 }} />
+                  {activeConfig === undefined ? null : (
+                    <>
+                      {isRunning(runState?.status) ? (
+                        <button type="button" className="ide-btn" onClick={() => { void runAction('stop'); }}>停止</button>
+                      ) : (
+                        <button type="button" className="ide-btn" data-kind="primary" onClick={() => { void runAction('start'); }}>启动</button>
+                      )}
+                      <button type="button" className="ide-btn" disabled={runState?.status !== 'running'} onClick={() => { void (async () => { await runAction('stop'); await runAction('start'); })(); }}>重启</button>
+                    </>
+                  )}
+                  <button type="button" className="ide-btn" onClick={() => setFolded(false)} title="展开控制区">展开</button>
+                </div>
+              ) : (
+                <>
               <div className="ide-mlist">
                 <div className="ide-mhead">
-                  <div className="ide-title">{active.title}</div>
+                  <div className="ide-mheadtop">
+                    <span className="ide-title" title={active.title}>{active.title}</span>
+                    {/* ⚙ 配置挂在项目名这一行的**最右端**：与折叠行的按钮对齐成同一条竖线，
+                        免得折叠/展开时按钮位置左右横跳（配置编辑本来就是"这个项目的配置"）。 */}
+                    <span style={{ flex: 1 }} />
+                    <button type="button" className="ide-btn" data-on={editing} onClick={() => setEditing((v) => !v)}>⚙ 配置</button>
+                  </div>
                   <div className="ide-note ide-mono ide-mpath" title={active.path}>{active.path}</div>
                 </div>
                 {active.configs.map((c) => {
@@ -902,9 +1113,9 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
 
               {activeConfig === undefined ? (
                 <div className="ide-detail">
-                  <div className="ide-note">这个项目还没有启动配置 —— 点左列「＋ 启动配置」添加</div>
+                  <div className="ide-note">这个项目还没有启动配置 —— 点左列「＋ 启动配置」添加（⚙ 配置在左边项目名旁边）</div>
                   <div className="ide-dactions">
-                    <button type="button" className="ide-btn" data-on={editing} onClick={() => setEditing((v) => !v)}>⚙ 配置</button>
+                    <button type="button" className="ide-btn" onClick={() => setFolded(true)} title="折叠控制区，把高度让给日志">折叠</button>
                   </div>
                 </div>
               ) : (
@@ -913,7 +1124,7 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
                     <span className="ide-configtitle">{activeConfig.name}</span>
                     <span style={{ flex: 1 }} />
                     <span className="ide-note">{flash}</span>
-                    <button type="button" className="ide-btn" data-on={editing} onClick={() => setEditing((v) => !v)}>⚙ 配置</button>
+                    <button type="button" className="ide-btn" onClick={() => setFolded(true)} title="折叠控制区，把高度让给日志（双击紧凑行也能展开）">折叠</button>
                   </div>
 
                   {/* 指标块：状态直接复用 describeRun 的文案，免得"运行中/已退出（码 N）"有第二套说法 */}
@@ -978,6 +1189,8 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
                   </div>
                 </div>
               )}
+                </>
+              )}
             </div>
 
             {editing && active !== undefined ? (
@@ -994,7 +1207,7 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
                   >
                     {discoveryBusy ? '正在扫描…' : '从 IDEA 导入'}
                   </button>
-                  <button type="button" className="ide-btn" data-kind="danger" onClick={() => removeProject(active.workspaceId)}>移除项目</button>
+                  <button type="button" className="ide-btn" data-kind="danger" onClick={() => removeProject(active.workspaceId)}>移除项目配置</button>
                 </div>
 
                 {discovery !== null ? (
@@ -1101,13 +1314,6 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
                     </div>
                   </div>
                 )}
-
-                <div className="ide-toolbar">
-                  <span className="ide-note">添加项目</span>
-                  {addProjectControl('＋ 选择工作区')}
-                  <span style={{ flex: 1 }} />
-                  <span className="ide-note">存于 ~/.dsh/storages/dsh-newbe-ide.json（0600，不在项目目录里）</span>
-                </div>
               </div>
             ) : null}
 
@@ -1118,7 +1324,18 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
                   ref={logRef}
                   onScroll={(event) => {
                     const el = event.currentTarget;
-                    pinnedRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+                    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+                    const scrolledDown = el.scrollTop > lastTopRef.current;
+                    lastTopRef.current = el.scrollTop;
+                    if (!atBottom) {
+                      setFollowing(false);           // 上滚即暂停（不管是谁滚的）
+                    } else if (scrolledDown) {
+                      // 只有"真的往下滚到最底"才算恢复。布局变化（例如底栏换行让日志变矮）
+                      // 会把 scrollTop 夹小、也满足 atBottom，但 scrolledDown 为 false——
+                      // 早先就是这样把用户刚按下的"暂停"悄悄解掉的。
+                      setFollowing(true);
+                      setPendingLines(0);
+                    }
                   }}
                 >
                   {shown.length === 0
@@ -1129,16 +1346,61 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
                           : isRunning(runState?.status) ? '等待输出…' : '点「启动」运行这条启动配置'}
                       </span>
                     )
-                    : shown.map((row, index) => (
-                      <div key={index} className={(row.hit ? 'ide-hit ' : '') + 'ide-lv-' + row.level}>{row.line}</div>
+                    : shown.map((row) => (
+                      // key = 绝对序号（缓冲首行序号 + 该行在缓冲里的下标）。用数组下标当 key 时，
+                      // 滑动尾窗每追加一批就把所有复用节点各改一次文本（2,000 次/批）。
+                      <div key={seqBase + row.index} className={(row.hit ? 'ide-hit ' : '') + 'ide-lv-' + row.level}>{row.line}</div>
                     ))}
                 </div>
-                <div className="ide-note">
-                  显示 {shown.length} / 共 {filtered.length} 行（缓存 {logLines.length} 行）
-                  {fromHistory
-                    ? <span title={historyPath}>（含上次运行的输出{truncated ? '，只取了最近一段' : ''}）</span>
-                    : runState?.lossy === true || truncated ? '（输出过快或过长，早期部分已丢弃）' : ''}
-                  {filtered.length > RENDER_LIMIT ? `（仅渲染最近 ${RENDER_LIMIT} 行）` : ''}
+                <div className="ide-note ide-logfoot">
+                  <span className="ide-logstats">
+                    显示 {shown.length} / 共 {filtered.length} 行（缓存 {logLines.length} 行）
+                    {fromHistory
+                      ? <span title={historyPath}>（含上次运行的输出{truncated ? '，只取了最近一段' : ''}）</span>
+                      : runState?.lossy === true || truncated ? '（输出过快或过长，早期部分已丢弃）' : ''}
+                    {filtered.length > RENDER_LIMIT ? `（仅渲染最近 ${RENDER_LIMIT} 行）` : ''}
+                  </span>
+                  {/* 控件跟在统计文字后面靠左：右下角是桌宠的地盘（固定定位），放那儿会被盖住 */}
+                  <button
+                    type="button"
+                    className="ide-btn"
+                    data-on={!following}
+                    title={following
+                      ? '跟随最新日志；点一下冻结视图（也可以直接上滚）'
+                      : '已暂停；点一下恢复跟随并跳到最新'}
+                    onClick={() => {
+                      const next = !following;
+                      setFollowing(next);
+                      const el = logRef.current;
+                      if (next && el !== null) el.scrollTop = el.scrollHeight;
+                    }}
+                  >
+                    {following ? '跟随中' : '已暂停'}
+                  </button>
+                  {following ? null : (
+                    <button
+                      type="button"
+                      className="ide-btn"
+                      data-kind="primary"
+                      title="跳到最新日志并恢复跟随"
+                      onClick={() => {
+                        setPendingLines(0);
+                        setFollowing(true);
+                        const el = logRef.current;
+                        if (el !== null) el.scrollTop = el.scrollHeight;
+                      }}
+                    >
+                      {pendingLines > 0 ? `↓ 跳到最新（${pendingLines}）` : '↓ 跳到最新'}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="ide-btn"
+                    title="只清面板里的显示；宿主缓冲与磁盘上的日志文件都不动（刷新页面可重新读到）"
+                    onClick={clearLogView}
+                  >
+                    清空
+                  </button>
                 </div>
               </div>
             )}
