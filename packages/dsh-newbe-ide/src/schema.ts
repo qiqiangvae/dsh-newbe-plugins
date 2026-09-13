@@ -10,6 +10,14 @@ import { z } from 'zod';
 export const envVarSchema = z.object({
   name: z.string(),
   value: z.string(),
+  /**
+   * 值从哪来：`literal` 就是上面的 `value`；`credential` **忽略 value**，启动时由宿主按 `name`
+   * 去 DSH 凭据库取（`$DSH_HOME/.credentials.yaml`）。
+   *
+   * 必须带默认值：老文件没有这个字段（那时密钥是明文存在 `value` 里的），
+   * 缺字段会被整份判为损坏、用户的配置全丢。
+   */
+  from: z.enum(['literal', 'credential']).default('literal'),
 });
 
 /** 一条启动配置：名称 + 启动命令 + 工作目录 + 环境变量。 */
@@ -19,6 +27,8 @@ export const launchConfigSchema = z.object({
   command: z.string(),
   cwd: z.string(),
   envs: z.array(envVarSchema),
+  /** 最后一次是谁写的：面板（`human`）还是内置工具（`agent`）。老文件缺省视为人写的。 */
+  origin: z.enum(['human', 'agent']).default('human'),
 });
 
 /** 一个项目（= DSH 工作区）在面板里的条目。 */
@@ -144,6 +154,28 @@ export const logHistorySchema = z.object({
   path: z.string(),
 });
 
+/** 查一组变量在凭据库里的状态。**值不可能出现在这里**——`CredentialInfo` 本身没有装值的字段。 */
+export const secretQuerySchema = z.object({
+  names: z.array(z.string()),
+});
+
+export const secretStatusSchema = z.object({
+  name: z.string(),
+  /** 现在解析这个名字能不能拿到值。 */
+  configured: z.boolean(),
+  /** 当前这层能不能写（进程环境层只读，写进去也会被它盖住）。 */
+  writable: z.boolean(),
+  source: z.string(),
+});
+
+export const secretStatusListSchema = z.array(secretStatusSchema);
+
+/** 人在面板里填一个密钥值：宿主直接写进凭据库，值不回传、不落面板的存储文件。 */
+export const secretSetSchema = z.object({
+  name: z.string(),
+  value: z.string(),
+});
+
 /** 空配置：存储层与客户端面板共用的同一个值（宿主与浏览器都从这里取，避免两处各写一份）。 */
 export function defaultState(): IdeState {
   return { projects: [], activeWorkspaceId: '', showOverview: false };
@@ -219,3 +251,4 @@ export type LogHistoryRequest = z.infer<typeof logHistoryRequestSchema>;
 export type LogHistory = z.infer<typeof logHistorySchema>;
 export type IdeaCandidateView = z.infer<typeof ideaCandidateSchema>;
 export type IdeaDiscovery = z.infer<typeof ideaDiscoverySchema>;
+export type SecretStatus = z.infer<typeof secretStatusSchema>;

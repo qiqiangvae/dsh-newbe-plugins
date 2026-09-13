@@ -14531,14 +14531,24 @@ config(en_default());
 // src/schema.ts
 var envVarSchema = external_exports.object({
   name: external_exports.string(),
-  value: external_exports.string()
+  value: external_exports.string(),
+  /**
+   * 值从哪来：`literal` 就是上面的 `value`；`credential` **忽略 value**，启动时由宿主按 `name`
+   * 去 DSH 凭据库取（`$DSH_HOME/.credentials.yaml`）。
+   *
+   * 必须带默认值：老文件没有这个字段（那时密钥是明文存在 `value` 里的），
+   * 缺字段会被整份判为损坏、用户的配置全丢。
+   */
+  from: external_exports.enum(["literal", "credential"]).default("literal")
 });
 var launchConfigSchema = external_exports.object({
   id: external_exports.string(),
   name: external_exports.string(),
   command: external_exports.string(),
   cwd: external_exports.string(),
-  envs: external_exports.array(envVarSchema)
+  envs: external_exports.array(envVarSchema),
+  /** 最后一次是谁写的：面板（`human`）还是内置工具（`agent`）。老文件缺省视为人写的。 */
+  origin: external_exports.enum(["human", "agent"]).default("human")
 });
 var projectEntrySchema = external_exports.object({
   workspaceId: external_exports.string(),
@@ -14632,6 +14642,22 @@ var logHistorySchema = external_exports.object({
   lines: external_exports.array(external_exports.string()),
   truncated: external_exports.boolean(),
   path: external_exports.string()
+});
+var secretQuerySchema = external_exports.object({
+  names: external_exports.array(external_exports.string())
+});
+var secretStatusSchema = external_exports.object({
+  name: external_exports.string(),
+  /** 现在解析这个名字能不能拿到值。 */
+  configured: external_exports.boolean(),
+  /** 当前这层能不能写（进程环境层只读，写进去也会被它盖住）。 */
+  writable: external_exports.boolean(),
+  source: external_exports.string()
+});
+var secretStatusListSchema = external_exports.array(secretStatusSchema);
+var secretSetSchema = external_exports.object({
+  name: external_exports.string(),
+  value: external_exports.string()
 });
 function defaultState() {
   return { projects: [], activeWorkspaceId: "", showOverview: false };
@@ -14783,10 +14809,10 @@ function isSecretName(name2) {
 // src/rundisplay.ts
 function formatUptime(startedAtMs, nowMs) {
   if (startedAtMs <= 0 || nowMs <= startedAtMs) return "";
-  const seconds = Math.floor((nowMs - startedAtMs) / 1e3);
-  if (seconds < 60) return `${seconds}s`;
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ${seconds % 60}s`;
+  const seconds2 = Math.floor((nowMs - startedAtMs) / 1e3);
+  if (seconds2 < 60) return `${seconds2}s`;
+  const minutes = Math.floor(seconds2 / 60);
+  if (minutes < 60) return `${minutes}m ${seconds2 % 60}s`;
   return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
 }
 function parsePort(line) {
@@ -15122,8 +15148,8 @@ function parseSpringBootConfigurations(xml) {
       if (key === "") continue;
       const value = attribute(envTag, "value");
       const seen = envs.findIndex((entry) => entry.name === key);
-      if (seen >= 0) envs[seen] = { name: key, value };
-      else envs.push({ name: key, value });
+      if (seen >= 0) envs[seen] = { name: key, value, from: "literal" };
+      else envs.push({ name: key, value, from: "literal" });
     }
     const problems = [];
     if (module === "") problems.push("\u7F3A\u5C11\u6A21\u5757\u540D\uFF08<module>\uFF09");
@@ -15155,6 +15181,511 @@ function plannedConfigName(base, taken) {
   let index = 2;
   while (taken.includes(`${base} (${index})`)) index += 1;
   return `${base} (${index})`;
+}
+
+// src/skill.ts
+var IDE_SKILL_NAME = "ide-launch-config";
+var IDE_SKILL_DESCRIPTION = "\u628A\u67D0\u4E2A\u76EE\u5F55\u7684\u542F\u52A8\u65B9\u5F0F\u5199\u8FDB DSH IDE \u9762\u677F\u7684\u4E00\u6761\u542F\u52A8\u914D\u7F6E\uFF1A\u5B9A\u4F4D\u5DE5\u4F5C\u76EE\u5F55\u4E0E\u547D\u4EE4\u3001\u767B\u8BB0\u73AF\u5883\u53D8\u91CF\uFF08\u5BC6\u94A5\u53EA\u767B\u8BB0\u540D\u5B57\uFF09\uFF0C\u518D\u542F\u52A8\u4E00\u6B21\u9A8C\u8BC1\u3002\u7528\u6237\u8981\u628A\u67D0\u4E2A\u670D\u52A1\u6216\u76EE\u5F55\u8DD1\u8D77\u6765\u3001\u5ACC\u547D\u4EE4\u884C\u592A\u957F\u3001\u6216\u95EE\u67D0\u4E2A\u76EE\u5F55\u600E\u4E48\u542F\u52A8\u65F6\u7528\u5B83\u3002";
+var IDE_SKILL_BODY = `# \u628A\u76EE\u5F55\u914D\u6210 IDE \u9762\u677F\u91CC\u7684\u542F\u52A8\u914D\u7F6E
+
+IDE \u9762\u677F\uFF08\u4F1A\u8BDD\u89C6\u56FE\u7684 tab\u300CIDE\u300D\uFF09\u6309\u9879\u76EE\u7EC4\u7EC7**\u542F\u52A8\u914D\u7F6E**\uFF1A\u4E00\u6761 = \u540D\u79F0 + \u542F\u52A8\u547D\u4EE4 + \u5DE5\u4F5C\u76EE\u5F55 + \u73AF\u5883\u53D8\u91CF\u3002
+\u4EBA\u5728\u9762\u677F\u4E0A\u70B9\u300C\u542F\u52A8/\u505C\u6B62/\u91CD\u542F\u300D\uFF0C\u65E5\u5FD7\u7559\u5728\u9762\u677F\u91CC\u2014\u2014**\u65E5\u5FD7\u4E0D\u4F1A\u81EA\u52A8\u8FDB\u4F60\u7684\u4E0A\u4E0B\u6587**\u3002
+
+\u4F60\u7684\u6D3B\u662F\u628A\u914D\u7F6E**\u5199\u5BF9**\uFF1A\u627E\u5230\u771F\u6B63\u8BE5\u8DD1\u7684\u76EE\u5F55\u548C\u547D\u4EE4\uFF0C\u5199\u8FDB\u53BB\uFF0C\u542F\u52A8\u4E00\u6B21\u8BC1\u660E\u5B83\u80FD\u8DD1\u3002
+
+## \u4EC0\u4E48\u65F6\u5019\u52A8\u624B
+
+- \u7528\u6237\u8BF4"\u628A X \u8DD1\u8D77\u6765 / \u914D\u4E00\u4E0B X / \u5E2E\u6211\u52A0\u6761\u542F\u52A8\u914D\u7F6E / \u8FD9\u4E2A\u547D\u4EE4\u592A\u957F\u4E86"\u3002
+- \u7528\u6237\u6B63\u60F3\u8DD1\u67D0\u4E2A\u76EE\u5F55\uFF0C\u800C\u9762\u677F\u91CC\u8FD8\u6CA1\u6709\u5B83\u7684\u542F\u52A8\u914D\u7F6E\u3002
+
+**\u4E0D\u8981**\u5728\u6CA1\u88AB\u8981\u6C42\u7684\u65F6\u5019\u81EA\u5DF1\u7FFB\u76EE\u5F55\u53BB\u914D\u4E1C\u897F\u3002
+
+## \u6D41\u7A0B
+
+1. \`ide_launch_list\` \u5148\u770B\u9762\u677F\u91CC\u5DF2\u6709\u4EC0\u4E48\uFF08\u8DEF\u5F84\u3001\u540D\u5B57\u3001\u547D\u4EE4\u3001\u72B6\u6001\u3001\u7AEF\u53E3\uFF09\u3002
+   \u540C\u540D\u5C31\u662F\u540C\u4E00\u6761\u914D\u7F6E\uFF0C\u522B\u91CD\u590D\u5EFA\uFF1B\u5DF2\u7ECF\u6709\u80FD\u8DD1\u7684\u5C31\u8DF3\u5230\u7B2C 6 \u6B65\u3002
+
+2. \u627E\u51FA**\u771F\u6B63\u8BE5\u8DD1\u7684\u76EE\u5F55**\u3002\u8FD9\u4E00\u6B65\u6700\u5BB9\u6613\u9519\uFF1A**\u5DE5\u4F5C\u76EE\u5F55\u5F80\u5F80\u662F\u5B50\u6A21\u5757\u76EE\u5F55\uFF0C\u4E0D\u662F\u4ED3\u5E93\u6839**
+   \uFF08\u4F8B\uFF1A\u4ED3\u5E93\u6839 \`/repo\` \u4E0B\u771F\u6B63\u8981\u8DD1\u7684\u662F \`/repo/kun-ai\`\uFF0C\u547D\u4EE4\u8FD8\u5F97\u518D\u6307\u5230 \`kun-ai-web\` \u6A21\u5757\uFF09\u3002
+
+3. \u6309\u76EE\u5F55\u91CC\u7684\u6E05\u5355\u6587\u4EF6\u51B3\u5B9A\u547D\u4EE4\u5F62\u72B6\uFF1A
+
+   - **\`pom.xml\`**\uFF1A\u6839 pom \u662F \`<packaging>pom</packaging>\` \u5C31\u662F\u805A\u5408\u5DE5\u7A0B\uFF0C\u80FD\u8DD1\u7684\u662F\u5E26
+     \`@SpringBootApplication\` \u7684\u5B50\u6A21\u5757\u3002\u547D\u4EE4\u5F62\u72B6\uFF1A
+     \`mvn -o -pl <\u6A21\u5757> spring-boot:run -Dspring-boot.run.main-class=<\u5168\u9650\u5B9A\u7C7B\u540D>\`\u3002
+     **\u4E0D\u8981\u52A0 \`-am\`**\uFF1A\u5B83\u4F1A\u628A\u4E0A\u6E38\u5DE5\u7A0B\u4E00\u8D77\u653E\u8FDB reactor\uFF0C\u800C \`spring-boot:run\` \u5BF9 reactor \u91CC\u6BCF\u4E2A\u5DE5\u7A0B\u6267\u884C\uFF0C
+     \u5148\u5728\u6CA1\u6709\u4E3B\u7C7B\u7684\u805A\u5408\u5DE5\u7A0B\u4E0A\u5931\u8D25\u3002
+   - **\`package.json\`**\uFF1A\u770B \`scripts\` \u91CC\u7684 \`dev\` / \`start\` \u4E0E README \u91CC\u90A3\u53E5"\u672C\u5730\u542F\u52A8"\uFF1B
+     \u6709 \`.nvmrc\` / \`packageManager\` \u65F6\u6CE8\u610F node \u7248\u672C\u3002\u5305\u7684\u76EE\u5F55\u5C31\u662F\u5DE5\u4F5C\u76EE\u5F55\u3002
+   - **\`pyproject.toml\` + \`uv.lock\`**\uFF1A\`uv run <\u6A21\u5757/\u547D\u4EE4>\`\u3002\u5E94\u7528\u81EA\u5DF1\u8BFB \`.env\` \u65F6
+     \uFF08\`pydantic-settings\` \u7684 \`env_file\`\uFF09\uFF0C**\u4E00\u4E2A\u53D8\u91CF\u90FD\u4E0D\u7528\u5F80\u9762\u677F\u91CC\u6284**\u3002
+   - **\`.idea/workspace.xml\`**\uFF1A\u5F80\u5F80\u5C31\u662F\u73B0\u6210\u7B54\u6848\uFF08\u6A21\u5757\u540D\u3001\u4E3B\u7C7B\u3001\u73AF\u5883\u53D8\u91CF\u90FD\u5728\uFF09\uFF0C\u5148\u8BFB\u5B83\u518D\u81EA\u5DF1\u62FC\u3002
+   - **\u4EC0\u4E48\u90FD\u6CA1\u627E\u5230**\uFF1A\u770B \`README.md\` \u4E0E \`scripts/*.sh\`\uFF0C\u5E76\u533A\u5206"\u5E38\u9A7B\u670D\u52A1"\u4E0E"\u4E00\u6B21\u6027\u811A\u672C"\u2014\u2014
+     \`./scripts/setup.sh --link\` \u90A3\u79CD\u8DD1\u5B8C\u5C31\u9000\u51FA\u7684\uFF0C\u4E0D\u8BE5\u914D\u6210\u542F\u52A8\u914D\u7F6E\u3002
+
+4. \u73AF\u5883\u53D8\u91CF\uFF1A**\u53EA\u6284\u53D8\u91CF\u540D**\u3002\u540D\u5B57\u91CC\u542B KEY / SECRET / TOKEN / PASSWORD \u7684\uFF0C
+   **\u4E0D\u8981\u8BFB\u5B83\u7684\u503C\u3001\u4E0D\u8981\u5199\u8FDB\u914D\u7F6E\u6216\u6D88\u606F**\u2014\u2014\`ide_launch_save\` \u53EA\u767B\u8BB0\u540D\u5B57\uFF0C\u503C\u7531\u7528\u6237\u5728\u9762\u677F\u91CC\u586B
+   \uFF08\u9762\u677F\u5199\u8FDB DSH \u51ED\u636E\u5E93\uFF0C\u4E0D\u843D\u9762\u677F\u5B58\u50A8\uFF09\u3002
+
+5. \`ide_launch_save\` \u5199\u8FDB\u53BB\uFF08\u4E00\u6B21\u4E00\u6761\uFF09\u3002\u540C\u540D\u5E42\u7B49\uFF1A\u5185\u5BB9\u4E00\u81F4\u5C31\u662F no-op\uFF0C\u4E0D\u4E00\u81F4\u4F1A\u544A\u8BC9\u4F60\u6539\u4E86\u54EA\u4E9B\u5B57\u6BB5\u3002
+
+6. \`ide_launch_run\` \u542F\u52A8\u5E76\u7B49\u5224\u51B3\uFF1B\u5931\u8D25\u65F6\u56DE\u6267\u5E26\u6700\u540E\u51E0\u5341\u884C\u8F93\u51FA\uFF0C\u7167\u5B83\u4FEE\u3002**\u6CE8\u610F\u5B83\u62A5\u7684\u7AEF\u53E3\u662F\u4ECE\u8F93\u51FA\u91CC\u8BA4\u7684**\uFF0C
+   \u4E00\u4E2A\u8FDB\u7A0B\u5F00\u591A\u4E2A\u7AEF\u53E3\u65F6\uFF08\u4F8B\u5982\u6307\u6807\u7AEF\u53E3\u5148\u6253\u5370\uFF09\u53EF\u80FD\u8BA4\u9519\uFF0C\u5FC5\u8981\u65F6\u5411\u7528\u6237\u6838\u5B9E\u3002
+
+7. \u56DE\u62A5\u7528\u6237\uFF1A\u914D\u4E86\u4EC0\u4E48\u3001\u5728\u54EA\u4E2A\u76EE\u5F55\u3001\u8DD1\u6CA1\u8DD1\u8D77\u6765\u3001\u7AEF\u53E3\u591A\u5C11\uFF0C\u4EE5\u53CA**\u6709\u4EC0\u4E48\u9700\u8981\u4ED6\u505A\u7684**
+   \uFF08\u5178\u578B\u60C5\u51B5\uFF1A\u586B\u5BC6\u94A5\uFF1B\u6216\u8005\u547D\u4EE4\u91CC\u67D0\u4E2A\u53C2\u6570\u53EA\u6709\u4ED6\u77E5\u9053\uFF09\u3002
+
+## \u786C\u8FB9\u754C
+
+- **\u4E0D\u8981\u76F4\u63A5\u7F16\u8F91** \`~/.dsh/storages/dsh-newbe-ide.json\`\u3002\u5199\u914D\u7F6E\u53EA\u8D70 \`ide_launch_save\`\uFF1A
+  \u9762\u677F\u662F\u552F\u4E00\u5199\u8005\u3001\u6574\u4EFD\u539F\u5B50\u63D0\u4EA4\uFF0C\u7ED5\u8FC7\u5B83\u81EA\u5DF1\u6539\u6587\u4EF6\u4F1A\u548C\u9762\u677F\u649E\u6210\u8BFB-\u6539-\u5199\u7ADE\u6001\uFF0C\u628A\u7528\u6237\u521A\u6539\u7684\u4E1C\u897F\u51B2\u6389\u3002
+- **\u5BC6\u94A5\u503C\u6C38\u8FDC\u4E0D\u7ECF\u8FC7\u4F60**\u3002\u5DE5\u5177\u4F1A\u4E22\u6389\u5BC6\u94A5\u503C\uFF0C\u4F60\u4E5F\u522B\u53BB\u8BFB \`.env\` \u6216 \`.idea/workspace.xml\` \u91CC\u7684\u5BC6\u94A5\u503C\u3002
+- **\u4E0D\u8981\u5220\u7528\u6237\u7684\u914D\u7F6E**\uFF08\`remove: true\`\uFF09\u9664\u975E\u7528\u6237\u660E\u786E\u8981\u6C42\u5220\u54EA\u4E00\u6761\u3002
+- \u5DE5\u4F5C\u76EE\u5F55\u7559\u7A7A\u4F1A\u56DE\u843D\u5230\u9879\u76EE\u8DEF\u5F84\uFF1B\u5199\u7684\u65F6\u5019\u522B\u7559\u7A7A\uFF0C\u9664\u975E\u786E\u5B9E\u5C31\u662F\u9879\u76EE\u6839\u3002
+- \u540C\u4E00\u4E2A\u8DEF\u5F84\u5728\u9762\u677F\u91CC\u53EF\u80FD\u6709\u591A\u6761\u9879\u76EE\u914D\u7F6E\uFF08\u4EBA\u624B\u5DE5\u5EFA\u7684\uFF09\uFF0C\u5DE5\u5177\u6309\u8DEF\u5F84\u627E**\u7B2C\u4E00\u6761**\u3002
+`;
+var IDE_SKILL = {
+  name: IDE_SKILL_NAME,
+  description: IDE_SKILL_DESCRIPTION,
+  source: "runtime",
+  content: IDE_SKILL_BODY,
+  invocation: { modelInvocable: true, userInvocable: true }
+};
+
+// src/tools.ts
+function toolView(state, runs) {
+  const byKey = new Map(runs.map((snapshot) => [snapshot.key, snapshot]));
+  return state.projects.map((project) => ({
+    path: project.path,
+    title: project.title,
+    configs: project.configs.map((config2) => {
+      const snapshot = byKey.get(runKeyOf({ workspaceId: project.workspaceId, configId: config2.id }));
+      return {
+        name: config2.name,
+        origin: config2.origin,
+        command: config2.command,
+        cwd: config2.cwd,
+        envs: config2.envs.map((env) => ({ name: env.name, from: env.from })),
+        status: snapshot?.status ?? "idle",
+        port: snapshot?.port ?? ""
+      };
+    })
+  }));
+}
+function normalizePath(path) {
+  return path.trim().replace(/[/\\]+$/, "");
+}
+function breakdown(request, error51) {
+  return {
+    ok: false,
+    result: {
+      ok: false,
+      action: "error",
+      path: normalizePath(String(request.path ?? "")),
+      title: "",
+      name: String(request.name ?? ""),
+      changed: [],
+      envs: { total: 0, credential: [] },
+      error: error51
+    }
+  };
+}
+function envSummary(envs) {
+  return {
+    total: envs.length,
+    credential: envs.filter((env) => env.from === "credential").map((env) => env.name)
+  };
+}
+function sameEnvs(a, b) {
+  if (a.length !== b.length) return false;
+  return a.every((left, index) => {
+    const right = b[index];
+    return right !== void 0 && left.name === right.name && left.value === right.value && left.from === right.from;
+  });
+}
+function toEnvs(input, existing) {
+  const out = [];
+  for (const raw of input) {
+    const name2 = String(raw?.name ?? "").trim();
+    if (name2 === "") continue;
+    if (isSecretName(name2)) {
+      out.push({ name: name2, value: "", from: "credential" });
+      continue;
+    }
+    const prior = existing?.find((env) => env.name === name2 && env.from === "literal");
+    const value = raw.value === void 0 ? prior?.value ?? "" : String(raw.value);
+    out.push({ name: name2, value, from: "literal" });
+  }
+  return out;
+}
+function planSave(state, request) {
+  const path = normalizePath(String(request.path ?? ""));
+  if (path === "") return breakdown(request, "path \u4E0D\u80FD\u4E3A\u7A7A");
+  if (!path.startsWith("/")) return breakdown(request, `path \u5FC5\u987B\u662F\u7EDD\u5BF9\u8DEF\u5F84\uFF0C\u6536\u5230\uFF1A${path}`);
+  const name2 = String(request.name ?? "").trim();
+  if (name2 === "") return breakdown(request, "name \u4E0D\u80FD\u4E3A\u7A7A");
+  const projectIndex = state.projects.findIndex((project2) => normalizePath(project2.path) === path);
+  const project = projectIndex >= 0 ? state.projects[projectIndex] : void 0;
+  if (request.remove === true) {
+    const victim = project?.configs.find((config2) => config2.name === name2);
+    if (project === void 0 || victim === void 0) {
+      return breakdown(request, `${path} \u4E0B\u6CA1\u6709\u53EB ${name2} \u7684\u542F\u52A8\u914D\u7F6E`);
+    }
+    const rest = project.configs.filter((config2) => config2.id !== victim.id);
+    const next2 = {
+      ...state,
+      projects: state.projects.map((entry, index) => index !== projectIndex ? entry : {
+        ...entry,
+        configs: rest,
+        // 删掉的正好是被记住的那条时，落到剩下的第一条（与面板 removeConfig 的行为一致）
+        activeConfigId: entry.activeConfigId === victim.id ? rest[0]?.id ?? "" : entry.activeConfigId
+      })
+    };
+    return {
+      ok: true,
+      next: next2,
+      result: { ok: true, action: "removed", path, title: project.title, name: name2, changed: [], envs: { total: 0, credential: [] }, error: "" }
+    };
+  }
+  const command = String(request.command ?? "").trim();
+  if (command === "") return breakdown(request, "command \u4E0D\u80FD\u4E3A\u7A7A\uFF08\u8981\u5220\u6389\u8FD9\u6761\u914D\u7F6E\u8BF7\u4F20 remove: true\uFF09");
+  const existing = project?.configs.find((config2) => config2.name === name2);
+  const envs = request.envs === void 0 || !Array.isArray(request.envs) ? void 0 : toEnvs(request.envs, existing?.envs);
+  const cwdInput = request.cwd === void 0 ? existing?.cwd : String(request.cwd).trim();
+  const cwd = cwdInput === void 0 || cwdInput === "" ? path : cwdInput;
+  if (existing === void 0) {
+    const fresh = {
+      id: `c${crypto.randomUUID()}`,
+      name: name2,
+      command,
+      cwd,
+      envs: envs ?? [],
+      origin: "agent"
+    };
+    const title = uniqueTitle(
+      String(request.title ?? "").trim() || basenameOf(path),
+      state.projects.map((entry) => entry.title)
+    );
+    const next2 = project === void 0 ? { ...state, projects: [...state.projects, { workspaceId: `p${crypto.randomUUID()}`, path, title, configs: [fresh], activeConfigId: fresh.id, hidden: false }] } : { ...state, projects: state.projects.map((entry, index) => index !== projectIndex ? entry : { ...entry, hidden: false, configs: [...entry.configs, fresh], activeConfigId: fresh.id }) };
+    return {
+      ok: true,
+      next: next2,
+      result: { ok: true, action: "created", path, title: project?.title ?? title, name: name2, changed: ["project", "config"], envs: envSummary(fresh.envs), error: "" }
+    };
+  }
+  const finalEnvs = envs ?? existing.envs;
+  const changed = [];
+  if (existing.command !== command) changed.push("command");
+  if (existing.cwd !== cwd) changed.push("cwd");
+  if (!sameEnvs(existing.envs, finalEnvs)) changed.push("envs");
+  if (changed.length === 0) {
+    return {
+      ok: true,
+      next: state,
+      result: { ok: true, action: "noop", path, title: project.title, name: name2, changed: [], envs: envSummary(finalEnvs), error: "" }
+    };
+  }
+  const updated = { ...existing, command, cwd, envs: finalEnvs, origin: "agent" };
+  const next = {
+    ...state,
+    projects: state.projects.map((entry, index) => index !== projectIndex ? entry : {
+      ...entry,
+      hidden: false,
+      configs: entry.configs.map((config2) => config2.id === existing.id ? updated : config2)
+    })
+  };
+  return {
+    ok: true,
+    next,
+    result: { ok: true, action: "updated", path, title: project.title, name: name2, changed, envs: envSummary(finalEnvs), error: "" }
+  };
+}
+function vanishedTargets(before, after) {
+  const alive = /* @__PURE__ */ new Set();
+  for (const project of after.projects) {
+    for (const config2 of project.configs) alive.add(runKeyOf({ workspaceId: project.workspaceId, configId: config2.id }));
+  }
+  const gone = [];
+  for (const project of before.projects) {
+    for (const config2 of project.configs) {
+      if (!alive.has(runKeyOf({ workspaceId: project.workspaceId, configId: config2.id }))) {
+        gone.push({ workspaceId: project.workspaceId, configId: config2.id });
+      }
+    }
+  }
+  return gone;
+}
+async function awaitVerdict(first, poll, options = {}) {
+  const timeoutMs = options.timeoutMs ?? 9e4;
+  const intervalMs = options.intervalMs ?? 500;
+  const sleep = options.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
+  const now = options.now ?? (() => Date.now());
+  const began = now();
+  let snapshot = first;
+  for (; ; ) {
+    if (snapshot.port !== "" && snapshot.status === "running") return { snapshot, waitedMs: now() - began, settled: "port" };
+    if (snapshot.status === "failed" || snapshot.status === "exited" || snapshot.status === "stopped") {
+      return { snapshot, waitedMs: now() - began, settled: "exited" };
+    }
+    if (now() - began >= timeoutMs) return { snapshot, waitedMs: now() - began, settled: "timeout" };
+    await sleep(intervalMs);
+    snapshot = poll();
+  }
+}
+function resolveTarget(state, path, name2) {
+  const wanted = normalizePath(String(path ?? ""));
+  const project = state.projects.find((entry) => normalizePath(entry.path) === wanted);
+  if (project === void 0) return { ok: false, error: `\u9762\u677F\u91CC\u6CA1\u6709 ${wanted} \u8FD9\u6761\u9879\u76EE\u914D\u7F6E\uFF08\u5148\u7528 ide_launch_save \u5EFA\uFF09` };
+  const config2 = project.configs.find((entry) => entry.name === name2);
+  if (config2 === void 0) return { ok: false, error: `${project.title} \u4E0B\u6CA1\u6709\u53EB ${name2} \u7684\u542F\u52A8\u914D\u7F6E` };
+  return { ok: true, target: { workspaceId: project.workspaceId, configId: config2.id } };
+}
+var RUN_ERROR_TAIL_LINES = 40;
+function seconds(ms) {
+  return `${(ms / 1e3).toFixed(1)}s`;
+}
+function envNote(result) {
+  const parts = [`${result.envs.total} \u4E2A\u53D8\u91CF`];
+  if (result.envs.credential.length > 0) {
+    parts.push(`\u5176\u4E2D ${result.envs.credential.length} \u4E2A\u662F\u5BC6\u94A5\uFF08${result.envs.credential.join("\u3001")}\uFF09\u2014\u2014\u53EA\u767B\u8BB0\u4E86\u53D8\u91CF\u540D\uFF0C\u503C\u9700\u8981\u7528\u6237\u81EA\u5DF1\u586B`);
+  }
+  return parts.join("\uFF0C");
+}
+function renderSave(result) {
+  if (!result.ok) return `\u6CA1\u6709\u5199\u5165\uFF1A${result.error}`;
+  const where = `${result.path} / ${result.name}`;
+  if (result.action === "noop") return `\u6CA1\u6709\u53D8\u5316\uFF08${where} \u5DF2\u7ECF\u662F\u8FD9\u4E2A\u6837\u5B50\uFF09\uFF0C\u672A\u5199\u5165\u3002`;
+  if (result.action === "removed") return `\u5DF2\u5220\u9664\u542F\u52A8\u914D\u7F6E ${where}\u3002`;
+  const head = result.action === "created" ? `\u5DF2\u65B0\u5EFA\u542F\u52A8\u914D\u7F6E ${where}` : `\u5DF2\u66F4\u65B0\u542F\u52A8\u914D\u7F6E ${where}\uFF08\u6539\u4E86 ${result.changed.join("\u3001")}\uFF09`;
+  return `${head}\uFF1A${envNote(result)}\u3002`;
+}
+function renderRun(action, path, name2, value) {
+  const where = `${path} / ${name2}`;
+  if (value.ok !== true) return `${where} \u6CA1\u6709\u6267\u884C\uFF1A${String(value.error ?? "")}`;
+  const status = String(value.status);
+  const port = String(value.port ?? "");
+  if (action === "status") return `${where} \u5F53\u524D\u72B6\u6001\uFF1A${status}${port === "" ? "" : `\uFF0C\u7AEF\u53E3 :${port}`}\u3002`;
+  if (action === "stop") return `\u5DF2\u505C\u6B62 ${where}\uFF08\u72B6\u6001\uFF1A${status}\uFF09\u3002`;
+  const waited = seconds(Number(value.waitedMs ?? 0));
+  if (value.settled === "port") return `${where} \u8D77\u6765\u4E86\uFF1A\u7AEF\u53E3 :${port}\uFF08\u7B49\u4E86 ${waited}\uFF09\u3002`;
+  if (value.settled === "timeout") return `${where} \u8FD8\u5728\u542F\u52A8\u4E2D\uFF08\u7B49\u4E86 ${waited}\uFF0C\u5C1A\u672A\u8BA4\u51FA\u7AEF\u53E3\uFF09\u3002\u53EF\u4EE5\u518D\u770B\u4E00\u6B21 status\uFF0C\u6216\u8BA9\u7528\u6237\u770B\u9762\u677F\u65E5\u5FD7\u3002`;
+  const tail = Array.isArray(value.errorTail) ? value.errorTail : [];
+  const exit = value.exitCode === null || value.exitCode === void 0 ? "" : `\uFF0C\u9000\u51FA\u7801 ${String(value.exitCode)}`;
+  return `${where} \u6CA1\u8D77\u6765\uFF08\u72B6\u6001\uFF1A${status}${exit}\uFF09\u3002\u6700\u540E ${tail.length} \u884C\u8F93\u51FA\uFF1A
+${tail.join("\n")}`;
+}
+function createIdeTools(deps) {
+  const list = {
+    name: "ide_launch_list",
+    description: "List the IDE panel's projects and their launch configurations (path, name, command, working directory, env var names, status, port). Never returns env values. Read it before writing, so you update instead of duplicate.",
+    parameters: { type: "object", properties: {}, additionalProperties: false, required: [] },
+    output: {
+      schema: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          projects: {
+            type: "array",
+            items: {
+              type: "object",
+              additionalProperties: false,
+              properties: {
+                path: { type: "string" },
+                title: { type: "string" },
+                configs: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    additionalProperties: false,
+                    properties: {
+                      name: { type: "string" },
+                      origin: { type: "string" },
+                      command: { type: "string" },
+                      cwd: { type: "string" },
+                      envs: {
+                        type: "array",
+                        items: {
+                          type: "object",
+                          additionalProperties: false,
+                          properties: { name: { type: "string" }, from: { type: "string" } },
+                          required: ["name", "from"]
+                        }
+                      },
+                      status: { type: "string" },
+                      port: { type: "string" }
+                    },
+                    required: ["name", "origin", "command", "cwd", "envs", "status", "port"]
+                  }
+                }
+              },
+              required: ["path", "title", "configs"]
+            }
+          }
+        },
+        required: ["projects"]
+      },
+      render: (_args, value) => {
+        const projects = value.projects ?? [];
+        if (projects.length === 0) return [{ type: "text", text: "\u9762\u677F\u91CC\u8FD8\u6CA1\u6709\u4EFB\u4F55\u9879\u76EE\u914D\u7F6E\u3002" }];
+        const lines = [];
+        for (const project of projects) {
+          lines.push(`${project.path}\uFF08${project.title}\uFF09`);
+          if (project.configs.length === 0) lines.push("  \uFF08\u6CA1\u6709\u542F\u52A8\u914D\u7F6E\uFF09");
+          for (const config2 of project.configs) {
+            const where = config2.port === "" ? "" : ` -> :${config2.port}`;
+            lines.push(`  - ${config2.name}${config2.origin === "agent" ? " [agent]" : ""}\uFF1A${config2.status}${where}`);
+            lines.push(`    \u547D\u4EE4\uFF1A${config2.command === "" ? "\uFF08\u672A\u8BBE\u7F6E\uFF09" : config2.command}`);
+            lines.push(`    \u76EE\u5F55\uFF1A${config2.cwd}`);
+            if (config2.envs.length > 0) {
+              lines.push(`    \u53D8\u91CF\uFF1A${config2.envs.map((env) => env.from === "credential" ? `${env.name}(\u51ED\u636E)` : env.name).join("\u3001")}`);
+            }
+          }
+        }
+        return [{ type: "text", text: lines.join("\n") }];
+      }
+    },
+    async execute() {
+      return { projects: toolView(deps.state(), deps.runs()) };
+    }
+  };
+  const save = {
+    name: "ide_launch_save",
+    description: "Create, update, or delete ONE launch configuration (name + command + working directory + env vars) in the IDE panel; an unknown path creates its project entry. Repeating a name with identical content is a no-op. Secret-named variables (KEY/SECRET/TOKEN/PASSWORD) store only the name \u2014 the user fills in the value.",
+    parameters: {
+      type: "object",
+      properties: {
+        path: { type: "string", description: "Absolute project directory (often a submodule, not the repository root). An unknown path creates a project entry." },
+        title: { type: "string", description: "Title for a newly created project entry; defaults to the last path segment." },
+        name: { type: "string", description: "Launch configuration name. The same name means the same configuration." },
+        command: { type: "string", description: "Shell command to run. Required unless remove is true." },
+        cwd: { type: "string", description: "Working directory. Omit to keep the current value; for a new configuration the project path is used." },
+        envs: {
+          type: "array",
+          description: "Env vars. Omit to keep the current ones, pass [] to clear; omit a value to keep the existing one. Secret-named values are discarded.",
+          items: { type: "object", properties: { name: { type: "string" }, value: { type: "string" } }, required: ["name"] }
+        },
+        remove: { type: "boolean", description: "true deletes this launch configuration after stopping its process." }
+      },
+      required: ["path", "name"],
+      additionalProperties: false
+    },
+    output: {
+      schema: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          ok: { type: "boolean" },
+          action: { type: "string" },
+          path: { type: "string" },
+          title: { type: "string" },
+          name: { type: "string" },
+          changed: { type: "array", items: { type: "string" } },
+          envs: {
+            type: "object",
+            additionalProperties: false,
+            properties: {
+              total: { type: "number" },
+              credential: { type: "array", items: { type: "string" } }
+            },
+            required: ["total", "credential"]
+          },
+          error: { type: "string" }
+        },
+        required: ["ok", "action", "path", "title", "name", "changed", "envs", "error"]
+      },
+      render: (args, value) => [{ type: "text", text: renderSave(value) }]
+    },
+    async execute(args) {
+      const request = args ?? {};
+      const before = deps.state();
+      const plan = planSave(before, request);
+      if (!plan.ok) return plan.result;
+      if (plan.result.action === "noop") return plan.result;
+      for (const target of vanishedTargets(before, plan.next)) {
+        try {
+          await deps.stop(target);
+        } catch {
+        }
+      }
+      await deps.apply(plan.next);
+      return plan.result;
+    }
+  };
+  const run = {
+    name: "ide_launch_run",
+    description: "Start, stop, or inspect ONE launch configuration and wait for a verdict: it settles when a port shows up in the output or the process exits, and a failure returns the last output lines. Use it after ide_launch_save to prove a configuration runs.",
+    parameters: {
+      type: "object",
+      properties: {
+        path: { type: "string", description: "Absolute project directory of the configuration." },
+        name: { type: "string", description: "Launch configuration name." },
+        action: { type: "string", description: "One of: start, stop, status." }
+      },
+      required: ["path", "name", "action"],
+      additionalProperties: false
+    },
+    output: {
+      schema: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          ok: { type: "boolean" },
+          action: { type: "string" },
+          status: { type: "string" },
+          port: { type: "string" },
+          // 没启动过是 null、启动过是数字：子集不支持 type 数组，用 oneOf 表达
+          exitCode: { oneOf: [{ type: "number" }, { type: "null" }] },
+          settled: { type: "string" },
+          waitedMs: { type: "number" },
+          errorTail: { type: "array", items: { type: "string" } },
+          error: { type: "string" }
+        },
+        required: ["ok", "action", "status", "port", "settled", "waitedMs", "errorTail", "error"]
+      },
+      render: (args, value) => {
+        const args2 = args ?? {};
+        return [{ type: "text", text: renderRun(String(args2.action ?? ""), String(args2.path ?? ""), String(args2.name ?? ""), value ?? {}) }];
+      }
+    },
+    async execute(args) {
+      const request = args ?? {};
+      const path = String(request.path ?? "");
+      const name2 = String(request.name ?? "");
+      const action = String(request.action ?? "");
+      if (action !== "start" && action !== "stop" && action !== "status") {
+        return blankRun(action, `action \u53EA\u80FD\u662F start / stop / status\uFF0C\u6536\u5230\uFF1A${action || "(\u7A7A)"}`);
+      }
+      const found = resolveTarget(deps.state(), path, name2);
+      if (!found.ok) return blankRun(action, found.error);
+      const current = () => deps.runs().find((snapshot) => snapshot.key === runKeyOf(found.target));
+      const shape = (snapshot, settled, waitedMs, errorTail) => ({
+        ok: true,
+        action,
+        status: snapshot.status,
+        port: snapshot.port,
+        exitCode: snapshot.exitCode,
+        settled,
+        waitedMs,
+        errorTail,
+        error: ""
+      });
+      if (action === "status") {
+        const snapshot = current();
+        if (snapshot === void 0) return blankRun(action, "\u8FD9\u6761\u914D\u7F6E\u8FD8\u6CA1\u542F\u52A8\u8FC7");
+        return shape(snapshot, "known", 0, []);
+      }
+      if (action === "stop") return shape(await deps.stop(found.target), "stopped", 0, []);
+      const first = await deps.start(found.target);
+      const verdict = await awaitVerdict(first, () => current() ?? first);
+      const failed = verdict.settled === "exited" && verdict.snapshot.status !== "stopped";
+      const tail = failed ? deps.tail(found.target, RUN_ERROR_TAIL_LINES) : [];
+      return shape(verdict.snapshot, verdict.settled, verdict.waitedMs, tail);
+    }
+  };
+  return [list, save, run];
+}
+function blankRun(action, error51) {
+  return { ok: false, action, status: "idle", port: "", exitCode: null, settled: "error", waitedMs: 0, errorTail: [], error: error51 };
 }
 
 // src/filter.ts
@@ -15230,13 +15761,32 @@ function apply(ctx) {
       registry2.dispose();
     };
   }, "dsh-newbe-ide: run pump");
-  function specFor(target) {
+  async function specFor(target) {
     const state = store.getState();
     const project = state.projects.find((p) => p.workspaceId === target.workspaceId);
     if (project === void 0) throw new Error("\u8FD9\u4E2A\u9879\u76EE\u4E0D\u5728\u9762\u677F\u914D\u7F6E\u91CC");
     const config2 = project.configs.find((c) => c.id === target.configId);
     if (config2 === void 0) throw new Error("\u627E\u4E0D\u5230\u8FD9\u6761\u542F\u52A8\u914D\u7F6E");
-    return { command: config2.command, cwd: config2.cwd !== "" ? config2.cwd : project.path, envs: config2.envs };
+    const envs = [];
+    const missing = [];
+    for (const entry of config2.envs) {
+      if (entry.name === "") continue;
+      if (entry.from !== "credential") {
+        envs.push({ name: entry.name, value: entry.value });
+        continue;
+      }
+      const provider = ctx.get("credentials");
+      const resolved = provider === void 0 ? void 0 : await provider.resolve(entry.name);
+      if (resolved === void 0 || resolved.value === "") {
+        missing.push(entry.name);
+        continue;
+      }
+      envs.push({ name: entry.name, value: resolved.value });
+    }
+    if (missing.length > 0) {
+      throw new Error(`\u51ED\u636E\u5E93\u91CC\u6CA1\u6709 ${missing.join("\u3001")}\uFF1A\u9700\u8981\u5728\u9762\u677F\u7684\u914D\u7F6E\u5757\u91CC\u586B\u5165\u503C\uFF08\u503C\u53EA\u5199\u8FDB DSH \u51ED\u636E\u5E93\uFF0C\u4E0D\u843D\u9762\u677F\u5B58\u50A8\uFF09`);
+    }
+    return { command: config2.command, cwd: config2.cwd !== "" ? config2.cwd : project.path, envs };
   }
   const service = {
     load() {
@@ -15245,11 +15795,38 @@ function apply(ctx) {
     submit(next) {
       return store.submit(next);
     },
-    start(target) {
-      return registry2.start(runKeyOf(target), specFor(target));
+    /** 启动是异步的：`from: 'credential'` 的变量要等凭据库解析。客户端本来就是 await 调用。 */
+    async start(target) {
+      return registry2.start(runKeyOf(target), await specFor(target));
     },
     stop(target) {
       return registry2.stop(runKeyOf(target));
+    },
+    /** 一组凭据变量的状态。**只回状态，值不可能出现在这里**——`CredentialInfo` 没有装值的字段。 */
+    async secretInfo(request) {
+      const provider = ctx.get("credentials");
+      const out = [];
+      for (const name2 of request.names ?? []) {
+        if (name2 === "") continue;
+        if (provider === void 0) {
+          out.push({ name: name2, configured: false, writable: false, source: "" });
+          continue;
+        }
+        const info = await provider.describe(name2);
+        out.push({ name: name2, configured: info.configured, writable: info.writable, source: info.source ?? "" });
+      }
+      return out;
+    },
+    /**
+     * 人在面板里填一个密钥值：直接写进 DSH 凭据库。
+     * 值**不回传、不落面板存储**，面板只拿到状态；空值会被 provider 拒绝（这正是我们要的）。
+     */
+    async secretSet(request) {
+      const provider = ctx.get("credentials");
+      if (provider === void 0) throw new Error("\u51ED\u636E\u670D\u52A1\u4E0D\u53EF\u7528\uFF0C\u65E0\u6CD5\u4FDD\u5B58\u5BC6\u94A5");
+      await provider.set(request.name, request.value);
+      const info = await provider.describe(request.name);
+      return { name: request.name, configured: info.configured, writable: info.writable, source: info.source ?? "" };
     },
     read(request) {
       return registry2.read(runKeyOf(request), request.from);
@@ -15303,21 +15880,54 @@ function apply(ctx) {
     value: { service, serviceKey: "ideConfig", namespace: "ideConfig" }
   });
   ctx.provide("ideConfig", service);
+  whenService(ctx, "skills", (skills) => {
+    ctx.effect(() => skills.register(IDE_SKILL), "dsh-newbe-ide: built-in skill");
+  });
+  whenService(ctx, "tools", (tools) => {
+    const deps = {
+      state: () => store.getState(),
+      runs: () => registry2.snapshots(),
+      apply: (next) => store.submit(next),
+      start: async (target) => registry2.start(runKeyOf(target), await specFor(target)),
+      stop: async (target) => registry2.stop(runKeyOf(target)),
+      // 失败回执里那几十行错误从磁盘尾部取：宿主缓冲可能已经滚过去了
+      tail: (target, lines) => sink.tail(runKeyOf(target), lines).lines
+    };
+    for (const tool of createIdeTools(deps)) {
+      ctx.effect(() => tools.register(tool), `dsh-newbe-ide: tool ${String(tool.name)}`);
+    }
+  });
+}
+function whenService(ctx, name2, use) {
+  const ready = ctx.get(name2);
+  if (ready !== void 0) {
+    use(ready);
+    return;
+  }
+  if (typeof ctx.on !== "function") return;
+  const off = ctx.on("internal/service", (serviceName, value) => {
+    if (serviceName !== name2 || value === void 0) return;
+    off();
+    use(value);
+  });
 }
 export {
   DEFAULT_HISTORY_LINES,
   DEFAULT_LEVELS,
+  IDE_SKILL,
   LEVELS,
   STORAGE_PATH,
   aggregateStatus,
   apply,
   availableWorkspaces,
+  awaitVerdict,
   basenameOf,
   buildLaunchConfig,
   cleanLine,
   compileMatcher,
   createConfigStore,
   createFileLogSink,
+  createIdeTools,
   createRunRegistry,
   defaultState,
   filterLines,
@@ -15329,9 +15939,13 @@ export {
   parsePort,
   parseSpringBootConfigurations,
   pickActiveConfig,
+  planSave,
   plannedConfigName,
   readLostLines,
+  resolveTarget,
   runKeyOf,
   splitLines,
-  uniqueTitle
+  toolView,
+  uniqueTitle,
+  vanishedTargets
 };

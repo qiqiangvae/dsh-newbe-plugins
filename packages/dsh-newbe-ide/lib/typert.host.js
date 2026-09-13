@@ -14521,14 +14521,24 @@ config(en_default());
 // src/schema.ts
 var envVarSchema = external_exports.object({
   name: external_exports.string(),
-  value: external_exports.string()
+  value: external_exports.string(),
+  /**
+   * 值从哪来：`literal` 就是上面的 `value`；`credential` **忽略 value**，启动时由宿主按 `name`
+   * 去 DSH 凭据库取（`$DSH_HOME/.credentials.yaml`）。
+   *
+   * 必须带默认值：老文件没有这个字段（那时密钥是明文存在 `value` 里的），
+   * 缺字段会被整份判为损坏、用户的配置全丢。
+   */
+  from: external_exports.enum(["literal", "credential"]).default("literal")
 });
 var launchConfigSchema = external_exports.object({
   id: external_exports.string(),
   name: external_exports.string(),
   command: external_exports.string(),
   cwd: external_exports.string(),
-  envs: external_exports.array(envVarSchema)
+  envs: external_exports.array(envVarSchema),
+  /** 最后一次是谁写的：面板（`human`）还是内置工具（`agent`）。老文件缺省视为人写的。 */
+  origin: external_exports.enum(["human", "agent"]).default("human")
 });
 var projectEntrySchema = external_exports.object({
   workspaceId: external_exports.string(),
@@ -14622,6 +14632,22 @@ var logHistorySchema = external_exports.object({
   truncated: external_exports.boolean(),
   path: external_exports.string()
 });
+var secretQuerySchema = external_exports.object({
+  names: external_exports.array(external_exports.string())
+});
+var secretStatusSchema = external_exports.object({
+  name: external_exports.string(),
+  /** 现在解析这个名字能不能拿到值。 */
+  configured: external_exports.boolean(),
+  /** 当前这层能不能写（进程环境层只读，写进去也会被它盖住）。 */
+  writable: external_exports.boolean(),
+  source: external_exports.string()
+});
+var secretStatusListSchema = external_exports.array(secretStatusSchema);
+var secretSetSchema = external_exports.object({
+  name: external_exports.string(),
+  value: external_exports.string()
+});
 
 // src/typert.ts
 var stateCodec = {
@@ -14678,6 +14704,26 @@ var snapshotListCodec = {
   mode: "strict",
   typeSymbol: "dsh-newbe-ide#RunSnapshotList",
   schema: runSnapshotListSchema
+};
+var secretQueryCodec = {
+  mode: "strict",
+  typeSymbol: "dsh-newbe-ide#SecretQuery",
+  schema: secretQuerySchema
+};
+var secretStatusListCodec = {
+  mode: "strict",
+  typeSymbol: "dsh-newbe-ide#SecretStatusList",
+  schema: secretStatusListSchema
+};
+var secretSetCodec = {
+  mode: "strict",
+  typeSymbol: "dsh-newbe-ide#SecretSet",
+  schema: secretSetSchema
+};
+var secretStatusCodec = {
+  mode: "strict",
+  typeSymbol: "dsh-newbe-ide#SecretStatus",
+  schema: secretStatusSchema
 };
 var TYPERT = {
   package: "dsh-newbe-ide",
@@ -14757,6 +14803,24 @@ var TYPERT = {
         { name: "next", wire: "next", source: "json", codec: { mode: "strict", typeSymbol: "dsh-newbe-ide#IdeStateInput", schema: ideStateSchema } }
       ],
       result: stateCodec
+    },
+    {
+      id: "dsh-newbe-ide#ideConfig/secretInfo",
+      service: "ideConfig",
+      namespace: "ideConfig",
+      method: "secretInfo",
+      invocation: { kind: "direct" },
+      parameters: [{ name: "request", wire: "request", source: "json", codec: secretQueryCodec }],
+      result: secretStatusListCodec
+    },
+    {
+      id: "dsh-newbe-ide#ideConfig/secretSet",
+      service: "ideConfig",
+      namespace: "ideConfig",
+      method: "secretSet",
+      invocation: { kind: "direct" },
+      parameters: [{ name: "request", wire: "request", source: "json", codec: secretSetCodec }],
+      result: secretStatusCodec
     }
   ],
   model: {
@@ -14770,12 +14834,14 @@ var TYPERT = {
         members: [
           { kind: "method", name: "load", signature: "load(): IdeLoad" },
           { kind: "method", name: "submit", signature: "submit(next: IdeState): Promise<IdeState>" },
-          { kind: "method", name: "start", signature: "start(target: RunTarget): RunSnapshot" },
+          { kind: "method", name: "start", signature: "start(target: RunTarget): Promise<RunSnapshot>" },
           { kind: "method", name: "stop", signature: "stop(target: RunTarget): RunSnapshot" },
           { kind: "method", name: "read", signature: "read(request: RunReadRequest): RunRead" },
           { kind: "method", name: "runs", signature: "runs(): RunSnapshot[]" },
           { kind: "method", name: "history", signature: "history(request: LogHistoryRequest): LogHistory" },
-          { kind: "method", name: "discover", signature: "discover(request: { workspaceId: string }): IdeaDiscovery" }
+          { kind: "method", name: "discover", signature: "discover(request: { workspaceId: string }): IdeaDiscovery" },
+          { kind: "method", name: "secretInfo", signature: "secretInfo(request: { names: string[] }): Promise<SecretStatus[]>" },
+          { kind: "method", name: "secretSet", signature: "secretSet(request: { name: string; value: string }): Promise<SecretStatus>" }
         ],
         types: []
       }

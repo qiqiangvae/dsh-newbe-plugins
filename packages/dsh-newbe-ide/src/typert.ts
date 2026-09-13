@@ -3,7 +3,7 @@
  * 手写清单，结构与 @deepseek-ai/dsh-typert-generator 产物一致：
  * `./typert` 导出 TYPERT，invocations 的 codec 必须是 zod v4 实例。
  */
-import { ideaDiscoveryRequestSchema, ideaDiscoverySchema, ideLoadSchema, ideStateSchema, logHistoryRequestSchema, logHistorySchema, runReadRequestSchema, runReadSchema, runSnapshotListSchema, runSnapshotSchema, runTargetSchema } from './schema.js';
+import { ideaDiscoveryRequestSchema, ideaDiscoverySchema, ideLoadSchema, ideStateSchema, logHistoryRequestSchema, logHistorySchema, runReadRequestSchema, runReadSchema, runSnapshotListSchema, runSnapshotSchema, runTargetSchema, secretQuerySchema, secretSetSchema, secretStatusListSchema, secretStatusSchema } from './schema.js';
 
 const stateCodec = {
   mode: 'strict' as const,
@@ -69,6 +69,30 @@ const snapshotListCodec = {
   mode: 'strict' as const,
   typeSymbol: 'dsh-newbe-ide#RunSnapshotList',
   schema: runSnapshotListSchema,
+};
+
+const secretQueryCodec = {
+  mode: 'strict' as const,
+  typeSymbol: 'dsh-newbe-ide#SecretQuery',
+  schema: secretQuerySchema,
+};
+
+const secretStatusListCodec = {
+  mode: 'strict' as const,
+  typeSymbol: 'dsh-newbe-ide#SecretStatusList',
+  schema: secretStatusListSchema,
+};
+
+const secretSetCodec = {
+  mode: 'strict' as const,
+  typeSymbol: 'dsh-newbe-ide#SecretSet',
+  schema: secretSetSchema,
+};
+
+const secretStatusCodec = {
+  mode: 'strict' as const,
+  typeSymbol: 'dsh-newbe-ide#SecretStatus',
+  schema: secretStatusSchema,
 };
 
 export const TYPERT = {
@@ -150,6 +174,24 @@ export const TYPERT = {
       ],
       result: stateCodec,
     },
+    {
+      id: 'dsh-newbe-ide#ideConfig/secretInfo',
+      service: 'ideConfig',
+      namespace: 'ideConfig',
+      method: 'secretInfo',
+      invocation: { kind: 'direct' },
+      parameters: [{ name: 'request', wire: 'request', source: 'json', codec: secretQueryCodec }],
+      result: secretStatusListCodec,
+    },
+    {
+      id: 'dsh-newbe-ide#ideConfig/secretSet',
+      service: 'ideConfig',
+      namespace: 'ideConfig',
+      method: 'secretSet',
+      invocation: { kind: 'direct' },
+      parameters: [{ name: 'request', wire: 'request', source: 'json', codec: secretSetCodec }],
+      result: secretStatusCodec,
+    },
   ],
   model: {
     services: [
@@ -162,12 +204,14 @@ export const TYPERT = {
         members: [
           { kind: 'method', name: 'load', signature: 'load(): IdeLoad' },
           { kind: 'method', name: 'submit', signature: 'submit(next: IdeState): Promise<IdeState>' },
-          { kind: 'method', name: 'start', signature: 'start(target: RunTarget): RunSnapshot' },
+          { kind: 'method', name: 'start', signature: 'start(target: RunTarget): Promise<RunSnapshot>' },
           { kind: 'method', name: 'stop', signature: 'stop(target: RunTarget): RunSnapshot' },
           { kind: 'method', name: 'read', signature: 'read(request: RunReadRequest): RunRead' },
           { kind: 'method', name: 'runs', signature: 'runs(): RunSnapshot[]' },
           { kind: 'method', name: 'history', signature: 'history(request: LogHistoryRequest): LogHistory' },
           { kind: 'method', name: 'discover', signature: 'discover(request: { workspaceId: string }): IdeaDiscovery' },
+          { kind: 'method', name: 'secretInfo', signature: 'secretInfo(request: { names: string[] }): Promise<SecretStatus[]>' },
+          { kind: 'method', name: 'secretSet', signature: 'secretSet(request: { name: string; value: string }): Promise<SecretStatus>' },
         ],
         types: [],
       },

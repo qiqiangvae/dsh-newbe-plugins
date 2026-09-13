@@ -15,8 +15,8 @@ import type { EnvVar, IdeaCandidateView, LaunchConfig } from './schema.js';
 /** 解析结果就是 wire 候选去掉 `source`（那是扫描时补的）。 */
 export type IdeaCandidate = Omit<IdeaCandidateView, 'source'>;
 
-/** 生成的启动配置 = 启动配置去掉 id（id 由调用方发）。 */
-export type BuiltLaunchConfig = Omit<LaunchConfig, 'id'>;
+/** 生成的启动配置 = 启动配置去掉 id 与写入来源（id 由调用方发，来源是调用方的事）。 */
+export type BuiltLaunchConfig = Omit<LaunchConfig, 'id' | 'origin'>;
 
 const SPRING_BOOT_TYPE = 'SpringBootApplicationConfigurationType';
 
@@ -60,8 +60,9 @@ export function parseSpringBootConfigurations(xml: string): IdeaCandidate[] {
       if (key === '') continue;
       const value = attribute(envTag, 'value');
       const seen = envs.findIndex((entry) => entry.name === key);
-      if (seen >= 0) envs[seen] = { name: key, value };
-      else envs.push({ name: key, value });
+      // IDEA 运行配置里的变量一律按明文值搬过来（`from` 只有 agent 那条路会设成 credential）
+      if (seen >= 0) envs[seen] = { name: key, value, from: 'literal' };
+      else envs.push({ name: key, value, from: 'literal' });
     }
 
     const problems: string[] = [];

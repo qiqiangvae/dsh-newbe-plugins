@@ -14545,14 +14545,24 @@ config(en_default());
 // src/schema.ts
 var envVarSchema = external_exports.object({
   name: external_exports.string(),
-  value: external_exports.string()
+  value: external_exports.string(),
+  /**
+   * 值从哪来：`literal` 就是上面的 `value`；`credential` **忽略 value**，启动时由宿主按 `name`
+   * 去 DSH 凭据库取（`$DSH_HOME/.credentials.yaml`）。
+   *
+   * 必须带默认值：老文件没有这个字段（那时密钥是明文存在 `value` 里的），
+   * 缺字段会被整份判为损坏、用户的配置全丢。
+   */
+  from: external_exports.enum(["literal", "credential"]).default("literal")
 });
 var launchConfigSchema = external_exports.object({
   id: external_exports.string(),
   name: external_exports.string(),
   command: external_exports.string(),
   cwd: external_exports.string(),
-  envs: external_exports.array(envVarSchema)
+  envs: external_exports.array(envVarSchema),
+  /** 最后一次是谁写的：面板（`human`）还是内置工具（`agent`）。老文件缺省视为人写的。 */
+  origin: external_exports.enum(["human", "agent"]).default("human")
 });
 var projectEntrySchema = external_exports.object({
   workspaceId: external_exports.string(),
@@ -14646,6 +14656,22 @@ var logHistorySchema = external_exports.object({
   lines: external_exports.array(external_exports.string()),
   truncated: external_exports.boolean(),
   path: external_exports.string()
+});
+var secretQuerySchema = external_exports.object({
+  names: external_exports.array(external_exports.string())
+});
+var secretStatusSchema = external_exports.object({
+  name: external_exports.string(),
+  /** 现在解析这个名字能不能拿到值。 */
+  configured: external_exports.boolean(),
+  /** 当前这层能不能写（进程环境层只读，写进去也会被它盖住）。 */
+  writable: external_exports.boolean(),
+  source: external_exports.string()
+});
+var secretStatusListSchema = external_exports.array(secretStatusSchema);
+var secretSetSchema = external_exports.object({
+  name: external_exports.string(),
+  value: external_exports.string()
 });
 function defaultState() {
   return { projects: [], activeWorkspaceId: "", showOverview: false };
@@ -14859,6 +14885,24 @@ var REMOTE_CONTRIBUTION = {
         { name: "next", wire: "next", source: "json", codec: { mode: "strict", typeSymbol: "dsh-newbe-ide#IdeStateInput", schema: ideStateSchema } }
       ],
       result: { mode: "strict", typeSymbol: "dsh-newbe-ide#IdeState", schema: ideStateSchema }
+    },
+    {
+      id: "dsh-newbe-ide#ideConfig/secretInfo",
+      service: "ideConfig",
+      namespace: "ideConfig",
+      method: "secretInfo",
+      invocation: { kind: "direct" },
+      parameters: [{ name: "request", wire: "request", source: "json", codec: { mode: "strict", typeSymbol: "dsh-newbe-ide#SecretQuery", schema: secretQuerySchema } }],
+      result: { mode: "strict", typeSymbol: "dsh-newbe-ide#SecretStatusList", schema: secretStatusListSchema }
+    },
+    {
+      id: "dsh-newbe-ide#ideConfig/secretSet",
+      service: "ideConfig",
+      namespace: "ideConfig",
+      method: "secretSet",
+      invocation: { kind: "direct" },
+      parameters: [{ name: "request", wire: "request", source: "json", codec: { mode: "strict", typeSymbol: "dsh-newbe-ide#SecretSet", schema: secretSetSchema } }],
+      result: { mode: "strict", typeSymbol: "dsh-newbe-ide#SecretStatus", schema: secretStatusSchema }
     }
   ]
 };
@@ -15058,6 +15102,9 @@ function IdeView({ api, ctx }) {
   const tabRowRef = (0, import_react.useRef)(null);
   const [discovery, setDiscovery] = (0, import_react.useState)(null);
   const [discoveryBusy, setDiscoveryBusy] = (0, import_react.useState)(false);
+  const [secretStatus, setSecretStatus] = (0, import_react.useState)({});
+  const [secretInput, setSecretInput] = (0, import_react.useState)({});
+  const [secretBusy, setSecretBusy] = (0, import_react.useState)("");
   const offsetsRef = (0, import_react.useRef)(/* @__PURE__ */ new Map());
   const logLinesRef = (0, import_react.useRef)([]);
   const followingRef = (0, import_react.useRef)(true);
@@ -15338,7 +15385,8 @@ function IdeView({ api, ctx }) {
       name: `\u542F\u52A8\u914D\u7F6E ${project.configs.length + 1}`,
       command: "",
       cwd: project.path,
-      envs: []
+      envs: [],
+      origin: "human"
     };
     setDrafts((prev) => ({ ...prev, [fresh.id]: fresh }));
     setActiveConfigIds((prev) => ({ ...prev, [project.workspaceId]: fresh.id }));
@@ -15373,7 +15421,7 @@ function IdeView({ api, ctx }) {
     setDrafts((prev) => ({ ...prev, [draft.id]: { ...draft, ...patch } }));
   };
   const saveDraft = async (project, draft) => {
-    const cleaned = { ...draft, cwd: draft.cwd !== "" ? draft.cwd : project.path };
+    const cleaned = { ...draft, cwd: draft.cwd !== "" ? draft.cwd : project.path, origin: "human" };
     const saved = await commit(patchProject(cfg, project.workspaceId, (p) => ({
       ...p,
       activeConfigId: cleaned.id,
@@ -15385,6 +15433,43 @@ function IdeView({ api, ctx }) {
         delete copy[cleaned.id];
         return copy;
       });
+    }
+  };
+  const credentialKey = (activeDraft?.envs ?? []).filter((env) => env.from === "credential" && env.name !== "").map((env) => env.name).join("|");
+  const refreshSecrets = async (names) => {
+    if (api === void 0 || names.length === 0) return;
+    try {
+      const list = envelopeValue(await api.secretInfo({ names }), "\u8BFB\u53D6\u51ED\u636E\u72B6\u6001");
+      setSecretStatus((prev) => {
+        const copy = { ...prev };
+        for (const status of list) copy[status.name] = status;
+        return copy;
+      });
+    } catch {
+    }
+  };
+  (0, import_react.useEffect)(() => {
+    void refreshSecrets(credentialKey === "" ? [] : credentialKey.split("|"));
+  }, [credentialKey]);
+  const saveSecret = async (name) => {
+    if (api === void 0 || name === "") return;
+    const value = secretInput[name] ?? "";
+    if (value === "") {
+      setError("\u5BC6\u94A5\u503C\u4E0D\u80FD\u4E3A\u7A7A");
+      return;
+    }
+    setSecretBusy(name);
+    setError("");
+    try {
+      const status = envelopeValue(await api.secretSet({ name, value }), "\u4FDD\u5B58\u5BC6\u94A5");
+      setSecretStatus((prev) => ({ ...prev, [status.name]: status }));
+      setSecretInput((prev) => ({ ...prev, [name]: "" }));
+      setFlash(`\u5DF2\u628A ${name} \u5B58\u8FDB\u51ED\u636E\u5E93`);
+      window.setTimeout(() => setFlash(""), 2e3);
+    } catch (e) {
+      setError(describeRpcFailure("\u4FDD\u5B58\u5BC6\u94A5", e));
+    } finally {
+      setSecretBusy("");
     }
   };
   const loadDiscovery = async () => {
@@ -15407,7 +15492,8 @@ function IdeView({ api, ctx }) {
       name,
       command: built.command,
       cwd: built.cwd,
-      envs: built.envs
+      envs: built.envs,
+      origin: "human"
     };
     setActiveConfigIds((prev) => ({ ...prev, [active.workspaceId]: fresh.id }));
     setFlash(`\u5DF2\u5BFC\u5165 ${name}`);
@@ -15651,6 +15737,7 @@ function IdeView({ api, ctx }) {
                   children: [
                     /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-dot", "data-state": snapshot?.status ?? "idle" }),
                     /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-mname", children: c.name }),
+                    c.origin === "agent" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-chip", title: "\u8FD9\u6761\u914D\u7F6E\u7531 agent \u5199\u5165\uFF08ide_launch_save\uFF09", children: "agent" }) : null,
                     snapshot !== void 0 && snapshot.port !== "" ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "ide-port", children: [
                       ":",
                       snapshot.port
@@ -15825,9 +15912,8 @@ function IdeView({ api, ctx }) {
             /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-line", children: [
               /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-label", children: "\u540D\u79F0" }),
               /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { className: "ide-field", style: { maxWidth: 240 }, value: activeDraft.name, onChange: (e) => patchDraft(activeDraft, { name: e.target.value }) }),
-              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-btn", "data-kind": "primary", onClick: () => {
-                void saveDraft(active, activeDraft);
-              }, children: "\u4FDD\u5B58" }),
+              activeDraft.origin === "agent" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-chip", "data-sel": true, title: "\u8FD9\u6761\u914D\u7F6E\u662F agent \u901A\u8FC7 ide_launch_save \u5199\u7684\uFF1A\u4FDD\u5B58\u4E00\u6B21\u5C31\u5F52\u4F60\uFF0C\u6807\u8BB0\u6D88\u5931", children: "agent \u5199\u5165" }) : null,
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { flex: 1 } }),
               /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-btn", "data-kind": "danger", onClick: () => removeConfig(active, activeDraft.id), children: "\u5220\u9664" })
             ] }),
             /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-line", children: [
@@ -15850,31 +15936,76 @@ function IdeView({ api, ctx }) {
             /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-line", style: { alignItems: "flex-start" }, children: [
               /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-label", children: "\u73AF\u5883\u53D8\u91CF" }),
               /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { style: { flex: 1 }, children: [
-                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("table", { className: "ide-envs", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("tbody", { children: activeDraft.envs.map((env, index) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("tr", { children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime.jsx)("td", { style: { width: "38%" }, children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-                    "input",
-                    {
-                      className: "ide-field ide-mono",
-                      value: env.name,
-                      placeholder: "NAME",
-                      onChange: (e) => patchDraft(activeDraft, { envs: activeDraft.envs.map((x, i) => i === index ? { ...x, name: e.target.value } : x) })
-                    }
-                  ) }),
-                  /* @__PURE__ */ (0, import_jsx_runtime.jsx)("td", { children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-                    "input",
-                    {
-                      className: "ide-field ide-mono",
-                      type: isSecretName(env.name) ? "password" : "text",
-                      title: isSecretName(env.name) ? "\u5BC6\u94A5\u7C7B\u53D8\u91CF\u5728\u754C\u9762\u4E0A\u63A9\u7801\u663E\u793A" : void 0,
-                      value: env.value,
-                      placeholder: "value",
-                      onChange: (e) => patchDraft(activeDraft, { envs: activeDraft.envs.map((x, i) => i === index ? { ...x, value: e.target.value } : x) })
-                    }
-                  ) }),
-                  /* @__PURE__ */ (0, import_jsx_runtime.jsx)("td", { style: { width: 32 }, children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-btn", onClick: () => patchDraft(activeDraft, { envs: activeDraft.envs.filter((_, i) => i !== index) }), children: "\xD7" }) })
-                ] }, index)) }) }),
-                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-chip", onClick: () => patchDraft(activeDraft, { envs: [...activeDraft.envs, { name: "", value: "" }] }), children: "\uFF0B \u53D8\u91CF" })
+                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("table", { className: "ide-envs", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("tbody", { children: activeDraft.envs.map((env, index) => {
+                  const status = secretStatus[env.name];
+                  return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("tr", { children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("td", { style: { width: "38%" }, children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                      "input",
+                      {
+                        className: "ide-field ide-mono",
+                        value: env.name,
+                        placeholder: "NAME",
+                        onChange: (e) => patchDraft(activeDraft, { envs: activeDraft.envs.map((x, i) => i === index ? { ...x, name: e.target.value } : x) })
+                      }
+                    ) }),
+                    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("td", { children: env.from === "credential" ? (
+                      /* 凭据变量：值不在面板的存储里，启动时由宿主按变量名去 DSH 凭据库取。
+                         这里只显示"配没配"，填进去的值直接写凭据库、不回显、不落面板存储。 */
+                      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-line", style: { gap: 6 }, children: [
+                        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-chip", "data-sel": true, title: "\u503C\u4E0D\u5728\u9762\u677F\u7684\u5B58\u50A8\u91CC\uFF1A\u542F\u52A8\u65F6\u7531\u5BBF\u4E3B\u6309\u53D8\u91CF\u540D\u4ECE DSH \u51ED\u636E\u5E93\u53D6", children: "\u51ED\u636E" }),
+                        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-note", children: status === void 0 ? "\uFF08\u67E5\u72B6\u6001\u2026\uFF09" : status.configured ? `\u5DF2\u914D\u7F6E\uFF08${status.source}\uFF09` : "\u672A\u914D\u7F6E" }),
+                        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                          "input",
+                          {
+                            className: "ide-field ide-mono",
+                            type: "password",
+                            style: { maxWidth: 220 },
+                            placeholder: "\u586B\u5165\u503C\uFF08\u5B58\u8FDB DSH \u51ED\u636E\u5E93\uFF09",
+                            value: secretInput[env.name] ?? "",
+                            onChange: (e) => setSecretInput((prev) => ({ ...prev, [env.name]: e.target.value }))
+                          }
+                        ),
+                        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                          "button",
+                          {
+                            type: "button",
+                            className: "ide-btn",
+                            "data-kind": "primary",
+                            disabled: secretBusy === env.name || (secretInput[env.name] ?? "") === "",
+                            onClick: () => {
+                              void saveSecret(env.name);
+                            },
+                            children: secretBusy === env.name ? "\u4FDD\u5B58\u4E2D\u2026" : "\u5B58\u51ED\u636E"
+                          }
+                        )
+                      ] })
+                    ) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                      "input",
+                      {
+                        className: "ide-field ide-mono",
+                        type: isSecretName(env.name) ? "password" : "text",
+                        title: isSecretName(env.name) ? "\u5BC6\u94A5\u7C7B\u53D8\u91CF\u5728\u754C\u9762\u4E0A\u63A9\u7801\u663E\u793A" : void 0,
+                        value: env.value,
+                        placeholder: "value",
+                        onChange: (e) => patchDraft(activeDraft, { envs: activeDraft.envs.map((x, i) => i === index ? { ...x, value: e.target.value } : x) })
+                      }
+                    ) }),
+                    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("td", { style: { width: 32 }, children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-btn", onClick: () => patchDraft(activeDraft, { envs: activeDraft.envs.filter((_, i) => i !== index) }), children: "\xD7" }) })
+                  ] }, index);
+                }) }) }),
+                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-chip", onClick: () => patchDraft(activeDraft, { envs: [...activeDraft.envs, { name: "", value: "", from: "literal" }] }), children: "\uFF0B \u53D8\u91CF" })
               ] })
+            ] }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-line", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { flex: 1 } }),
+              /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "ide-note", children: [
+                "\u4FDD\u5B58\u53EA\u4F5C\u7528\u4E8E\u8FD9\u4E00\u6761\uFF08\u6B63\u5728\u7F16\u8F91\uFF1A",
+                activeDraft.name,
+                "\uFF09"
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-btn", "data-kind": "primary", onClick: () => {
+                void saveDraft(active, activeDraft);
+              }, children: "\u4FDD\u5B58" })
             ] })
           ] })
         ] }) : null,

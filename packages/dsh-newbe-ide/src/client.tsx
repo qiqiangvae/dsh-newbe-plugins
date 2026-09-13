@@ -37,6 +37,10 @@ import {
   runSnapshotListSchema,
   runSnapshotSchema,
   runTargetSchema,
+  secretQuerySchema,
+  secretSetSchema,
+  secretStatusListSchema,
+  secretStatusSchema,
   type IdeLoad,
   type IdeProjectView,
   type IdeState,
@@ -49,6 +53,7 @@ import {
   type RunSnapshot,
   type RunStatus,
   type RunTarget,
+  type SecretStatus,
 } from './schema.js';
 import { isSecretName } from './lines.js';
 import { buildLaunchConfig, plannedConfigName } from './ideaconfig.js';
@@ -77,6 +82,8 @@ type RemoteIde = {
   runs(): Promise<RemoteEnvelope<unknown>>;
   history(request: RunTarget & { tail: number }): Promise<RemoteEnvelope<unknown>>;
   discover(request: { workspaceId: string }): Promise<RemoteEnvelope<unknown>>;
+  secretInfo(request: { names: string[] }): Promise<RemoteEnvelope<unknown>>;
+  secretSet(request: { name: string; value: string }): Promise<RemoteEnvelope<unknown>>;
 };
 
 /** 客户端 Remote contribution：与宿主 ./typert 清单的端点逐一对应。 */
@@ -156,6 +163,24 @@ const REMOTE_CONTRIBUTION = {
         { name: 'next', wire: 'next', source: 'json' as const, codec: { mode: 'strict' as const, typeSymbol: 'dsh-newbe-ide#IdeStateInput', schema: ideStateSchema } },
       ],
       result: { mode: 'strict' as const, typeSymbol: 'dsh-newbe-ide#IdeState', schema: ideStateSchema },
+    },
+    {
+      id: 'dsh-newbe-ide#ideConfig/secretInfo',
+      service: 'ideConfig',
+      namespace: 'ideConfig',
+      method: 'secretInfo',
+      invocation: { kind: 'direct' as const },
+      parameters: [{ name: 'request', wire: 'request', source: 'json' as const, codec: { mode: 'strict' as const, typeSymbol: 'dsh-newbe-ide#SecretQuery', schema: secretQuerySchema } }],
+      result: { mode: 'strict' as const, typeSymbol: 'dsh-newbe-ide#SecretStatusList', schema: secretStatusListSchema },
+    },
+    {
+      id: 'dsh-newbe-ide#ideConfig/secretSet',
+      service: 'ideConfig',
+      namespace: 'ideConfig',
+      method: 'secretSet',
+      invocation: { kind: 'direct' as const },
+      parameters: [{ name: 'request', wire: 'request', source: 'json' as const, codec: { mode: 'strict' as const, typeSymbol: 'dsh-newbe-ide#SecretSet', schema: secretSetSchema } }],
+      result: { mode: 'strict' as const, typeSymbol: 'dsh-newbe-ide#SecretStatus', schema: secretStatusSchema },
     },
   ],
 };
@@ -390,6 +415,15 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
   const tabRowRef = useRef<HTMLDivElement | null>(null);
   const [discovery, setDiscovery] = useState<IdeaDiscovery | null>(null);
   const [discoveryBusy, setDiscoveryBusy] = useState(false);
+  /**
+   * 凭据变量（`from: 'credential'`）的状态：**只有"配没配"，没有值**——值在 DSH 凭据库里，
+   * 面板既读不到也不存它。键 = 变量名。
+   */
+  const [secretStatus, setSecretStatus] = useState<Record<string, SecretStatus>>({});
+  /** 用户在面板里输入、还没提交的密钥值。提交后立刻清空（不留在组件状态里）。 */
+  const [secretInput, setSecretInput] = useState<Record<string, string>>({});
+  /** 正在保存的变量名（禁用按钮用）。 */
+  const [secretBusy, setSecretBusy] = useState('');
   /**
    * 每个启动配置自己的读取偏移（键 = runKey）。
    * 以前是一个全局 ref、切配置就归零：切回来时只要宿主 ring 已经滚过，就会整段重发（最多 5,000 行 ≈ 728KB）。
@@ -775,6 +809,7 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
       command: '',
       cwd: project.path,
       envs: [],
+      origin: 'human',
     };
     setDrafts((prev) => ({ ...prev, [fresh.id]: fresh }));
     setActiveConfigIds((prev) => ({ ...prev, [project.workspaceId]: fresh.id }));
@@ -809,7 +844,8 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
   };
 
   const saveDraft = async (project: ProjectEntry, draft: LaunchConfig) => {
-    const cleaned: LaunchConfig = { ...draft, cwd: draft.cwd !== '' ? draft.cwd : project.path };
+    // 人在面板上点了保存 → 这条配置的「写入来源」就是人（agent 之前写的标记到此为止）
+    const cleaned: LaunchConfig = { ...draft, cwd: draft.cwd !== '' ? draft.cwd : project.path, origin: 'human' };
     const saved = await commit(patchProject(cfg, project.workspaceId, (p) => ({
       ...p,
       activeConfigId: cleaned.id,
@@ -817,6 +853,52 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
     })), true);
     if (saved) {
       setDrafts((prev) => { const copy = { ...prev }; delete copy[cleaned.id]; return copy; });
+    }
+  };
+
+  /** 当前在编辑的这条配置里有哪些凭据变量（值不在前端，只有名字）。 */
+  const credentialKey = (activeDraft?.envs ?? [])
+    .filter((env) => env.from === 'credential' && env.name !== '')
+    .map((env) => env.name)
+    .join('|');
+
+  /** 问一次凭据状态。查不到就静默——状态缺失不该挡住编辑。 */
+  const refreshSecrets = async (names: string[]) => {
+    if (api === undefined || names.length === 0) return;
+    try {
+      const list = envelopeValue(await api.secretInfo({ names }), '读取凭据状态') as SecretStatus[];
+      setSecretStatus((prev) => {
+        const copy = { ...prev };
+        for (const status of list) copy[status.name] = status;
+        return copy;
+      });
+    } catch { /* 状态查不到不影响编辑 */ }
+  };
+
+  useEffect(() => {
+    void refreshSecrets(credentialKey === '' ? [] : credentialKey.split('|'));
+  }, [credentialKey]);
+
+  /**
+   * 把用户填的密钥值写进 DSH 凭据库（宿主的 `credentials.set`）。
+   * 值不回传、不落面板存储；提交后立刻从组件状态里清掉，面板以后只显示"配没配"。
+   */
+  const saveSecret = async (name: string) => {
+    if (api === undefined || name === '') return;
+    const value = secretInput[name] ?? '';
+    if (value === '') { setError('密钥值不能为空'); return; }
+    setSecretBusy(name);
+    setError('');
+    try {
+      const status = envelopeValue(await api.secretSet({ name, value }), '保存密钥') as SecretStatus;
+      setSecretStatus((prev) => ({ ...prev, [status.name]: status }));
+      setSecretInput((prev) => ({ ...prev, [name]: '' }));
+      setFlash(`已把 ${name} 存进凭据库`);
+      window.setTimeout(() => setFlash(''), 2000);
+    } catch (e) {
+      setError(describeRpcFailure('保存密钥', e));
+    } finally {
+      setSecretBusy('');
     }
   };
 
@@ -843,6 +925,7 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
       command: built.command,
       cwd: built.cwd,
       envs: built.envs,
+      origin: 'human',
     };
     setActiveConfigIds((prev) => ({ ...prev, [active.workspaceId]: fresh.id }));
     setFlash(`已导入 ${name}`);
@@ -1103,6 +1186,7 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
                     >
                       <span className="ide-dot" data-state={snapshot?.status ?? 'idle'} />
                       <span className="ide-mname">{c.name}</span>
+                      {c.origin === 'agent' ? <span className="ide-chip" title="这条配置由 agent 写入（ide_launch_save）">agent</span> : null}
                       {snapshot !== undefined && snapshot.port !== '' ? <span className="ide-port">:{snapshot.port}</span> : null}
                       <span className="ide-note ide-mstate">{up !== '' ? up : describeRun(snapshot)}</span>
                     </button>
@@ -1260,7 +1344,10 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
                     <div className="ide-line">
                       <span className="ide-label">名称</span>
                       <input className="ide-field" style={{ maxWidth: 240 }} value={activeDraft.name} onChange={(e) => patchDraft(activeDraft, { name: e.target.value })} />
-                      <button type="button" className="ide-btn" data-kind="primary" onClick={() => { void saveDraft(active, activeDraft); }}>保存</button>
+                      {activeDraft.origin === 'agent' ? (
+                        <span className="ide-chip" data-sel title="这条配置是 agent 通过 ide_launch_save 写的：保存一次就归你，标记消失">agent 写入</span>
+                      ) : null}
+                      <span style={{ flex: 1 }} />
                       <button type="button" className="ide-btn" data-kind="danger" onClick={() => removeConfig(active, activeDraft.id)}>删除</button>
                     </div>
                     <div className="ide-line">
@@ -1282,7 +1369,9 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
                       <div style={{ flex: 1 }}>
                         <table className="ide-envs">
                           <tbody>
-                            {activeDraft.envs.map((env, index) => (
+                            {activeDraft.envs.map((env, index) => {
+                              const status = secretStatus[env.name];
+                              return (
                               <tr key={index}>
                                 <td style={{ width: '38%' }}>
                                   <input
@@ -1293,24 +1382,59 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
                                   />
                                 </td>
                                 <td>
-                                  <input
-                                    className="ide-field ide-mono"
-                                    type={isSecretName(env.name) ? 'password' : 'text'}
-                                    title={isSecretName(env.name) ? '密钥类变量在界面上掩码显示' : undefined}
-                                    value={env.value}
-                                    placeholder="value"
-                                    onChange={(e) => patchDraft(activeDraft, { envs: activeDraft.envs.map((x, i) => (i === index ? { ...x, value: e.target.value } : x)) })}
-                                  />
+                                  {env.from === 'credential' ? (
+                                    /* 凭据变量：值不在面板的存储里，启动时由宿主按变量名去 DSH 凭据库取。
+                                       这里只显示"配没配"，填进去的值直接写凭据库、不回显、不落面板存储。 */
+                                    <div className="ide-line" style={{ gap: 6 }}>
+                                      <span className="ide-chip" data-sel title="值不在面板的存储里：启动时由宿主按变量名从 DSH 凭据库取">凭据</span>
+                                      <span className="ide-note">
+                                        {status === undefined ? '（查状态…）' : status.configured ? `已配置（${status.source}）` : '未配置'}
+                                      </span>
+                                      <input
+                                        className="ide-field ide-mono"
+                                        type="password"
+                                        style={{ maxWidth: 220 }}
+                                        placeholder="填入值（存进 DSH 凭据库）"
+                                        value={secretInput[env.name] ?? ''}
+                                        onChange={(e) => setSecretInput((prev) => ({ ...prev, [env.name]: e.target.value }))}
+                                      />
+                                      <button
+                                        type="button"
+                                        className="ide-btn"
+                                        data-kind="primary"
+                                        disabled={secretBusy === env.name || (secretInput[env.name] ?? '') === ''}
+                                        onClick={() => { void saveSecret(env.name); }}
+                                      >
+                                        {secretBusy === env.name ? '保存中…' : '存凭据'}
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <input
+                                      className="ide-field ide-mono"
+                                      type={isSecretName(env.name) ? 'password' : 'text'}
+                                      title={isSecretName(env.name) ? '密钥类变量在界面上掩码显示' : undefined}
+                                      value={env.value}
+                                      placeholder="value"
+                                      onChange={(e) => patchDraft(activeDraft, { envs: activeDraft.envs.map((x, i) => (i === index ? { ...x, value: e.target.value } : x)) })}
+                                    />
+                                  )}
                                 </td>
                                 <td style={{ width: 32 }}>
                                   <button type="button" className="ide-btn" onClick={() => patchDraft(activeDraft, { envs: activeDraft.envs.filter((_, i) => i !== index) })}>×</button>
                                 </td>
                               </tr>
-                            ))}
+                              );
+                            })}
                           </tbody>
                         </table>
-                        <button type="button" className="ide-chip" onClick={() => patchDraft(activeDraft, { envs: [...activeDraft.envs, { name: '', value: '' }] })}>＋ 变量</button>
+                        <button type="button" className="ide-chip" onClick={() => patchDraft(activeDraft, { envs: [...activeDraft.envs, { name: '', value: '', from: 'literal' }] })}>＋ 变量</button>
                       </div>
+                    </div>
+                    {/* 保存挪到表单底部：以前它挂在「名称」那一行，改完命令/变量常常忘了点 */}
+                    <div className="ide-line">
+                      <span style={{ flex: 1 }} />
+                      <span className="ide-note">保存只作用于这一条（正在编辑：{activeDraft.name}）</span>
+                      <button type="button" className="ide-btn" data-kind="primary" onClick={() => { void saveDraft(active, activeDraft); }}>保存</button>
                     </div>
                   </div>
                 )}

@@ -14,7 +14,9 @@ import { createConfigStore } from './store.js';
 import { createRunRegistry, type RunSpec } from './runtime.js';
 import { createFileLogSink } from './logsink.js';
 import { parseSpringBootConfigurations } from './ideaconfig.js';
-import { DEFAULT_HISTORY_LINES, runKeyOf, type IdeaDiscovery, type IdeLoad, type IdeProjectView, type IdeState, type LogHistory, type LogHistoryRequest, type RunRead, type RunSnapshot } from './schema.js';
+import { IDE_SKILL } from './skill.js';
+import { createIdeTools, type IdeToolDeps } from './tools.js';
+import { DEFAULT_HISTORY_LINES, runKeyOf, type IdeaDiscovery, type IdeLoad, type IdeProjectView, type IdeState, type LogHistory, type LogHistoryRequest, type RunRead, type RunSnapshot, type SecretStatus } from './schema.js';
 
 export { createConfigStore } from './store.js';
 export { DEFAULT_HISTORY_LINES, availableWorkspaces, basenameOf, defaultState, pickActiveConfig, runKeyOf, uniqueTitle } from './schema.js';
@@ -26,6 +28,8 @@ export { createFileLogSink } from './logsink.js';
 export { aggregateStatus, formatUptime, parsePort, readLostLines } from './rundisplay.js';
 export { buildLaunchConfig, parseSpringBootConfigurations, plannedConfigName } from './ideaconfig.js';
 export { createRunRegistry } from './runtime.js';
+export { awaitVerdict, createIdeTools, planSave, resolveTarget, toolView, vanishedTargets } from './tools.js';
+export { IDE_SKILL } from './skill.js';
 
 /** 持久化文件：$DSH_HOME/storages/dsh-newbe-ide.json。 */
 export const STORAGE_PATH = dshHomePath('storages', 'dsh-newbe-ide.json');
@@ -67,14 +71,40 @@ export function apply(ctx: any): void {
     };
   }, 'dsh-newbe-ide: run pump');
 
-  /** 从持久化配置里取出要跑的命令；找不到就把原因说清楚，而不是抛栈。 */
-  function specFor(target: { workspaceId: string; configId: string }): RunSpec {
+  /**
+   * 从持久化配置里取出要跑的命令；找不到就把原因说清楚，而不是抛栈。
+   *
+   * `from: 'credential'` 的变量**值不在面板的存储里**：按变量名去 DSH 凭据库取
+   * （`$DSH_HOME/.credentials.yaml`，服务键 `credentials`）。
+   * 取不到就报一条点名错误——绝不空值悄悄跑起来（空的环境变量会让进程用默认配置启动，
+   * 那种"跑起来了但连的是错的库"最难查）。
+   */
+  async function specFor(target: { workspaceId: string; configId: string }): Promise<RunSpec> {
     const state = store.getState();
     const project = state.projects.find((p) => p.workspaceId === target.workspaceId);
     if (project === undefined) throw new Error('这个项目不在面板配置里');
     const config = project.configs.find((c) => c.id === target.configId);
     if (config === undefined) throw new Error('找不到这条启动配置');
-    return { command: config.command, cwd: config.cwd !== '' ? config.cwd : project.path, envs: config.envs };
+    const envs: { name: string; value: string }[] = [];
+    const missing: string[] = [];
+    for (const entry of config.envs) {
+      if (entry.name === '') continue;
+      if (entry.from !== 'credential') {
+        envs.push({ name: entry.name, value: entry.value });
+        continue;
+      }
+      const provider = ctx.get('credentials');
+      const resolved = provider === undefined ? undefined : await provider.resolve(entry.name);
+      if (resolved === undefined || resolved.value === '') {
+        missing.push(entry.name);
+        continue;
+      }
+      envs.push({ name: entry.name, value: resolved.value });
+    }
+    if (missing.length > 0) {
+      throw new Error(`凭据库里没有 ${missing.join('、')}：需要在面板的配置块里填入值（值只写进 DSH 凭据库，不落面板存储）`);
+    }
+    return { command: config.command, cwd: config.cwd !== '' ? config.cwd : project.path, envs };
   }
 
   const service = {
@@ -84,11 +114,38 @@ export function apply(ctx: any): void {
     submit(next: unknown): Promise<IdeState> {
       return store.submit(next);
     },
-    start(target: { workspaceId: string; configId: string }): RunSnapshot {
-      return registry.start(runKeyOf(target), specFor(target));
+    /** 启动是异步的：`from: 'credential'` 的变量要等凭据库解析。客户端本来就是 await 调用。 */
+    async start(target: { workspaceId: string; configId: string }): Promise<RunSnapshot> {
+      return registry.start(runKeyOf(target), await specFor(target));
     },
     stop(target: { workspaceId: string; configId: string }): RunSnapshot {
       return registry.stop(runKeyOf(target));
+    },
+    /** 一组凭据变量的状态。**只回状态，值不可能出现在这里**——`CredentialInfo` 没有装值的字段。 */
+    async secretInfo(request: { names: string[] }): Promise<SecretStatus[]> {
+      const provider = ctx.get('credentials');
+      const out: SecretStatus[] = [];
+      for (const name of request.names ?? []) {
+        if (name === '') continue;
+        if (provider === undefined) {
+          out.push({ name, configured: false, writable: false, source: '' });
+          continue;
+        }
+        const info = await provider.describe(name);
+        out.push({ name, configured: info.configured, writable: info.writable, source: info.source ?? '' });
+      }
+      return out;
+    },
+    /**
+     * 人在面板里填一个密钥值：直接写进 DSH 凭据库。
+     * 值**不回传、不落面板存储**，面板只拿到状态；空值会被 provider 拒绝（这正是我们要的）。
+     */
+    async secretSet(request: { name: string; value: string }): Promise<SecretStatus> {
+      const provider = ctx.get('credentials');
+      if (provider === undefined) throw new Error('凭据服务不可用，无法保存密钥');
+      await provider.set(request.name, request.value);
+      const info = await provider.describe(request.name);
+      return { name: request.name, configured: info.configured, writable: info.writable, source: info.source ?? '' };
     },
     read(request: { workspaceId: string; configId: string; from: number }): RunRead {
       return registry.read(runKeyOf(request), request.from);
@@ -144,4 +201,45 @@ export function apply(ctx: any): void {
 
   // 客户端经 remote.ideConfig.* 调用（./typert 清单由 typert-loader 自动注册）。
   ctx.provide('ideConfig', service);
+
+  // 内置 skill：**装完即用**。DSH 的六个 skill 根目录都不扫已安装插件包里的 skills/，
+  // 所以走运行时注册（与工具同版本发布，不可能出现 skill 说一套、工具做一套）。
+  whenService(ctx, 'skills', (skills: any) => {
+    ctx.effect(() => skills.register(IDE_SKILL), 'dsh-newbe-ide: built-in skill');
+  });
+
+  // 内置模型工具：从宿主行注册 → 落在**全局层**，每个会话可见，不需要改任何 preset。
+  whenService(ctx, 'tools', (tools: any) => {
+    const deps: IdeToolDeps = {
+      state: () => store.getState(),
+      runs: () => registry.snapshots(),
+      apply: (next) => store.submit(next),
+      start: async (target) => registry.start(runKeyOf(target), await specFor(target)),
+      stop: async (target) => registry.stop(runKeyOf(target)),
+      // 失败回执里那几十行错误从磁盘尾部取：宿主缓冲可能已经滚过去了
+      tail: (target, lines) => sink.tail(runKeyOf(target), lines).lines,
+    };
+    for (const tool of createIdeTools(deps)) {
+      ctx.effect(() => tools.register(tool), `dsh-newbe-ide: tool ${String(tool.name)}`);
+    }
+  });
+}
+
+/**
+ * 等服务出现再注册。**只 `ctx.get` 一次是不够的**：profile 里 bundles 的顺序不保证谁先挂载，
+ * 晚挂载时那一次 get 拿到 undefined，工具就**静默**不存在了——面板照旧能用，最难发现。
+ * （不写进 `inject`：那是硬依赖，服务真缺席时整个插件都不挂载，连面板一起没了。）
+ */
+function whenService(ctx: any, name: string, use: (service: any) => void): void {
+  const ready = ctx.get(name);
+  if (ready !== undefined) {
+    use(ready);
+    return;
+  }
+  if (typeof ctx.on !== 'function') return;   // 极简 ctx（测试里那种）没有事件面
+  const off = ctx.on('internal/service', (serviceName: string, value: unknown) => {
+    if (serviceName !== name || value === undefined) return;
+    off();
+    use(value);
+  });
 }

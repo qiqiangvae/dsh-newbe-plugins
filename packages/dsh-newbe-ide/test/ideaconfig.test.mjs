@@ -52,8 +52,8 @@ test('解析出模块、主类与环境变量', () => {
   assert.equal(first.module, 'kun-ai-web');
   assert.equal(first.mainClass, 'com.pingpongx.kun.ai.web.KunAiApplication');
   assert.deepEqual(first.envs, [
-    { name: 'ai-review.workflow.python.base-url', value: 'http://localhost:8080' },
-    { name: 'pingpongx.cloud.tag', value: 'QQ' },
+    { name: 'ai-review.workflow.python.base-url', value: 'http://localhost:8080', from: 'literal' },
+    { name: 'pingpongx.cloud.tag', value: 'QQ', from: 'literal' },
   ]);
   assert.equal(first.problem, '');
 });
@@ -106,7 +106,7 @@ test('XML 实体被解码', () => {
   </configuration>`;
   const [cfg] = parseSpringBootConfigurations(xml);
   assert.equal(cfg.name, 'A&B');
-  assert.deepEqual(cfg.envs, [{ name: 'URL', value: 'http://x?a=1&b=2' }]);
+  assert.deepEqual(cfg.envs, [{ name: 'URL', value: 'http://x?a=1&b=2', from: 'literal' }]);
 });
 
 test('空环境变量名被丢弃，重复的环境变量保留最后一个', () => {
@@ -120,7 +120,7 @@ test('空环境变量名被丢弃，重复的环境变量保留最后一个', ()
     </envs>
   </configuration>`;
   const [cfg] = parseSpringBootConfigurations(xml);
-  assert.deepEqual(cfg.envs, [{ name: 'A', value: '2' }]);
+  assert.deepEqual(cfg.envs, [{ name: 'A', value: '2', from: 'literal' }]);
 });
 
 test('非 XML 文本不抛错，返回空列表', () => {

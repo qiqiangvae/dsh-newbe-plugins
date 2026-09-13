@@ -29,7 +29,9 @@ const sample = {
       name: 'web',
       command: 'mvn -o -pl kun-ai-web -am spring-boot:run',
       cwd: '/tmp/kun-ai',
-      envs: [{ name: 'pingpongx.cloud.tag', value: 'QQ' }],
+      // 形状跟着 schema 长：新字段都有默认值，所以老文件读回来也会带上它们
+      envs: [{ name: 'pingpongx.cloud.tag', value: 'QQ', from: 'literal' }],
+      origin: 'human',
     }],
   }],
   activeWorkspaceId: 'w1',
@@ -116,4 +118,24 @@ test('老文件没有 showOverview 字段时仍能读回（该字段已无 UI，
   assert.equal(store.warning, '', '不该被判为损坏');
   assert.equal(store.getState().showOverview, false);
   assert.equal(store.getState().projects[0].configs.length, 1, '配置不能丢');
+});
+
+test('老文件没有 origin / envs[].from 时仍能读回（缺省视为人写的、明文值）', () => {
+  const file = tempFile();
+  // 模拟 agent 工具出现之前写下的文件：配置没有 origin，变量没有 from
+  writeFileSync(file, JSON.stringify({
+    projects: [{
+      workspaceId: 'w1', path: '/tmp/p', title: 'p', activeConfigId: 'c1',
+      hidden: false,
+      configs: [{ id: 'c1', name: 'A', command: 'x', cwd: '/tmp/p', envs: [{ name: 'K', value: 'v' }] }],
+    }],
+    activeWorkspaceId: 'w1',
+    showOverview: false,
+  }));
+  const store = createConfigStore(file);
+  assert.equal(store.warning, '', '不该被判为损坏——那等于把用户的启动配置全丢');
+  const config = store.getState().projects[0].configs[0];
+  assert.equal(config.origin, 'human');
+  assert.equal(config.envs[0].from, 'literal');
+  assert.equal(config.envs[0].value, 'v', '老文件里的明文值必须原样留着');
 });
