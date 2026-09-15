@@ -15,7 +15,7 @@ import { createRunRegistry, type RunSpec } from './runtime.js';
 import { createFileLogSink } from './logsink.js';
 import { parseSpringBootConfigurations } from './ideaconfig.js';
 import { IDE_SKILL } from './skill.js';
-import { createIdeTools, type IdeToolDeps } from './tools.js';
+import { createIdeTools, vanishedTargets, type IdeToolDeps } from './tools.js';
 import { DEFAULT_HISTORY_LINES, runKeyOf, type IdeaDiscovery, type IdeLoad, type IdeProjectView, type IdeState, type LogHistory, type LogHistoryRequest, type RunRead, type RunSnapshot, type SecretStatus } from './schema.js';
 
 export { createConfigStore } from './store.js';
@@ -107,12 +107,25 @@ export function apply(ctx: any): void {
     return { command: config.command, cwd: config.cwd !== '' ? config.cwd : project.path, envs };
   }
 
+  /**
+   * 唯一写者：落盘，并把**在新状态里已经消失的启动配置**的日志一并删掉。
+   * 两条路都必须走这里——面板 RPC（`submit`）与模型工具（`IdeToolDeps.apply`）：
+   * 绕过去就会留下谁也够不着的孤儿日志（键已不在状态里，面板再也指不到它）。
+   * 停进程由调用方负责（面板的 removeConfig/removeProject、工具 save 里的 vanishedTargets 循环都停过）。
+   */
+  async function applyState(next: unknown): Promise<IdeState> {
+    const before = store.getState();
+    const saved = await store.submit(next);
+    for (const target of vanishedTargets(before, saved)) sink.remove(runKeyOf(target));
+    return saved;
+  }
+
   const service = {
     load(): IdeLoad {
       return { config: store.getState(), projects: listProjects(ctx), warning: store.warning };
     },
     submit(next: unknown): Promise<IdeState> {
-      return store.submit(next);
+      return applyState(next);
     },
     /** 启动是异步的：`from: 'credential'` 的变量要等凭据库解析。客户端本来就是 await 调用。 */
     async start(target: { workspaceId: string; configId: string }): Promise<RunSnapshot> {
@@ -213,7 +226,8 @@ export function apply(ctx: any): void {
     const deps: IdeToolDeps = {
       state: () => store.getState(),
       runs: () => registry.snapshots(),
-      apply: (next) => store.submit(next),
+      // 与面板同一条写路径：删掉的配置连日志一起清（applyState 的注释）
+      apply: (next) => applyState(next),
       start: async (target) => registry.start(runKeyOf(target), await specFor(target)),
       stop: async (target) => registry.stop(runKeyOf(target)),
       // 失败回执里那几十行错误从磁盘尾部取：宿主缓冲可能已经滚过去了

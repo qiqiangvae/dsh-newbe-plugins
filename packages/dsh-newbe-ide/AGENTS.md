@@ -56,11 +56,29 @@ skill `ctx.skills.register(...)`，都从宿主行进全局层，**不需要改�
 `$DSH_HOME/.credentials.yaml`，启动时按名字 `resolve` 注入 env；取不到就**点名报错**，不许空值悄悄
 跑起来。任何回执、列表、日志里出现密钥值都是 bug——`test/tools.test.mjs` 有断言守着。
 
+**删除必须两步 + 走 `applyState`**。面板上的删除（卡片 `…` 菜单 / 行内 `×`）是**两步确认**
+（`armed` 状态，4 秒自动解除武装），因为这个插件里的删除不可逆：项目配置会连它的全部启动配置一起没。
+删完还要**连磁盘日志一起清**——`index.ts` 的 `applyState()` 是唯一写者，它 diff 出"新状态里消失的配置"
+再 `sink.remove()`；面板 RPC 与模型工具两条路都走它，绕过就会留下谁也够不着的孤儿日志
+（`test/host.test.mjs` 有一条断言守着）。UI 这块没有 React 单测，靠
+`.scratch/dsh-newbe-ide/repro/run-delete-check.sh` 驱动真面板取证。
+
 **CSS 触发条件用 `.ide-view`**。收起底部消息输入框、把视图高度夹到面板高度，都挂在
 `[data-conversation-scroll]:has(.ide-view)` 上；`.ide-root` 只是共用样式类，拿它当触发条件会波及另一个面。
 
 **导入生成的命令不带 `-am`**。`-am` 会把上游工程放进 reactor，而 `spring-boot:run` 对 reactor 里
 每个工程执行，先在没有主类的聚合工程上失败。原因写在 `src/ideaconfig.ts` 的头注释里。
+
+**启动进程必须显式给 `sandboxPolicy`**。`dsh-bash-sandbox` 的 resolve 实现是
+`request.sandboxPolicy ?? ctx.sandboxPolicy.resolve()`——**不给就套上环境默认策略**，而默认策略
+（`dsh-base` 里 `DSH_PERMISSION_MODE ?? 'workspace-write'`）在 `workspace-write` 下只允许写
+`{workspaceRoot, /tmp, $TMPDIR}`（见 `dsh-sandbox` 的 `writableRoots()`）。实测后果：面板启动的进程
+**连自己项目目录和 `~/.m2` 都写不了**，`mvn` 直接报
+`resolver-status.properties (Operation not permitted)` + BUILD FAILURE；`sh -c 'touch …'` 探针从面板跑
+测出来是 `~/.m2` DENIED、项目目录 DENIED、只有 `/tmp` 与 `$TMPDIR` WRITABLE。
+策略结构只有 `mode` / `workspaceRoot` / `sessionId`，**没有"额外可写路径"可加**，所以只能整体放行：
+`runtime.ts` 的 `shell.resolve()` 传 `{ mode: 'danger-full-access', workspaceRoot: spec.cwd }`
+（放行模式下 root 不参与判定）。`test/runtime.test.mjs` 有一条断言守着——删掉那行它就会红。
 
 **DSH 的 `ShellProcess` 没有 pid**。它只暴露 status / exitCode / done / readOutput / kill / sandbox。
 面板因此显示端口（从输出里认）与运行时长（宿主记启动时刻），不显示 pid。

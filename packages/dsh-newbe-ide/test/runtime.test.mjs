@@ -48,6 +48,19 @@ test('启动把命令、工作目录、环境变量交给 shell，并进入运�
   assert.deepEqual({ ...shell.started[0].spec.env }, { A: '1' });
 });
 
+test('必须显式放行沙箱：不给策略时 dsh-bash-sandbox 会套上默认策略，连 target/ 与 ~/.m2 都写不了', () => {
+  const shell = makeShell();
+  const runs = createRunRegistry(() => shell);
+  runs.start('w/c', SPEC);
+  // dsh-bash-sandbox 的 resolve：request.sandboxPolicy ?? ctx.sandboxPolicy.resolve()
+  // 默认策略在 workspace-write 下只允许 {workspaceRoot, /tmp, $TMPDIR} 可写，
+  // 于是 mvn 写 ~/.m2 报 EPERM（Operation not permitted）、构建直接失败。
+  assert.deepEqual(shell.started[0].spec.sandboxPolicy, {
+    mode: 'danger-full-access',
+    workspaceRoot: '/tmp/kun-ai',
+  });
+});
+
 test('读取是增量的：第二次读不重复已给过的行', () => {
   const shell = makeShell();
   const runs = createRunRegistry(() => shell);

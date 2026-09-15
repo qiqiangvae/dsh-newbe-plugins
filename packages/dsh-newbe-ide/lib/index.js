@@ -14982,7 +14982,13 @@ function createRunRegistry(provideShell, options = {}) {
       const env = {};
       for (const entry of spec.envs) if (entry.name !== "") env[entry.name] = entry.value;
       try {
-        const resolved = shell.resolve({ command: spec.command, workdir: spec.cwd, env });
+        const resolved = shell.resolve({
+          command: spec.command,
+          workdir: spec.cwd,
+          env,
+          // 不给策略 = 套上环境默认沙箱 = 连 target/ 与 ~/.m2 都写不了（见 ShellServiceLike 的注释）
+          sandboxPolicy: { mode: "danger-full-access", workspaceRoot: spec.cwd }
+        });
         run.proc = shell.start(resolved);
         run.status = "running";
       } catch (error51) {
@@ -15117,6 +15123,12 @@ function createFileLogSink(dir, options = {}) {
       if (newest.lines.length >= maxLines) return { lines: newest.lines, truncated: newest.more };
       const older = readTailLines(pathOf(key) + ".1", maxLines - newest.lines.length, tailBytes);
       return { lines: [...older.lines, ...newest.lines], truncated: older.more || newest.more };
+    },
+    remove(key) {
+      const file2 = pathOf(key);
+      sizes.delete(file2);
+      rmSync2(file2, { force: true });
+      rmSync2(file2 + ".1", { force: true });
     }
   };
 }
@@ -15788,12 +15800,18 @@ function apply(ctx) {
     }
     return { command: config2.command, cwd: config2.cwd !== "" ? config2.cwd : project.path, envs };
   }
+  async function applyState(next) {
+    const before = store.getState();
+    const saved = await store.submit(next);
+    for (const target of vanishedTargets(before, saved)) sink.remove(runKeyOf(target));
+    return saved;
+  }
   const service = {
     load() {
       return { config: store.getState(), projects: listProjects(ctx), warning: store.warning };
     },
     submit(next) {
-      return store.submit(next);
+      return applyState(next);
     },
     /** 启动是异步的：`from: 'credential'` 的变量要等凭据库解析。客户端本来就是 await 调用。 */
     async start(target) {
@@ -15887,7 +15905,8 @@ function apply(ctx) {
     const deps = {
       state: () => store.getState(),
       runs: () => registry2.snapshots(),
-      apply: (next) => store.submit(next),
+      // 与面板同一条写路径：删掉的配置连日志一起清（applyState 的注释）
+      apply: (next) => applyState(next),
       start: async (target) => registry2.start(runKeyOf(target), await specFor(target)),
       stop: async (target) => registry2.stop(runKeyOf(target)),
       // 失败回执里那几十行错误从磁盘尾部取：宿主缓冲可能已经滚过去了

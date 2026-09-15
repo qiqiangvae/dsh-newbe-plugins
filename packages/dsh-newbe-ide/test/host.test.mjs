@@ -6,7 +6,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -376,4 +376,29 @@ test('secretInfo / secretSet：只回状态，值永远不回传', async () => {
   mod.apply(bare.ctx);
   assert.deepEqual(await bare.provided.ideConfig.secretInfo({ names: ['X_API_KEY'] }), [{ name: 'X_API_KEY', configured: false, writable: false, source: '' }]);
   await assert.rejects(() => bare.provided.ideConfig.secretSet({ name: 'X_API_KEY', value: 'x' }), /凭据服务不可用/);
+});
+
+test('删掉启动配置时，它在磁盘上的日志一起消失（不留孤儿）', async () => {
+  const shell = makeShell();
+  const { ctx, provided } = makeCtx(null, shell);
+  mod.apply(ctx);
+  await provided.ideConfig.submit({
+    projects: [{
+      workspaceId: 'w-gone', path: '/tmp/p', title: 'p', activeConfigId: 'c1', hidden: false,
+      configs: [{ id: 'c1', name: 'A', command: 'echo hi', cwd: '/tmp/p', envs: [], origin: 'human' }],
+    }],
+    activeWorkspaceId: 'w-gone',
+    showOverview: false,
+  });
+  await provided.ideConfig.start({ workspaceId: 'w-gone', configId: 'c1' });
+  shell.started[shell.started.length - 1].proc.emit('hello\n');
+  // read() 触发一次采集：走磁盘的那条路（history 读的是落盘文件）
+  provided.ideConfig.read({ workspaceId: 'w-gone', configId: 'c1', from: 0 });
+  const history = provided.ideConfig.history({ workspaceId: 'w-gone', configId: 'c1', tail: 10 });
+  assert.deepEqual([...history.lines], ['hello']);
+  assert.equal(existsSync(history.path), true);
+
+  // 把这条配置从状态里删掉：日志必须跟着走——键已不在状态里，留着就是谁也够不着的孤儿
+  await provided.ideConfig.submit({ projects: [], activeWorkspaceId: '', showOverview: false });
+  assert.equal(existsSync(history.path), false, '删了配置还留着日志文件');
 });

@@ -228,6 +228,8 @@ function ensureStyles(): () => void {
 .ide-overflow ul{position:absolute;right:0;top:30px;z-index:30;background:var(--dsw-alias-bg-module-platform,#fff);border:1px solid var(--dsw-alias-border-l2,#d9dce1);border-radius:9px;box-shadow:0 14px 34px rgba(0,0,0,.28);padding:6px;margin:0;list-style:none;min-width:240px;max-height:320px;overflow:auto}
 .ide-overflow li{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;cursor:pointer;font-size:12px;color:var(--dsw-alias-label-secondary,#697586);white-space:nowrap}
 .ide-overflow li:hover{background:var(--dsw-alias-interactive-bg-hover,rgba(0,0,0,.07));color:var(--dsw-alias-label-primary,#1f2329)}
+.ide-overflow li[data-danger]{color:var(--dsw-alias-state-error-primary,#d83931)}
+.ide-overflow li[data-armed=true]{background:var(--dsw-alias-state-error-primary,#d83931);color:#fff;font-weight:600}
 .ide-board{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px;align-content:start;overflow:auto;flex:1;min-height:0}
 /* 一行一条配置：名字与状态各自单行省略，否则窄卡里会折成"停 / 止"那样的竖排 */
 .ide-cardrow{display:flex;align-items:center;gap:8px;padding:5px 7px;border-radius:7px;background:var(--dsw-alias-interactive-bg-hover,rgba(128,128,128,.08));font-size:12px;min-width:0}
@@ -424,6 +426,16 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
   const [secretInput, setSecretInput] = useState<Record<string, string>>({});
   /** 正在保存的变量名（禁用按钮用）。 */
   const [secretBusy, setSecretBusy] = useState('');
+  /**
+   * 已被"武装"的删除键（`workspaceId` = 删整条项目配置；`workspaceId/configId` = 删一条启动配置）。
+   * 删除是**两步确认**：第一下只把按钮变成「确认删除」，再点一下才真删。
+   * 这个插件里删除是不可逆的（连磁盘日志一起删），所以不留一步确认就等于在默认落地页上放了个陷阱。
+   */
+  const [armed, setArmed] = useState('');
+  const armTimerRef = useRef<number | null>(null);
+  /** 正在改名的那条项目配置（内联输入框）。 */
+  const [renaming, setRenaming] = useState('');
+  const [renameText, setRenameText] = useState('');
   /**
    * 每个启动配置自己的读取偏移（键 = runKey）。
    * 以前是一个全局 ref、切配置就归零：切回来时只要宿主 ring 已经滚过，就会整段重发（最多 5,000 行 ≈ 728KB）。
@@ -740,6 +752,39 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
   };
 
   /**
+   * 两步确认。第一次点只是"把按钮变成「确认删除」"，第二下才真删；**4 秒后自动解除武装**——
+   * 否则一个被点过一次的按钮会一直挂着，等于没有确认。
+   */
+  const armDelete = (key: string, run: () => void) => {
+    if (armTimerRef.current !== null) window.clearTimeout(armTimerRef.current);
+    if (armed !== key) {
+      setArmed(key);
+      armTimerRef.current = window.setTimeout(() => setArmed(''), 4000);
+      return;
+    }
+    setArmed('');
+    run();
+  };
+
+  /** 菜单项点完把 `<details>` 收起来（原生 details 不会自己关）。 */
+  const closeMenu = (event: { currentTarget: HTMLElement }) => {
+    event.currentTarget.closest('details')?.removeAttribute('open');
+  };
+
+  const startRename = (project: ProjectEntry) => {
+    setRenaming(project.workspaceId);
+    setRenameText(project.title);
+  };
+
+  /** 项目配置的标题此前只能在新建时定，之后没有入口——菜单里的「重命名」就是补这个。 */
+  const commitRename = (project: ProjectEntry) => {
+    const title = renameText.trim();
+    setRenaming('');
+    if (title === '' || title === project.title) return;
+    void commit(patchProject(cfg, project.workspaceId, (p) => ({ ...p, title })), false);
+  };
+
+  /**
    * 清空日志**视图**（终端 `clear` 的语义）：宿主缓冲与磁盘上的日志文件都不动，
    * 所以"上次为什么挂"仍在，刷新页面也还能重新读到宿主缓冲里的内容。
    * 不动偏移（偏移继续往后走，新行照常追加），也不让编号倒退。
@@ -1046,12 +1091,48 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
               <div className="ide-card" key={p.workspaceId}>
                 <div className="ide-cardhead">
                   <span className="ide-dot" data-state={statusOfProject(p)} />
-                  <span className="ide-title">{p.title}</span>
+                  {renaming === p.workspaceId ? (
+                    <>
+                      <input
+                        className="ide-field"
+                        style={{ maxWidth: 200 }}
+                        value={renameText}
+                        autoFocus
+                        onChange={(e) => setRenameText(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') commitRename(p);
+                          if (e.key === 'Escape') setRenaming('');
+                        }}
+                      />
+                      <button type="button" className="ide-btn" data-kind="primary" onClick={() => commitRename(p)}>保存</button>
+                      <button type="button" className="ide-btn" onClick={() => setRenaming('')}>取消</button>
+                    </>
+                  ) : (
+                    <span className="ide-title">{p.title}</span>
+                  )}
                   {p.hidden ? <span className="ide-note">已收起</span> : null}
                   <span style={{ flex: 1 }} />
                   <span className="ide-note">{p.configs.length} 条配置</span>
                   {/* 「打开」= 进这个项目配置的面板：0 配置的卡片过去没有任何可点入口（死胡同） */}
                   <button type="button" className="ide-btn" onClick={() => revealProject(p.workspaceId)}>打开</button>
+                  {/* 卡片级动作都收进 `…` 里：总览是默认落地页，把红色删除按钮摆在「打开」旁边就是给手滑创造条件 */}
+                  <details className="ide-overflow">
+                    <summary title="更多操作">…</summary>
+                    <ul>
+                      <li onClick={(e) => { closeMenu(e); setHidden(p.workspaceId, !p.hidden); }}>
+                        {p.hidden ? '恢复显示' : '收起'}
+                      </li>
+                      <li onClick={(e) => { closeMenu(e); startRename(p); }}>重命名</li>
+                      <li
+                        data-danger
+                        data-armed={armed === p.workspaceId}
+                        title={armed === p.workspaceId ? '再点一次：删除这条项目配置，连同它的全部启动配置与磁盘日志' : '删除这条项目配置'}
+                        onClick={(e) => armDelete(p.workspaceId, () => { closeMenu(e); removeProject(p.workspaceId); })}
+                      >
+                        {armed === p.workspaceId ? '确认删除（含日志）' : '删除'}
+                      </li>
+                    </ul>
+                  </details>
                 </div>
                 <div className="ide-note ide-mono">{p.path}</div>
                 {p.configs.length === 0 ? <div className="ide-note">还没有启动配置 —— 点右上角「打开」进去加第一条</div> : null}
@@ -1072,6 +1153,16 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
                       ) : (
                         <button type="button" className="ide-btn" data-kind="primary" onClick={() => { void runAction('start', { workspaceId: p.workspaceId, configId: c.id }); }}>启动</button>
                       )}
+                      {/* 行内删除（同样是两步确认）：先在面板里看到这条，就地删，不必先进 ⚙ 配置 */}
+                      <button
+                        type="button"
+                        className="ide-btn"
+                        data-kind={armed === p.workspaceId + '/' + c.id ? 'danger' : undefined}
+                        title={armed === p.workspaceId + '/' + c.id ? '再点一次：删掉这条启动配置（连它的日志）' : '删除这条启动配置'}
+                        onClick={() => armDelete(p.workspaceId + '/' + c.id, () => removeConfig(p, c.id))}
+                      >
+                        {armed === p.workspaceId + '/' + c.id ? '确认' : '×'}
+                      </button>
                     </div>
                   );
                 })}

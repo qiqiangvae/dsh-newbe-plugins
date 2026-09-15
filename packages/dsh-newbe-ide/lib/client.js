@@ -14943,6 +14943,8 @@ function ensureStyles() {
 .ide-overflow ul{position:absolute;right:0;top:30px;z-index:30;background:var(--dsw-alias-bg-module-platform,#fff);border:1px solid var(--dsw-alias-border-l2,#d9dce1);border-radius:9px;box-shadow:0 14px 34px rgba(0,0,0,.28);padding:6px;margin:0;list-style:none;min-width:240px;max-height:320px;overflow:auto}
 .ide-overflow li{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;cursor:pointer;font-size:12px;color:var(--dsw-alias-label-secondary,#697586);white-space:nowrap}
 .ide-overflow li:hover{background:var(--dsw-alias-interactive-bg-hover,rgba(0,0,0,.07));color:var(--dsw-alias-label-primary,#1f2329)}
+.ide-overflow li[data-danger]{color:var(--dsw-alias-state-error-primary,#d83931)}
+.ide-overflow li[data-armed=true]{background:var(--dsw-alias-state-error-primary,#d83931);color:#fff;font-weight:600}
 .ide-board{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px;align-content:start;overflow:auto;flex:1;min-height:0}
 /* \u4E00\u884C\u4E00\u6761\u914D\u7F6E\uFF1A\u540D\u5B57\u4E0E\u72B6\u6001\u5404\u81EA\u5355\u884C\u7701\u7565\uFF0C\u5426\u5219\u7A84\u5361\u91CC\u4F1A\u6298\u6210"\u505C / \u6B62"\u90A3\u6837\u7684\u7AD6\u6392 */
 .ide-cardrow{display:flex;align-items:center;gap:8px;padding:5px 7px;border-radius:7px;background:var(--dsw-alias-interactive-bg-hover,rgba(128,128,128,.08));font-size:12px;min-width:0}
@@ -15105,6 +15107,10 @@ function IdeView({ api, ctx }) {
   const [secretStatus, setSecretStatus] = (0, import_react.useState)({});
   const [secretInput, setSecretInput] = (0, import_react.useState)({});
   const [secretBusy, setSecretBusy] = (0, import_react.useState)("");
+  const [armed, setArmed] = (0, import_react.useState)("");
+  const armTimerRef = (0, import_react.useRef)(null);
+  const [renaming, setRenaming] = (0, import_react.useState)("");
+  const [renameText, setRenameText] = (0, import_react.useState)("");
   const offsetsRef = (0, import_react.useRef)(/* @__PURE__ */ new Map());
   const logLinesRef = (0, import_react.useRef)([]);
   const followingRef = (0, import_react.useRef)(true);
@@ -15336,6 +15342,29 @@ function IdeView({ api, ctx }) {
   }, [config2, overview, visibleKey, activeProjectId]);
   const setHidden = (workspaceId, hidden) => {
     void commit(patchProject(cfg, workspaceId, (p) => ({ ...p, hidden })), false);
+  };
+  const armDelete = (key, run) => {
+    if (armTimerRef.current !== null) window.clearTimeout(armTimerRef.current);
+    if (armed !== key) {
+      setArmed(key);
+      armTimerRef.current = window.setTimeout(() => setArmed(""), 4e3);
+      return;
+    }
+    setArmed("");
+    run();
+  };
+  const closeMenu = (event) => {
+    event.currentTarget.closest("details")?.removeAttribute("open");
+  };
+  const startRename = (project) => {
+    setRenaming(project.workspaceId);
+    setRenameText(project.title);
+  };
+  const commitRename = (project) => {
+    const title = renameText.trim();
+    setRenaming("");
+    if (title === "" || title === project.title) return;
+    void commit(patchProject(cfg, project.workspaceId, (p) => ({ ...p, title })), false);
   };
   const clearLogView = () => {
     setSeqBase(seqBase + logLinesRef.current.length);
@@ -15600,14 +15629,57 @@ function IdeView({ api, ctx }) {
         cfg.projects.map((p) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-card", children: [
           /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-cardhead", children: [
             /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-dot", "data-state": statusOfProject(p) }),
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-title", children: p.title }),
+            renaming === p.workspaceId ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                "input",
+                {
+                  className: "ide-field",
+                  style: { maxWidth: 200 },
+                  value: renameText,
+                  autoFocus: true,
+                  onChange: (e) => setRenameText(e.target.value),
+                  onKeyDown: (e) => {
+                    if (e.key === "Enter") commitRename(p);
+                    if (e.key === "Escape") setRenaming("");
+                  }
+                }
+              ),
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-btn", "data-kind": "primary", onClick: () => commitRename(p), children: "\u4FDD\u5B58" }),
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-btn", onClick: () => setRenaming(""), children: "\u53D6\u6D88" })
+            ] }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-title", children: p.title }),
             p.hidden ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-note", children: "\u5DF2\u6536\u8D77" }) : null,
             /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { flex: 1 } }),
             /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "ide-note", children: [
               p.configs.length,
               " \u6761\u914D\u7F6E"
             ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-btn", onClick: () => revealProject(p.workspaceId), children: "\u6253\u5F00" })
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-btn", onClick: () => revealProject(p.workspaceId), children: "\u6253\u5F00" }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("details", { className: "ide-overflow", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("summary", { title: "\u66F4\u591A\u64CD\u4F5C", children: "\u2026" }),
+              /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("ul", { children: [
+                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("li", { onClick: (e) => {
+                  closeMenu(e);
+                  setHidden(p.workspaceId, !p.hidden);
+                }, children: p.hidden ? "\u6062\u590D\u663E\u793A" : "\u6536\u8D77" }),
+                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("li", { onClick: (e) => {
+                  closeMenu(e);
+                  startRename(p);
+                }, children: "\u91CD\u547D\u540D" }),
+                /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                  "li",
+                  {
+                    "data-danger": true,
+                    "data-armed": armed === p.workspaceId,
+                    title: armed === p.workspaceId ? "\u518D\u70B9\u4E00\u6B21\uFF1A\u5220\u9664\u8FD9\u6761\u9879\u76EE\u914D\u7F6E\uFF0C\u8FDE\u540C\u5B83\u7684\u5168\u90E8\u542F\u52A8\u914D\u7F6E\u4E0E\u78C1\u76D8\u65E5\u5FD7" : "\u5220\u9664\u8FD9\u6761\u9879\u76EE\u914D\u7F6E",
+                    onClick: (e) => armDelete(p.workspaceId, () => {
+                      closeMenu(e);
+                      removeProject(p.workspaceId);
+                    }),
+                    children: armed === p.workspaceId ? "\u786E\u8BA4\u5220\u9664\uFF08\u542B\u65E5\u5FD7\uFF09" : "\u5220\u9664"
+                  }
+                )
+              ] })
+            ] })
           ] }),
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-note ide-mono", children: p.path }),
           p.configs.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-note", children: "\u8FD8\u6CA1\u6709\u542F\u52A8\u914D\u7F6E \u2014\u2014 \u70B9\u53F3\u4E0A\u89D2\u300C\u6253\u5F00\u300D\u8FDB\u53BB\u52A0\u7B2C\u4E00\u6761" }) : null,
@@ -15629,7 +15701,18 @@ function IdeView({ api, ctx }) {
                 void runAction("stop", { workspaceId: p.workspaceId, configId: c.id });
               }, children: "\u505C\u6B62" }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-btn", "data-kind": "primary", onClick: () => {
                 void runAction("start", { workspaceId: p.workspaceId, configId: c.id });
-              }, children: "\u542F\u52A8" })
+              }, children: "\u542F\u52A8" }),
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                "button",
+                {
+                  type: "button",
+                  className: "ide-btn",
+                  "data-kind": armed === p.workspaceId + "/" + c.id ? "danger" : void 0,
+                  title: armed === p.workspaceId + "/" + c.id ? "\u518D\u70B9\u4E00\u6B21\uFF1A\u5220\u6389\u8FD9\u6761\u542F\u52A8\u914D\u7F6E\uFF08\u8FDE\u5B83\u7684\u65E5\u5FD7\uFF09" : "\u5220\u9664\u8FD9\u6761\u542F\u52A8\u914D\u7F6E",
+                  onClick: () => armDelete(p.workspaceId + "/" + c.id, () => removeConfig(p, c.id)),
+                  children: armed === p.workspaceId + "/" + c.id ? "\u786E\u8BA4" : "\xD7"
+                }
+              )
             ] }, c.id);
           })
         ] }, p.workspaceId)),

@@ -107,3 +107,19 @@ test('消毒会撞车的两个键不会写到同一个文件', () => {
   assert.deepEqual(sink.tail('a/b', 10).lines, ['first']);
   assert.deepEqual(sink.tail('a_b', 10).lines, ['second']);
 });
+
+test('remove 把两代都删掉，且不碰别人的日志', () => {
+  const base = dir();
+  const sink = createFileLogSink(base, { maxBytes: 40 });
+  sink.append('w/c', ['a'.repeat(30)]);   // 先把主文件写大
+  sink.append('w/c', ['b'.repeat(30)]);   // 再写一次触发轮转 → 出现 .1
+  sink.append('w/other', ['keep me']);
+  assert.equal(readdirSync(base).length, 3, '应当是 主文件 + .1 + other');
+
+  sink.remove('w/c');
+  assert.deepEqual(sink.tail('w/c', 5).lines, [], '删了配置就不该还能读回它的日志');
+  assert.equal(readdirSync(base).length, 1, '只该剩下 other 那一个文件');
+  assert.deepEqual(sink.tail('w/other', 5).lines, ['keep me']);
+
+  sink.remove('w/c');   // 不存在也不抛
+});

@@ -23,7 +23,23 @@ interface ShellProcessLike {
 }
 
 interface ShellServiceLike {
-  resolve(request: { command: string; workdir?: string; env?: Record<string, string> }): unknown;
+  /**
+   * `sandboxPolicy` **必须显式给**：`dsh-bash-sandbox` 的 resolve 实现是
+   * `request.sandboxPolicy ?? ctx.sandboxPolicy.resolve()`——不给就套上环境默认策略，
+   * 而默认策略在 `workspace-write` 下只允许写 `{workspaceRoot, /tmp, $TMPDIR}`。
+   * 实测后果：面板启动的进程**连自己项目目录与 `~/.m2` 都写不了**，
+   * `mvn` 直接 `resolver-status.properties (Operation not permitted)` + BUILD FAILURE。
+   * 这里显式放行：面板启动的是用户自己的开发进程（dev server / mvn / uv），
+   * 构建工具必须能写自己的 `target/`、`node_modules/` 与全局缓存——与 IDEA 点 Run 同类。
+   * （策略结构只有 mode / workspaceRoot / sessionId，没有"额外可写路径"可加，
+   * 所以只能整体放行；`workspaceRoot` 在放行模式下不参与判定，给 cwd 占位。）
+   */
+  resolve(request: {
+    command: string;
+    workdir?: string;
+    env?: Record<string, string>;
+    sandboxPolicy?: { mode: 'read-only' | 'workspace-write' | 'danger-full-access'; workspaceRoot: string };
+  }): unknown;
   start(spec: unknown): ShellProcessLike;
 }
 
@@ -237,7 +253,13 @@ export function createRunRegistry(provideShell: ShellProvider, options: RunRegis
       const env: Record<string, string> = {};
       for (const entry of spec.envs) if (entry.name !== '') env[entry.name] = entry.value;
       try {
-        const resolved = shell.resolve({ command: spec.command, workdir: spec.cwd, env });
+        const resolved = shell.resolve({
+          command: spec.command,
+          workdir: spec.cwd,
+          env,
+          // 不给策略 = 套上环境默认沙箱 = 连 target/ 与 ~/.m2 都写不了（见 ShellServiceLike 的注释）
+          sandboxPolicy: { mode: 'danger-full-access', workspaceRoot: spec.cwd },
+        });
         run.proc = shell.start(resolved);
         run.status = 'running';
       } catch (error) {

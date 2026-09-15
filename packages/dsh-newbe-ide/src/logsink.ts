@@ -20,6 +20,8 @@ export interface LogSink {
   append(key: string, lines: readonly string[]): void;
   tail(key: string, maxLines: number): TailResult;
   path(key: string): string;
+  /** 删掉这条键的日志（两代都删）。用于"删启动配置"——删了配置，日志就成了谁也够不着的孤儿。 */
+  remove(key: string): void;
 }
 
 export interface LogSinkOptions {
@@ -123,6 +125,13 @@ export function createFileLogSink(dir: string, options: LogSinkOptions = {}): Lo
       if (newest.lines.length >= maxLines) return { lines: newest.lines, truncated: newest.more };
       const older = readTailLines(pathOf(key) + '.1', maxLines - newest.lines.length, tailBytes);
       return { lines: [...older.lines, ...newest.lines], truncated: older.more || newest.more };
+    },
+
+    remove(key: string): void {
+      const file = pathOf(key);
+      sizes.delete(file);
+      rmSync(file, { force: true });
+      rmSync(file + '.1', { force: true });
     },
   };
 }
