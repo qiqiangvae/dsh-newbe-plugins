@@ -14962,7 +14962,7 @@ function createRunRegistry(provideShell, options = {}) {
     };
   }
   return {
-    start(key, spec) {
+    async start(key, spec) {
       const shell = provideShell();
       const run = record2(key);
       if (run.status === "running" && !run.stopRequested) throw new Error("\u8BE5\u542F\u52A8\u914D\u7F6E\u5DF2\u5728\u8FD0\u884C");
@@ -14982,6 +14982,7 @@ function createRunRegistry(provideShell, options = {}) {
       const env = {};
       for (const entry of spec.envs) if (entry.name !== "") env[entry.name] = entry.value;
       try {
+        run.proc = null;
         const resolved = shell.resolve({
           command: spec.command,
           workdir: spec.cwd,
@@ -14989,7 +14990,7 @@ function createRunRegistry(provideShell, options = {}) {
           // 不给策略 = 套上环境默认沙箱 = 连 target/ 与 ~/.m2 都写不了（见 ShellServiceLike 的注释）
           sandboxPolicy: { mode: "danger-full-access", workspaceRoot: spec.cwd }
         });
-        run.proc = shell.start(resolved);
+        run.proc = await shell.start(resolved);
         run.status = "running";
       } catch (error51) {
         run.proc = null;

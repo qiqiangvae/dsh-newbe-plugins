@@ -40,7 +40,14 @@ interface ShellServiceLike {
     env?: Record<string, string>;
     sandboxPolicy?: { mode: 'read-only' | 'workspace-write' | 'danger-full-access'; workspaceRoot: string };
   }): unknown;
-  start(spec: unknown): ShellProcessLike;
+  /**
+   * **可能是 async 的**：0.1.5 的 `start()` 同步返回 `ShellProcess`，0.1.6-alpha.1 起
+   * `LocalBashExecutor` / `SandboxBashExecutor` 都把它写成了 `async`，于是返回 Promise。
+   * 按同步写就会把 Promise 当成进程对象：`proc.readOutput` 不存在 → 每次泵都抛 TypeError
+   * （被 drainInto 的 catch 静默吞掉）→ **输出一条不落、状态永远停在「运行中」**。
+   * 所以这里统一 `await`——对非 Promise 是空操作，两个版本都能跑。
+   */
+  start(spec: unknown): ShellProcessLike | Promise<ShellProcessLike>;
 }
 
 export interface RunSpec {
@@ -50,7 +57,8 @@ export interface RunSpec {
 }
 
 interface RunRegistry {
-  start(key: string, spec: RunSpec): RunSnapshot;
+  /** 异步：`shell.start()` 在 0.1.6 起返回 Promise（见 ShellServiceLike 的注释）。 */
+  start(key: string, spec: RunSpec): Promise<RunSnapshot>;
   stop(key: string): RunSnapshot;
   read(key: string, from: number): RunRead;
   snapshot(key: string): RunSnapshot;
@@ -233,7 +241,7 @@ export function createRunRegistry(provideShell: ShellProvider, options: RunRegis
   }
 
   return {
-    start(key: string, spec: RunSpec): RunSnapshot {
+    async start(key: string, spec: RunSpec): Promise<RunSnapshot> {
       const shell = provideShell();
       const run = record(key);
       if (run.status === 'running' && !run.stopRequested) throw new Error('该启动配置已在运行');
@@ -253,6 +261,8 @@ export function createRunRegistry(provideShell: ShellProvider, options: RunRegis
       const env: Record<string, string> = {};
       for (const entry of spec.envs) if (entry.name !== '') env[entry.name] = entry.value;
       try {
+        // await 期间把句柄置空：否则（重启同一条配置时）泵会拿**上一代**的 proc 去读，把旧输出串进新缓冲。
+        run.proc = null;
         const resolved = shell.resolve({
           command: spec.command,
           workdir: spec.cwd,
@@ -260,7 +270,7 @@ export function createRunRegistry(provideShell: ShellProvider, options: RunRegis
           // 不给策略 = 套上环境默认沙箱 = 连 target/ 与 ~/.m2 都写不了（见 ShellServiceLike 的注释）
           sandboxPolicy: { mode: 'danger-full-access', workspaceRoot: spec.cwd },
         });
-        run.proc = shell.start(resolved);
+        run.proc = await shell.start(resolved);
         run.status = 'running';
       } catch (error) {
         run.proc = null;

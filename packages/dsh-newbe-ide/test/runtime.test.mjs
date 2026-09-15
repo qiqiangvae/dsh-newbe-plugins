@@ -38,20 +38,20 @@ function makeShell() {
 
 const SPEC = { command: 'mvn -o test', cwd: '/tmp/kun-ai', envs: [{ name: 'A', value: '1' }] };
 
-test('启动把命令、工作目录、环境变量交给 shell，并进入运行中', () => {
+test('启动把命令、工作目录、环境变量交给 shell，并进入运行中', async () => {
   const shell = makeShell();
   const runs = createRunRegistry(() => shell);
-  assert.equal(runs.start('w/c', SPEC).status, 'running');
+  assert.equal((await runs.start('w/c', SPEC)).status, 'running');
   assert.equal(shell.started.length, 1);
   assert.equal(shell.started[0].spec.command, 'mvn -o test');
   assert.equal(shell.started[0].spec.workdir, '/tmp/kun-ai');
   assert.deepEqual({ ...shell.started[0].spec.env }, { A: '1' });
 });
 
-test('必须显式放行沙箱：不给策略时 dsh-bash-sandbox 会套上默认策略，连 target/ 与 ~/.m2 都写不了', () => {
+test('必须显式放行沙箱：不给策略时 dsh-bash-sandbox 会套上默认策略，连 target/ 与 ~/.m2 都写不了', async () => {
   const shell = makeShell();
   const runs = createRunRegistry(() => shell);
-  runs.start('w/c', SPEC);
+  await runs.start('w/c', SPEC);
   // dsh-bash-sandbox 的 resolve：request.sandboxPolicy ?? ctx.sandboxPolicy.resolve()
   // 默认策略在 workspace-write 下只允许 {workspaceRoot, /tmp, $TMPDIR} 可写，
   // 于是 mvn 写 ~/.m2 报 EPERM（Operation not permitted）、构建直接失败。
@@ -61,10 +61,10 @@ test('必须显式放行沙箱：不给策略时 dsh-bash-sandbox 会套上默�
   });
 });
 
-test('读取是增量的：第二次读不重复已给过的行', () => {
+test('读取是增量的：第二次读不重复已给过的行', async () => {
   const shell = makeShell();
   const runs = createRunRegistry(() => shell);
-  runs.start('w/c', SPEC);
+  await runs.start('w/c', SPEC);
   const { proc } = shell.started[0];
   proc.emit('one\ntwo\n');
   const first = runs.read('w/c', 0);
@@ -76,10 +76,10 @@ test('读取是增量的：第二次读不重复已给过的行', () => {
   assert.equal(second.next, 3);
 });
 
-test('半行跨 chunk 在注册表里也拼成一行', () => {
+test('半行跨 chunk 在注册表里也拼成一行', async () => {
   const shell = makeShell();
   const runs = createRunRegistry(() => shell);
-  runs.start('w/c', SPEC);
+  await runs.start('w/c', SPEC);
   const { proc } = shell.started[0];
   proc.emit('par');
   assert.deepEqual(runs.read('w/c', 0).lines, []);
@@ -87,62 +87,62 @@ test('半行跨 chunk 在注册表里也拼成一行', () => {
   assert.deepEqual(runs.read('w/c', 0).lines, ['partial']);
 });
 
-test('自然退出都记 exited，退出码如实带出（非 0 ≠ 启动失败）', () => {
+test('自然退出都记 exited，退出码如实带出（非 0 ≠ 启动失败）', async () => {
   const shell = makeShell();
   const runs = createRunRegistry(() => shell);
-  runs.start('w/c', SPEC);
+  await runs.start('w/c', SPEC);
   shell.started[0].proc.finish(0);
   assert.equal(runs.read('w/c', 0).status, 'exited');
-  runs.start('w/c2', SPEC);
+  await runs.start('w/c2', SPEC);
   shell.started[1].proc.finish(2);
   const done = runs.read('w/c2', 0);
   assert.equal(done.status, 'exited');
   assert.equal(done.exitCode, 2);
 });
 
-test('停止：发信号时进程可能还在，真退出后才记已停止', () => {
+test('停止：发信号时进程可能还在，真退出后才记已停止', async () => {
   const shell = makeShell();
   const runs = createRunRegistry(() => shell);
-  runs.start('w/c', SPEC);
+  await runs.start('w/c', SPEC);
   assert.equal(runs.stop('w/c').status, 'running', '宽限期内不该抢报已停止');
   assert.equal(shell.started[0].proc.killed, true);
   shell.started[0].proc.exitBySignal();
   assert.equal(runs.read('w/c', 0).status, 'stopped');
 });
 
-test('不是我们停的 killed = 进程没起来：记 failed 并给出可读原因', () => {
+test('不是我们停的 killed = 进程没起来：记 failed 并给出可读原因', async () => {
   const shell = makeShell();
   const runs = createRunRegistry(() => shell);
-  runs.start('w/c', SPEC);
+  await runs.start('w/c', SPEC);
   shell.started[0].proc.exitBySignal(); // shell 契约：spawn 失败也以 killed 收场
   const snap = runs.read('w/c', 0);
   assert.equal(snap.status, 'failed');
   assert.match(snap.error, /进程未能启动/);
 });
 
-test('dispose 回收仍在跑的进程，已退出的不碰', () => {
+test('dispose 回收仍在跑的进程，已退出的不碰', async () => {
   const shell = makeShell();
   const runs = createRunRegistry(() => shell);
-  runs.start('w/c', SPEC);
-  runs.start('w/c2', SPEC);
+  await runs.start('w/c', SPEC);
+  await runs.start('w/c2', SPEC);
   shell.started[1].proc.finish(0);
   runs.dispose();
   assert.equal(shell.started[0].proc.killed, true);
   assert.equal(shell.started[1].proc.killed, false);
 });
 
-test('密钥值在日志里被掩码', () => {
+test('密钥值在日志里被掩码', async () => {
   const shell = makeShell();
   const runs = createRunRegistry(() => shell);
-  runs.start('w/c', { ...SPEC, envs: [{ name: 'HARNESS_LLM_API_KEY', value: 'sk-secret' }] });
+  await runs.start('w/c', { ...SPEC, envs: [{ name: 'HARNESS_LLM_API_KEY', value: 'sk-secret' }] });
   shell.started[0].proc.emit('using sk-secret to call\n');
   assert.deepEqual(runs.read('w/c', 0).lines, ['using **** to call']);
 });
 
-test('超过上限从头部丢弃，并标记 dropped', () => {
+test('超过上限从头部丢弃，并标记 dropped', async () => {
   const shell = makeShell();
   const runs = createRunRegistry(() => shell, { maxLines: 3 });
-  runs.start('w/c', SPEC);
+  await runs.start('w/c', SPEC);
   shell.started[0].proc.emit('1\n2\n3\n4\n5\n');
   const all = runs.read('w/c', 0);
   assert.deepEqual(all.lines, ['3', '4', '5']);
@@ -151,24 +151,24 @@ test('超过上限从头部丢弃，并标记 dropped', () => {
   assert.deepEqual(runs.read('w/c', 5).lines, []);
 });
 
-test('偏移超前于当前缓冲（重启竞态）时整份重发并标记 dropped', () => {
+test('偏移超前于当前缓冲（重启竞态）时整份重发并标记 dropped', async () => {
   const shell = makeShell();
   const runs = createRunRegistry(() => shell);
-  runs.start('w/c', SPEC);
+  await runs.start('w/c', SPEC);
   shell.started[0].proc.emit('old1\nold2\n');
   runs.read('w/c', 0);
   runs.stop('w/c');
-  runs.start('w/c', SPEC);        // 重启：缓冲归零，客户端可能还拿着上一代的偏移
+  await runs.start('w/c', SPEC);        // 重启：缓冲归零，客户端可能还拿着上一代的偏移
   shell.started[1].proc.emit('new1\nnew2\n');
   const snap = runs.read('w/c', 40);
   assert.equal(snap.dropped, true);
   assert.deepEqual(snap.lines, ['new1', 'new2']);
 });
 
-test('裸 CR 进度刷新每轮泵收成一行：不丢、也不在 pending 里无界堆积', () => {
+test('裸 CR 进度刷新每轮泵收成一行：不丢、也不在 pending 里无界堆积', async () => {
   const shell = makeShell();
   const runs = createRunRegistry(() => shell);
-  runs.start('w/c', SPEC);
+  await runs.start('w/c', SPEC);
   const { proc } = shell.started[0];
   proc.emit('Downloading 10%\r');
   runs.pump();
@@ -181,20 +181,20 @@ test('裸 CR 进度刷新每轮泵收成一行：不丢、也不在 pending 里�
   assert.deepEqual(runs.read('w/c', 2).lines, ['Downloading 100% done']);
 });
 
-test('shell 不可用 / 命令为空 / 重复启动给出可读错误', () => {
-  assert.throws(() => createRunRegistry(() => undefined).start('w/c', SPEC), /shell 服务不可用/);
+test('shell 不可用 / 命令为空 / 重复启动给出可读错误', async () => {
+  await assert.rejects(() => createRunRegistry(() => undefined).start('w/c', SPEC), /shell 服务不可用/);
   const shell = makeShell();
   const runs = createRunRegistry(() => shell);
-  assert.throws(() => runs.start('w/c', { ...SPEC, command: '   ' }), /启动命令为空/);
-  runs.start('w/c', SPEC);
-  assert.throws(() => runs.start('w/c', SPEC), /已在运行/);
+  await assert.rejects(() => runs.start('w/c', { ...SPEC, command: '   ' }), /启动命令为空/);
+  await runs.start('w/c', SPEC);
+  await assert.rejects(() => runs.start('w/c', SPEC), /已在运行/);
 });
 
-test('快照带上最后一条非空输出与启动时刻', () => {
+test('快照带上最后一条非空输出与启动时刻', async () => {
   const shell = makeShell();
   const runs = createRunRegistry(() => shell);
   const before = Date.now();
-  runs.start('w/c', SPEC);
+  await runs.start('w/c', SPEC);
   shell.started[0].proc.emit('first\nsecond\n');
   const snap = runs.snapshot('w/c');
   assert.equal(snap.lastLine, 'second');
@@ -203,4 +203,24 @@ test('快照带上最后一条非空输出与启动时刻', () => {
   shell.started[0].proc.emit('Tomcat started on port 8083 (http)\n');
   runs.pump();
   assert.equal(runs.snapshot('w/c').port, '8083');
+});
+
+test('shell.start 返回 Promise 时照样采到输出并结算（DSH 0.1.6-alpha.1 起 start 是 async）', async () => {
+  // 实测踩过：0.1.5 的 start() 同步返回 ShellProcess，0.1.6 把它写成了 async。
+  // 插件按同步写就会把 Promise 存进 run.proc：proc.readOutput 不存在 → 每次泵抛 TypeError，
+  // 被 drainInto 的 catch 静默吞掉 → 输出一条不落、状态永远停在「运行中」（面板看起来就是"没反应"）。
+  const sync = makeShell();
+  const asyncShell = { started: sync.started, resolve: (r) => sync.resolve(r), start: (spec) => Promise.resolve(sync.start(spec)) };
+  const runs = createRunRegistry(() => asyncShell);
+
+  await runs.start('w/c', SPEC);
+  const { proc } = sync.started[0];
+  proc.emit('hello\n');
+  runs.pump();
+  assert.deepEqual(runs.read('w/c', 0).lines, ['hello'], 'Promise 形态下也必须读到输出');
+
+  proc.finish(3);
+  runs.pump();
+  assert.equal(runs.snapshot('w/c').status, 'exited', 'Promise 形态下也必须结算，不能永远 running');
+  assert.equal(runs.snapshot('w/c').exitCode, 3);
 });
