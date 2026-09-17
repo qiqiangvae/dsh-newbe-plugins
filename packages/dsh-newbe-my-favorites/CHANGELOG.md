@@ -4,16 +4,18 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
-### Changed
-
-- 迁入 newbe 插件合集 monorepo（`qiqiangvae/dsh-newbe-plugins`，子目录 `packages/dsh-newbe-my-favorites`），包名由 `dsh-my-favorites` 改为 `dsh-newbe-my-favorites`（插件 id / settings namespace / RPC·typeSymbol 前缀 / 槽位 id 全量同步）。
-- 历史收藏数据自动迁移：首次启动时若存在旧存储文件 `~/.dsh/storages/dsh-my-favorites.json`，自动改名为新路径 `dsh-newbe-my-favorites.json`，老用户收藏不丢失。
+## [0.5.5] - 2026-09-17
 
 ### Fixed
 
 - 适配 DSH `v0.1.6-alpha.2` 的 Typert codec 破坏性变更，修复 `dsh web` 启动 fatal（`typert-loader: dsh-newbe-my-favorites invocation "dsh-newbe-my-favorites#myFavorites/getState" result codec has no create() factory`）：`v0.1.6-alpha.2` 起严格 codec 只认 `create()` 惰性工厂，而 `v0.1.2-rc.1` ~ `v0.1.6-alpha.1` 只认 `schema` 字段。宿主清单（`src/typert.ts`）与客户端 descriptors（`src/client.tsx`）统一改由 `src/schema.ts` 的 `strictCodec()` 构造，**同时带 `schema` 与 `create()`**（两代校验都只查自己认识的字段），因此在 `v0.1.2-rc.1` ~ `v0.1.6-alpha.2` 全都能启动；新增 `test/typert.test.mjs` 同时守着两代契约。
 
 ## [0.5.4] - 2026-09-03
+
+### Changed
+
+- 迁入 newbe 插件合集 monorepo（`qiqiangvae/dsh-newbe-plugins`，子目录 `packages/dsh-newbe-my-favorites`），包名由 `dsh-my-favorites` 改为 `dsh-newbe-my-favorites`（插件 id / settings namespace / RPC·typeSymbol 前缀 / 槽位 id 全量同步）。
+- 历史收藏数据自动迁移：首次启动时若存在旧存储文件 `~/.dsh/storages/dsh-my-favorites.json`，自动改名为新路径 `dsh-newbe-my-favorites.json`，老用户收藏不丢失。
 
 ### Fixed
 
