@@ -14649,7 +14649,7 @@ var secretSetSchema = external_exports.object({
   value: external_exports.string()
 });
 function strictCodec(typeSymbol, schema) {
-  return { mode: "strict", typeSymbol, create: () => schema };
+  return { mode: "strict", typeSymbol, schema, create: () => schema };
 }
 
 // src/typert.ts

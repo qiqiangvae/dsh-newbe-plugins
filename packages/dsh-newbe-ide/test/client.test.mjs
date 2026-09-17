@@ -99,7 +99,7 @@ test('$mount 失败不会让插件挂掉，面板仍注册（降级为可见提�
   assert.deepEqual(registered.map((r) => r.options.name), ['conversation.view']);
 });
 
-test('客户端端点与宿主 Typert 清单逐条一致，且每个严格 codec 都带 create() 工厂', async () => {
+test('客户端端点与宿主 Typert 清单逐条一致，且 codec 同时满足新一代与老一代 DSH 的契约', async () => {
   let mounted;
   const slots = { inject: (_k, cb) => { cb(); return () => {}; }, register: () => () => {} };
   const ctx = {
@@ -115,15 +115,18 @@ test('客户端端点与宿主 Typert 清单逐条一致，且每个严格 codec
   assert.deepEqual(clientIds, hostIds);
   assert.equal(mounted.package, TYPERT.package);
 
-  // DSH 0.1.6-alpha.2 起 typert-loader 与 typert registry 都只认 create() 惰性给出的 schema：
-  // 直接挂 schema 字段会在 dsh web 启动时 fatal（result codec has no create() factory）。
+  // codec 必须同时满足两代契约，缺一个就红：
+  // 老一代（≤ 0.1.6-alpha.1）的 loader/registry 直接读 codec.schema，要求它是 zod v4 实例且有 parse；
+  // 新一代（≥ 0.1.6-alpha.2）只认 create() 惰性工厂，没有它 dsh web 启动就 fatal。
   const codecsOf = (descriptor) => [descriptor.result, ...Array.from(descriptor.parameters ?? [], (p) => p.codec)];
   for (const [face, descriptors] of [['宿主', TYPERT.invocations], ['客户端', mounted.descriptors]]) {
     for (const descriptor of descriptors) {
       for (const codec of codecsOf(descriptor)) {
         assert.equal(codec.mode, 'strict', `${face} ${descriptor.id} 用了非严格 codec`);
         assert.ok(codec.typeSymbol?.length > 0, `${face} ${descriptor.id} 的 codec 缺 typeSymbol`);
-        assert.equal(typeof codec.create, 'function', `${face} ${descriptor.id} 的 codec 没有 create() 工厂`);
+        assert.equal(typeof codec.schema?.parse, 'function', `${face} ${descriptor.id} 的 codec 没有老一代要的 schema.parse`);
+        assert.ok('_zod' in codec.schema, `${face} ${descriptor.id} 的 codec.schema 不是 zod v4 实例`);
+        assert.equal(typeof codec.create, 'function', `${face} ${descriptor.id} 的 codec 没有新一代要的 create() 工厂`);
         assert.equal(typeof codec.create()?.parse, 'function', `${face} ${descriptor.id} 的 create() 没给出可 parse 的 schema`);
       }
     }

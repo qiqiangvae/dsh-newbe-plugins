@@ -1,7 +1,7 @@
 /**
  * dsh-newbe-ide 的 Host 面 Typert 清单（由 typert-loader 自动扫描注册）。
  * 手写清单，结构与 @deepseek-ai/dsh-typert-generator 产物一致：
- * `./typert` 导出 TYPERT，invocations 的 codec 统一由 `strictCodec()` 造（`create()` 惰性给出 zod v4 schema）。
+ * `./typert` 导出 TYPERT，invocations 的 codec 统一由 `strictCodec()` 造（同时带 `schema` 与 `create()`，跨 DSH 版本）。
  */
 import { ideaDiscoveryRequestSchema, ideaDiscoverySchema, ideLoadSchema, ideStateSchema, logHistoryRequestSchema, logHistorySchema, runReadRequestSchema, runReadSchema, runSnapshotListSchema, runSnapshotSchema, runTargetSchema, secretQuerySchema, secretSetSchema, secretStatusListSchema, secretStatusSchema, strictCodec } from './schema.js';
 

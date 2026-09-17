@@ -14707,7 +14707,7 @@ function runKeyOf(target) {
   return `${target.workspaceId}/${target.configId}`;
 }
 function strictCodec(typeSymbol, schema) {
-  return { mode: "strict", typeSymbol, create: () => schema };
+  return { mode: "strict", typeSymbol, schema, create: () => schema };
 }
 
 // src/lines.ts

@@ -26,10 +26,12 @@ DSH Web 的会话视图 tab「IDE」：按项目组织启动配置，一键启�
 它红了就是漏了一边。新端点还要**重启 `dsh web`** 才存在（端点在进程启动时装配），
 客户端会把这种情况的 404 说成"重启后生效"。
 
-**codec 只能由 `strictCodec()` 造**。0.1.6-alpha.2 起 typert codec 是
-`{ mode: 'strict', typeSymbol, create }`——`create()` 惰性给出 schema；老写法直接挂 `schema` 字段会让
-`dsh web` 启动 fatal（`result codec has no create() factory`）。两处都改由 `src/schema.ts` 的
-`strictCodec()` 生成，`test/client.test.mjs` 断言每个 codec 都带 `create()` 且能给出可 `parse` 的 schema。
+**codec 只能由 `strictCodec()` 造，且必须同时带 `schema` 与 `create()`**。typert 严格 codec 的形态换过代：
+`0.1.2-rc.1` ~ `0.1.6-alpha.1` 的 loader/registry 直接读 `codec.schema`（要求是带 `parse` 的 zod v4 实例），
+`0.1.6-alpha.2` 起只认 `create()` 惰性工厂——只写 `schema` 在新版启动 fatal
+（`result codec has no create() factory`），只写 `create` 在旧版 fatal（`not backed by a zod v4 schema`）。
+两边的校验都只查自己认识的字段，多带一个不影响，所以 `src/schema.ts` 的 `strictCodec()` 两个都带。
+`src/typert.ts` 与 `src/client.tsx` 两处都从它出；`test/client.test.mjs` 对两代契约各有一条断言。
 
 **`typertRemote` 绑定必须是服务对象**。`value.service` 传服务名字符串，网关的 `readBinding`
 会拒绝每一次调用（它校验 `Reflect.get(value,'service') === original`）。
