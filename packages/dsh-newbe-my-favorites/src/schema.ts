@@ -43,11 +43,14 @@ export const favoritesFieldValueSchema = z.unknown();
 
 /**
  * 一个严格 Typert codec（宿主 ./typert 清单与客户端 descriptors 共用）。
- * DSH 0.1.6-alpha.2 起 typert-loader 与 typert registry 都要求 codec 用 `create()` 惰性给出
- * schema——直接挂 `schema` 字段会在启动时被判成 `result codec has no create() factory` 而整体 fatal。
+ * 两个字段**都要带**，才能跨 DSH 版本：
+ * - `schema`：≤ 0.1.6-alpha.1 的 typert-loader / registry 直接读它（要求是 zod v4 实例、有 `parse`）；
+ * - `create()`：≥ 0.1.6-alpha.2 只认惰性工厂，老写法会让 `dsh web` 启动 fatal
+ *   （`result codec has no create() factory`）。
+ * 两边的校验都只查自己认识的字段，多带一个不影响。
  */
 export function strictCodec<T extends { parse(value: unknown): unknown }>(typeSymbol: string, schema: T) {
-  return { mode: 'strict' as const, typeSymbol, create: () => schema };
+  return { mode: 'strict' as const, typeSymbol, schema, create: () => schema };
 }
 
 export type SessionFavorite = z.infer<typeof sessionFavoriteSchema>;

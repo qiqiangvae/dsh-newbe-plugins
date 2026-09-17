@@ -11,7 +11,7 @@ All notable changes to this project are documented in this file.
 
 ### Fixed
 
-- 适配 DSH `v0.1.6-alpha.2` 的 Typert codec 破坏性变更，修复 `dsh web` 启动 fatal（`typert-loader: dsh-newbe-my-favorites invocation "dsh-newbe-my-favorites#myFavorites/getState" result codec has no create() factory`）：严格 codec 不再接受 `schema` 字段，改为 `{ mode: 'strict', typeSymbol, create }`，`create()` 惰性给出 zod schema。宿主清单（`src/typert.ts`）与客户端 descriptors（`src/client.tsx`）统一改由 `src/schema.ts` 的 `strictCodec()` 构造，并新增 `test/typert.test.mjs` 守着这条契约。
+- 适配 DSH `v0.1.6-alpha.2` 的 Typert codec 破坏性变更，修复 `dsh web` 启动 fatal（`typert-loader: dsh-newbe-my-favorites invocation "dsh-newbe-my-favorites#myFavorites/getState" result codec has no create() factory`）：`v0.1.6-alpha.2` 起严格 codec 只认 `create()` 惰性工厂，而 `v0.1.2-rc.1` ~ `v0.1.6-alpha.1` 只认 `schema` 字段。宿主清单（`src/typert.ts`）与客户端 descriptors（`src/client.tsx`）统一改由 `src/schema.ts` 的 `strictCodec()` 构造，**同时带 `schema` 与 `create()`**（两代校验都只查自己认识的字段），因此在 `v0.1.2-rc.1` ~ `v0.1.6-alpha.2` 全都能启动；新增 `test/typert.test.mjs` 同时守着两代契约。
 
 ## [0.5.4] - 2026-09-03
 

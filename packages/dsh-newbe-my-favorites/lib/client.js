@@ -14584,7 +14584,7 @@ var favoritesFieldSchema = external_exports.union([
 ]);
 var favoritesFieldValueSchema = external_exports.unknown();
 function strictCodec(typeSymbol, schema) {
-  return { mode: "strict", typeSymbol, create: () => schema };
+  return { mode: "strict", typeSymbol, schema, create: () => schema };
 }
 
 // src/constants.ts
