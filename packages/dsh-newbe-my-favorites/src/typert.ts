@@ -1,31 +1,20 @@
 /**
  * dsh-newbe-my-favorites 的 Host 面 Typert 清单（由 typert-loader 自动扫描注册）。
  * 手写清单，结构与 @deepseek-ai/dsh-typert-generator 产物一致：
- * `./typert` 导出 TYPERT，invocations 的 codec 必须是 zod v4 实例。
+ * `./typert` 导出 TYPERT，invocations 的 codec 统一由 `strictCodec()` 造（`create()` 惰性给出 zod v4 schema）。
  */
 import {
   favoritesFieldSchema,
   favoritesFieldValueSchema,
   favoritesStateSchema,
+  strictCodec,
 } from './schema.js';
 
-const stateCodec = {
-  mode: 'strict' as const,
-  typeSymbol: 'dsh-newbe-my-favorites#FavoritesState',
-  schema: favoritesStateSchema,
-};
+const stateCodec = strictCodec('dsh-newbe-my-favorites#FavoritesState', favoritesStateSchema);
 
-const fieldCodec = {
-  mode: 'strict' as const,
-  typeSymbol: 'dsh-newbe-my-favorites#FavoritesField',
-  schema: favoritesFieldSchema,
-};
+const fieldCodec = strictCodec('dsh-newbe-my-favorites#FavoritesField', favoritesFieldSchema);
 
-const valueCodec = {
-  mode: 'strict' as const,
-  typeSymbol: 'dsh-newbe-my-favorites#FavoritesFieldValue',
-  schema: favoritesFieldValueSchema,
-};
+const valueCodec = strictCodec('dsh-newbe-my-favorites#FavoritesFieldValue', favoritesFieldValueSchema);
 
 export const TYPERT = {
   package: 'dsh-newbe-my-favorites',

@@ -14583,6 +14583,9 @@ var favoritesFieldSchema = external_exports.union([
   external_exports.literal("urlsEnabled")
 ]);
 var favoritesFieldValueSchema = external_exports.unknown();
+function strictCodec(typeSymbol, schema) {
+  return { mode: "strict", typeSymbol, create: () => schema };
+}
 
 // src/constants.ts
 var MIN_RECENT = 5;
@@ -14602,7 +14605,7 @@ var REMOTE_CONTRIBUTION = {
       method: "getState",
       invocation: { kind: "direct" },
       parameters: [],
-      result: { mode: "strict", typeSymbol: "dsh-newbe-my-favorites#FavoritesState", schema: favoritesStateSchema }
+      result: strictCodec("dsh-newbe-my-favorites#FavoritesState", favoritesStateSchema)
     },
     {
       id: "dsh-newbe-my-favorites#myFavorites/setField",
@@ -14611,10 +14614,10 @@ var REMOTE_CONTRIBUTION = {
       method: "setField",
       invocation: { kind: "direct" },
       parameters: [
-        { name: "field", wire: "field", source: "json", codec: { mode: "strict", typeSymbol: "dsh-newbe-my-favorites#FavoritesField", schema: favoritesFieldSchema } },
-        { name: "value", wire: "value", source: "json", codec: { mode: "strict", typeSymbol: "dsh-newbe-my-favorites#FavoritesFieldValue", schema: favoritesFieldValueSchema } }
+        { name: "field", wire: "field", source: "json", codec: strictCodec("dsh-newbe-my-favorites#FavoritesField", favoritesFieldSchema) },
+        { name: "value", wire: "value", source: "json", codec: strictCodec("dsh-newbe-my-favorites#FavoritesFieldValue", favoritesFieldValueSchema) }
       ],
-      result: { mode: "strict", typeSymbol: "dsh-newbe-my-favorites#FavoritesState", schema: favoritesStateSchema }
+      result: strictCodec("dsh-newbe-my-favorites#FavoritesState", favoritesStateSchema)
     }
   ]
 };

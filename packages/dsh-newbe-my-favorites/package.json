@@ -43,7 +43,8 @@
   "scripts": {
     "build": "node build.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "check": "tsc -p tsconfig.json --noEmit && node --check lib/index.js && node --check lib/typert.host.js && node --check lib/client.js"
+    "check": "tsc -p tsconfig.json --noEmit && node --check lib/index.js && node --check lib/typert.host.js && node --check lib/client.js",
+    "test": "node build.mjs && node --test test/*.test.mjs"
   },
   "dependencies": {
     "@deepseek-ai/dsh-home-paths": "^0.1.2-rc.1",

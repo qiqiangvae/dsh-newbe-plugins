@@ -4,7 +4,8 @@
 
 ## 兼容性
 
-- 本插件要求 **DSH ≥ `v0.1.2-rc.1`**，并已针对 `v0.1.2-rc.1` 适配。
+- 本插件要求 **DSH ≥ `v0.1.2-rc.1`**，并已针对 `v0.1.2-rc.1` 与 `v0.1.6-alpha.2` 适配。
+- `v0.1.6-alpha.2` 起 typert codec 必须是 `{ mode: 'strict', typeSymbol, create }`（`create()` 惰性给出 schema），直接挂 `schema` 字段会让 `dsh web` 启动 fatal；本插件的宿主清单与客户端 descriptors 统一由 `src/schema.ts` 的 `strictCodec()` 构造。
 - **不兼容 DSH `v0.1.2-alpha.1` 及更早版本**：`v0.1.2-rc.1` 存在破坏性更新——
   - `@deepseek-ai/dsh-client-store` 与 `@deepseek-ai/dsh-client-ui-primitives` 不再是独立发布的 npm 包，而是由 Web 外壳以「基线静态模块」（`PLATFORM_MODULES`）注入浏览器模块表；插件 `dsh.client.inject` 已移除对这两个包的包级依赖。
   - 插件设置标签页 `settings.plugins.tab` 改由 `@deepseek-ai/dsh-client-ui-settings-plugins` 声明，`dsh.client.inject` 相应更新。

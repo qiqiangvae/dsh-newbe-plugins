@@ -14546,23 +14546,14 @@ var favoritesFieldSchema = external_exports.union([
   external_exports.literal("urlsEnabled")
 ]);
 var favoritesFieldValueSchema = external_exports.unknown();
+function strictCodec(typeSymbol, schema) {
+  return { mode: "strict", typeSymbol, create: () => schema };
+}
 
 // src/typert.ts
-var stateCodec = {
-  mode: "strict",
-  typeSymbol: "dsh-newbe-my-favorites#FavoritesState",
-  schema: favoritesStateSchema
-};
-var fieldCodec = {
-  mode: "strict",
-  typeSymbol: "dsh-newbe-my-favorites#FavoritesField",
-  schema: favoritesFieldSchema
-};
-var valueCodec = {
-  mode: "strict",
-  typeSymbol: "dsh-newbe-my-favorites#FavoritesFieldValue",
-  schema: favoritesFieldValueSchema
-};
+var stateCodec = strictCodec("dsh-newbe-my-favorites#FavoritesState", favoritesStateSchema);
+var fieldCodec = strictCodec("dsh-newbe-my-favorites#FavoritesField", favoritesFieldSchema);
+var valueCodec = strictCodec("dsh-newbe-my-favorites#FavoritesFieldValue", favoritesFieldValueSchema);
 var TYPERT = {
   package: "dsh-newbe-my-favorites",
   face: "host",

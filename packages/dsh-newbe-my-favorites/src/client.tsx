@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore } fro
 import * as ReactDOM from 'react-dom';
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store';
 import { IconFolderClose16, IconFolderOpen16 } from '@deepseek-ai/dsh-client-ui-primitives';
-import { favoritesFieldSchema, favoritesFieldValueSchema, favoritesStateSchema } from './schema.js';
+import { favoritesFieldSchema, favoritesFieldValueSchema, favoritesStateSchema, strictCodec } from './schema.js';
 import { MIN_RECENT, MAX_RECENT, DEFAULT_RECENT } from './constants.js';
 
 export const NS = 'newbe-my-favorites';
@@ -28,16 +28,16 @@ const REMOTE_CONTRIBUTION = {
     {
       id: 'dsh-newbe-my-favorites#myFavorites/getState', service: 'myFavorites', namespace: 'myFavorites', method: 'getState',
       invocation: { kind: 'direct' as const }, parameters: [],
-      result: { mode: 'strict' as const, typeSymbol: 'dsh-newbe-my-favorites#FavoritesState', schema: favoritesStateSchema },
+      result: strictCodec('dsh-newbe-my-favorites#FavoritesState', favoritesStateSchema),
     },
     {
       id: 'dsh-newbe-my-favorites#myFavorites/setField', service: 'myFavorites', namespace: 'myFavorites', method: 'setField',
       invocation: { kind: 'direct' as const },
       parameters: [
-        { name: 'field', wire: 'field', source: 'json' as const, codec: { mode: 'strict' as const, typeSymbol: 'dsh-newbe-my-favorites#FavoritesField', schema: favoritesFieldSchema } },
-        { name: 'value', wire: 'value', source: 'json' as const, codec: { mode: 'strict' as const, typeSymbol: 'dsh-newbe-my-favorites#FavoritesFieldValue', schema: favoritesFieldValueSchema } },
+        { name: 'field', wire: 'field', source: 'json' as const, codec: strictCodec('dsh-newbe-my-favorites#FavoritesField', favoritesFieldSchema) },
+        { name: 'value', wire: 'value', source: 'json' as const, codec: strictCodec('dsh-newbe-my-favorites#FavoritesFieldValue', favoritesFieldValueSchema) },
       ],
-      result: { mode: 'strict' as const, typeSymbol: 'dsh-newbe-my-favorites#FavoritesState', schema: favoritesStateSchema },
+      result: strictCodec('dsh-newbe-my-favorites#FavoritesState', favoritesStateSchema),
     },
   ],
 };
