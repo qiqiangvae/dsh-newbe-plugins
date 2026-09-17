@@ -79,7 +79,7 @@ dsh plugin --profile web add 'github:qiqiangvae/dsh-newbe-plugins#<commit-sha>&p
 
 ## 已验证
 
-DSH **0.1.5-alpha.2 / 0.1.6-alpha.1**（macOS）。其他平台与版本未验证。
+DSH **0.1.5-alpha.2 / 0.1.6-alpha.1 / 0.1.6-alpha.2**（macOS）。其他平台与版本未验证。
 
 ## 限制
 

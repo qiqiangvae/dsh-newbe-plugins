@@ -235,6 +235,15 @@ export function runKeyOf(target: RunTarget): string {
   return `${target.workspaceId}/${target.configId}`;
 }
 
+/**
+ * 一个严格 Typert codec（宿主 ./typert 清单与客户端 descriptors 共用）。
+ * DSH 0.1.6-alpha.2 起 typert-loader 与 typert registry 都要求 codec 用 `create()` 惰性给出
+ * schema——直接挂 `schema` 字段会在启动时被判成 `result codec has no create() factory` 而整体 fatal。
+ */
+export function strictCodec<T extends { parse(value: unknown): unknown }>(typeSymbol: string, schema: T) {
+  return { mode: 'strict' as const, typeSymbol, create: () => schema };
+}
+
 export type EnvVar = z.infer<typeof envVarSchema>;
 export type LaunchConfig = z.infer<typeof launchConfigSchema>;
 export type ProjectEntry = z.infer<typeof projectEntrySchema>;

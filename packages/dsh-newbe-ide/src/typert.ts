@@ -1,99 +1,39 @@
 /**
  * dsh-newbe-ide 的 Host 面 Typert 清单（由 typert-loader 自动扫描注册）。
  * 手写清单，结构与 @deepseek-ai/dsh-typert-generator 产物一致：
- * `./typert` 导出 TYPERT，invocations 的 codec 必须是 zod v4 实例。
+ * `./typert` 导出 TYPERT，invocations 的 codec 统一由 `strictCodec()` 造（`create()` 惰性给出 zod v4 schema）。
  */
-import { ideaDiscoveryRequestSchema, ideaDiscoverySchema, ideLoadSchema, ideStateSchema, logHistoryRequestSchema, logHistorySchema, runReadRequestSchema, runReadSchema, runSnapshotListSchema, runSnapshotSchema, runTargetSchema, secretQuerySchema, secretSetSchema, secretStatusListSchema, secretStatusSchema } from './schema.js';
+import { ideaDiscoveryRequestSchema, ideaDiscoverySchema, ideLoadSchema, ideStateSchema, logHistoryRequestSchema, logHistorySchema, runReadRequestSchema, runReadSchema, runSnapshotListSchema, runSnapshotSchema, runTargetSchema, secretQuerySchema, secretSetSchema, secretStatusListSchema, secretStatusSchema, strictCodec } from './schema.js';
 
-const stateCodec = {
-  mode: 'strict' as const,
-  typeSymbol: 'dsh-newbe-ide#IdeState',
-  schema: ideStateSchema,
-};
+const stateCodec = strictCodec('dsh-newbe-ide#IdeState', ideStateSchema);
 
-const loadCodec = {
-  mode: 'strict' as const,
-  typeSymbol: 'dsh-newbe-ide#IdeLoad',
-  schema: ideLoadSchema,
-};
+const loadCodec = strictCodec('dsh-newbe-ide#IdeLoad', ideLoadSchema);
 
-const targetCodec = {
-  mode: 'strict' as const,
-  typeSymbol: 'dsh-newbe-ide#RunTarget',
-  schema: runTargetSchema,
-};
+const targetCodec = strictCodec('dsh-newbe-ide#RunTarget', runTargetSchema);
 
-const snapshotCodec = {
-  mode: 'strict' as const,
-  typeSymbol: 'dsh-newbe-ide#RunSnapshot',
-  schema: runSnapshotSchema,
-};
+const snapshotCodec = strictCodec('dsh-newbe-ide#RunSnapshot', runSnapshotSchema);
 
-const readRequestCodec = {
-  mode: 'strict' as const,
-  typeSymbol: 'dsh-newbe-ide#RunReadRequest',
-  schema: runReadRequestSchema,
-};
+const readRequestCodec = strictCodec('dsh-newbe-ide#RunReadRequest', runReadRequestSchema);
 
-const readCodec = {
-  mode: 'strict' as const,
-  typeSymbol: 'dsh-newbe-ide#RunRead',
-  schema: runReadSchema,
-};
+const readCodec = strictCodec('dsh-newbe-ide#RunRead', runReadSchema);
 
-const discoveryRequestCodec = {
-  mode: 'strict' as const,
-  typeSymbol: 'dsh-newbe-ide#IdeaDiscoveryRequest',
-  schema: ideaDiscoveryRequestSchema,
-};
+const discoveryRequestCodec = strictCodec('dsh-newbe-ide#IdeaDiscoveryRequest', ideaDiscoveryRequestSchema);
 
-const discoveryCodec = {
-  mode: 'strict' as const,
-  typeSymbol: 'dsh-newbe-ide#IdeaDiscovery',
-  schema: ideaDiscoverySchema,
-};
+const discoveryCodec = strictCodec('dsh-newbe-ide#IdeaDiscovery', ideaDiscoverySchema);
 
-const historyRequestCodec = {
-  mode: 'strict' as const,
-  typeSymbol: 'dsh-newbe-ide#LogHistoryRequest',
-  schema: logHistoryRequestSchema,
-};
+const historyRequestCodec = strictCodec('dsh-newbe-ide#LogHistoryRequest', logHistoryRequestSchema);
 
-const historyCodec = {
-  mode: 'strict' as const,
-  typeSymbol: 'dsh-newbe-ide#LogHistory',
-  schema: logHistorySchema,
-};
+const historyCodec = strictCodec('dsh-newbe-ide#LogHistory', logHistorySchema);
 
-const snapshotListCodec = {
-  mode: 'strict' as const,
-  typeSymbol: 'dsh-newbe-ide#RunSnapshotList',
-  schema: runSnapshotListSchema,
-};
+const snapshotListCodec = strictCodec('dsh-newbe-ide#RunSnapshotList', runSnapshotListSchema);
 
-const secretQueryCodec = {
-  mode: 'strict' as const,
-  typeSymbol: 'dsh-newbe-ide#SecretQuery',
-  schema: secretQuerySchema,
-};
+const secretQueryCodec = strictCodec('dsh-newbe-ide#SecretQuery', secretQuerySchema);
 
-const secretStatusListCodec = {
-  mode: 'strict' as const,
-  typeSymbol: 'dsh-newbe-ide#SecretStatusList',
-  schema: secretStatusListSchema,
-};
+const secretStatusListCodec = strictCodec('dsh-newbe-ide#SecretStatusList', secretStatusListSchema);
 
-const secretSetCodec = {
-  mode: 'strict' as const,
-  typeSymbol: 'dsh-newbe-ide#SecretSet',
-  schema: secretSetSchema,
-};
+const secretSetCodec = strictCodec('dsh-newbe-ide#SecretSet', secretSetSchema);
 
-const secretStatusCodec = {
-  mode: 'strict' as const,
-  typeSymbol: 'dsh-newbe-ide#SecretStatus',
-  schema: secretStatusSchema,
-};
+const secretStatusCodec = strictCodec('dsh-newbe-ide#SecretStatus', secretStatusSchema);
 
 export const TYPERT = {
   package: 'dsh-newbe-ide',
@@ -170,7 +110,7 @@ export const TYPERT = {
       method: 'submit',
       invocation: { kind: 'direct' },
       parameters: [
-        { name: 'next', wire: 'next', source: 'json', codec: { mode: 'strict' as const, typeSymbol: 'dsh-newbe-ide#IdeStateInput', schema: ideStateSchema } },
+        { name: 'next', wire: 'next', source: 'json', codec: strictCodec('dsh-newbe-ide#IdeStateInput', ideStateSchema) },
       ],
       result: stateCodec,
     },

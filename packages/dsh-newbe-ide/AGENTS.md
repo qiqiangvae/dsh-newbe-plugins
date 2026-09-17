@@ -26,6 +26,11 @@ DSH Web 的会话视图 tab「IDE」：按项目组织启动配置，一键启�
 它红了就是漏了一边。新端点还要**重启 `dsh web`** 才存在（端点在进程启动时装配），
 客户端会把这种情况的 404 说成"重启后生效"。
 
+**codec 只能由 `strictCodec()` 造**。0.1.6-alpha.2 起 typert codec 是
+`{ mode: 'strict', typeSymbol, create }`——`create()` 惰性给出 schema；老写法直接挂 `schema` 字段会让
+`dsh web` 启动 fatal（`result codec has no create() factory`）。两处都改由 `src/schema.ts` 的
+`strictCodec()` 生成，`test/client.test.mjs` 断言每个 codec 都带 `create()` 且能给出可 `parse` 的 schema。
+
 **`typertRemote` 绑定必须是服务对象**。`value.service` 传服务名字符串，网关的 `readBinding`
 会拒绝每一次调用（它校验 `Reflect.get(value,'service') === original`）。
 

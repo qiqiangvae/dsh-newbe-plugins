@@ -14706,6 +14706,9 @@ function availableWorkspaces(registry2, usedPaths) {
 function runKeyOf(target) {
   return `${target.workspaceId}/${target.configId}`;
 }
+function strictCodec(typeSymbol, schema) {
+  return { mode: "strict", typeSymbol, create: () => schema };
+}
 
 // src/lines.ts
 var SECRET_NAME = /KEY|SECRET|TOKEN|PASSWORD/i;
@@ -14819,7 +14822,7 @@ var REMOTE_CONTRIBUTION = {
       method: "load",
       invocation: { kind: "direct" },
       parameters: [],
-      result: { mode: "strict", typeSymbol: "dsh-newbe-ide#IdeLoad", schema: ideLoadSchema }
+      result: strictCodec("dsh-newbe-ide#IdeLoad", ideLoadSchema)
     },
     {
       id: "dsh-newbe-ide#ideConfig/start",
@@ -14827,8 +14830,8 @@ var REMOTE_CONTRIBUTION = {
       namespace: "ideConfig",
       method: "start",
       invocation: { kind: "direct" },
-      parameters: [{ name: "target", wire: "target", source: "json", codec: { mode: "strict", typeSymbol: "dsh-newbe-ide#RunTarget", schema: runTargetSchema } }],
-      result: { mode: "strict", typeSymbol: "dsh-newbe-ide#RunSnapshot", schema: runSnapshotSchema }
+      parameters: [{ name: "target", wire: "target", source: "json", codec: strictCodec("dsh-newbe-ide#RunTarget", runTargetSchema) }],
+      result: strictCodec("dsh-newbe-ide#RunSnapshot", runSnapshotSchema)
     },
     {
       id: "dsh-newbe-ide#ideConfig/stop",
@@ -14836,8 +14839,8 @@ var REMOTE_CONTRIBUTION = {
       namespace: "ideConfig",
       method: "stop",
       invocation: { kind: "direct" },
-      parameters: [{ name: "target", wire: "target", source: "json", codec: { mode: "strict", typeSymbol: "dsh-newbe-ide#RunTarget", schema: runTargetSchema } }],
-      result: { mode: "strict", typeSymbol: "dsh-newbe-ide#RunSnapshot", schema: runSnapshotSchema }
+      parameters: [{ name: "target", wire: "target", source: "json", codec: strictCodec("dsh-newbe-ide#RunTarget", runTargetSchema) }],
+      result: strictCodec("dsh-newbe-ide#RunSnapshot", runSnapshotSchema)
     },
     {
       id: "dsh-newbe-ide#ideConfig/read",
@@ -14845,8 +14848,8 @@ var REMOTE_CONTRIBUTION = {
       namespace: "ideConfig",
       method: "read",
       invocation: { kind: "direct" },
-      parameters: [{ name: "request", wire: "request", source: "json", codec: { mode: "strict", typeSymbol: "dsh-newbe-ide#RunReadRequest", schema: runReadRequestSchema } }],
-      result: { mode: "strict", typeSymbol: "dsh-newbe-ide#RunRead", schema: runReadSchema }
+      parameters: [{ name: "request", wire: "request", source: "json", codec: strictCodec("dsh-newbe-ide#RunReadRequest", runReadRequestSchema) }],
+      result: strictCodec("dsh-newbe-ide#RunRead", runReadSchema)
     },
     {
       id: "dsh-newbe-ide#ideConfig/runs",
@@ -14855,7 +14858,7 @@ var REMOTE_CONTRIBUTION = {
       method: "runs",
       invocation: { kind: "direct" },
       parameters: [],
-      result: { mode: "strict", typeSymbol: "dsh-newbe-ide#RunSnapshotList", schema: runSnapshotListSchema }
+      result: strictCodec("dsh-newbe-ide#RunSnapshotList", runSnapshotListSchema)
     },
     {
       id: "dsh-newbe-ide#ideConfig/discover",
@@ -14863,8 +14866,8 @@ var REMOTE_CONTRIBUTION = {
       namespace: "ideConfig",
       method: "discover",
       invocation: { kind: "direct" },
-      parameters: [{ name: "request", wire: "request", source: "json", codec: { mode: "strict", typeSymbol: "dsh-newbe-ide#IdeaDiscoveryRequest", schema: ideaDiscoveryRequestSchema } }],
-      result: { mode: "strict", typeSymbol: "dsh-newbe-ide#IdeaDiscovery", schema: ideaDiscoverySchema }
+      parameters: [{ name: "request", wire: "request", source: "json", codec: strictCodec("dsh-newbe-ide#IdeaDiscoveryRequest", ideaDiscoveryRequestSchema) }],
+      result: strictCodec("dsh-newbe-ide#IdeaDiscovery", ideaDiscoverySchema)
     },
     {
       id: "dsh-newbe-ide#ideConfig/history",
@@ -14872,8 +14875,8 @@ var REMOTE_CONTRIBUTION = {
       namespace: "ideConfig",
       method: "history",
       invocation: { kind: "direct" },
-      parameters: [{ name: "request", wire: "request", source: "json", codec: { mode: "strict", typeSymbol: "dsh-newbe-ide#LogHistoryRequest", schema: logHistoryRequestSchema } }],
-      result: { mode: "strict", typeSymbol: "dsh-newbe-ide#LogHistory", schema: logHistorySchema }
+      parameters: [{ name: "request", wire: "request", source: "json", codec: strictCodec("dsh-newbe-ide#LogHistoryRequest", logHistoryRequestSchema) }],
+      result: strictCodec("dsh-newbe-ide#LogHistory", logHistorySchema)
     },
     {
       id: "dsh-newbe-ide#ideConfig/submit",
@@ -14882,9 +14885,9 @@ var REMOTE_CONTRIBUTION = {
       method: "submit",
       invocation: { kind: "direct" },
       parameters: [
-        { name: "next", wire: "next", source: "json", codec: { mode: "strict", typeSymbol: "dsh-newbe-ide#IdeStateInput", schema: ideStateSchema } }
+        { name: "next", wire: "next", source: "json", codec: strictCodec("dsh-newbe-ide#IdeStateInput", ideStateSchema) }
       ],
-      result: { mode: "strict", typeSymbol: "dsh-newbe-ide#IdeState", schema: ideStateSchema }
+      result: strictCodec("dsh-newbe-ide#IdeState", ideStateSchema)
     },
     {
       id: "dsh-newbe-ide#ideConfig/secretInfo",
@@ -14892,8 +14895,8 @@ var REMOTE_CONTRIBUTION = {
       namespace: "ideConfig",
       method: "secretInfo",
       invocation: { kind: "direct" },
-      parameters: [{ name: "request", wire: "request", source: "json", codec: { mode: "strict", typeSymbol: "dsh-newbe-ide#SecretQuery", schema: secretQuerySchema } }],
-      result: { mode: "strict", typeSymbol: "dsh-newbe-ide#SecretStatusList", schema: secretStatusListSchema }
+      parameters: [{ name: "request", wire: "request", source: "json", codec: strictCodec("dsh-newbe-ide#SecretQuery", secretQuerySchema) }],
+      result: strictCodec("dsh-newbe-ide#SecretStatusList", secretStatusListSchema)
     },
     {
       id: "dsh-newbe-ide#ideConfig/secretSet",
@@ -14901,8 +14904,8 @@ var REMOTE_CONTRIBUTION = {
       namespace: "ideConfig",
       method: "secretSet",
       invocation: { kind: "direct" },
-      parameters: [{ name: "request", wire: "request", source: "json", codec: { mode: "strict", typeSymbol: "dsh-newbe-ide#SecretSet", schema: secretSetSchema } }],
-      result: { mode: "strict", typeSymbol: "dsh-newbe-ide#SecretStatus", schema: secretStatusSchema }
+      parameters: [{ name: "request", wire: "request", source: "json", codec: strictCodec("dsh-newbe-ide#SecretSet", secretSetSchema) }],
+      result: strictCodec("dsh-newbe-ide#SecretStatus", secretStatusSchema)
     }
   ]
 };

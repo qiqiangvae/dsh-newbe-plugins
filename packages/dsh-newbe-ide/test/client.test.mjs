@@ -99,7 +99,7 @@ test('$mount 失败不会让插件挂掉，面板仍注册（降级为可见提�
   assert.deepEqual(registered.map((r) => r.options.name), ['conversation.view']);
 });
 
-test('客户端端点与宿主 Typert 清单逐条一致', async () => {
+test('客户端端点与宿主 Typert 清单逐条一致，且每个严格 codec 都带 create() 工厂', async () => {
   let mounted;
   const slots = { inject: (_k, cb) => { cb(); return () => {}; }, register: () => () => {} };
   const ctx = {
@@ -114,4 +114,18 @@ test('客户端端点与宿主 Typert 清单逐条一致', async () => {
   const hostIds = Array.from(TYPERT.invocations, (i) => i.id).sort();
   assert.deepEqual(clientIds, hostIds);
   assert.equal(mounted.package, TYPERT.package);
+
+  // DSH 0.1.6-alpha.2 起 typert-loader 与 typert registry 都只认 create() 惰性给出的 schema：
+  // 直接挂 schema 字段会在 dsh web 启动时 fatal（result codec has no create() factory）。
+  const codecsOf = (descriptor) => [descriptor.result, ...Array.from(descriptor.parameters ?? [], (p) => p.codec)];
+  for (const [face, descriptors] of [['宿主', TYPERT.invocations], ['客户端', mounted.descriptors]]) {
+    for (const descriptor of descriptors) {
+      for (const codec of codecsOf(descriptor)) {
+        assert.equal(codec.mode, 'strict', `${face} ${descriptor.id} 用了非严格 codec`);
+        assert.ok(codec.typeSymbol?.length > 0, `${face} ${descriptor.id} 的 codec 缺 typeSymbol`);
+        assert.equal(typeof codec.create, 'function', `${face} ${descriptor.id} 的 codec 没有 create() 工厂`);
+        assert.equal(typeof codec.create()?.parse, 'function', `${face} ${descriptor.id} 的 create() 没给出可 parse 的 schema`);
+      }
+    }
+  }
 });

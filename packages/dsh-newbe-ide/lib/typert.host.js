@@ -14648,83 +14648,26 @@ var secretSetSchema = external_exports.object({
   name: external_exports.string(),
   value: external_exports.string()
 });
+function strictCodec(typeSymbol, schema) {
+  return { mode: "strict", typeSymbol, create: () => schema };
+}
 
 // src/typert.ts
-var stateCodec = {
-  mode: "strict",
-  typeSymbol: "dsh-newbe-ide#IdeState",
-  schema: ideStateSchema
-};
-var loadCodec = {
-  mode: "strict",
-  typeSymbol: "dsh-newbe-ide#IdeLoad",
-  schema: ideLoadSchema
-};
-var targetCodec = {
-  mode: "strict",
-  typeSymbol: "dsh-newbe-ide#RunTarget",
-  schema: runTargetSchema
-};
-var snapshotCodec = {
-  mode: "strict",
-  typeSymbol: "dsh-newbe-ide#RunSnapshot",
-  schema: runSnapshotSchema
-};
-var readRequestCodec = {
-  mode: "strict",
-  typeSymbol: "dsh-newbe-ide#RunReadRequest",
-  schema: runReadRequestSchema
-};
-var readCodec = {
-  mode: "strict",
-  typeSymbol: "dsh-newbe-ide#RunRead",
-  schema: runReadSchema
-};
-var discoveryRequestCodec = {
-  mode: "strict",
-  typeSymbol: "dsh-newbe-ide#IdeaDiscoveryRequest",
-  schema: ideaDiscoveryRequestSchema
-};
-var discoveryCodec = {
-  mode: "strict",
-  typeSymbol: "dsh-newbe-ide#IdeaDiscovery",
-  schema: ideaDiscoverySchema
-};
-var historyRequestCodec = {
-  mode: "strict",
-  typeSymbol: "dsh-newbe-ide#LogHistoryRequest",
-  schema: logHistoryRequestSchema
-};
-var historyCodec = {
-  mode: "strict",
-  typeSymbol: "dsh-newbe-ide#LogHistory",
-  schema: logHistorySchema
-};
-var snapshotListCodec = {
-  mode: "strict",
-  typeSymbol: "dsh-newbe-ide#RunSnapshotList",
-  schema: runSnapshotListSchema
-};
-var secretQueryCodec = {
-  mode: "strict",
-  typeSymbol: "dsh-newbe-ide#SecretQuery",
-  schema: secretQuerySchema
-};
-var secretStatusListCodec = {
-  mode: "strict",
-  typeSymbol: "dsh-newbe-ide#SecretStatusList",
-  schema: secretStatusListSchema
-};
-var secretSetCodec = {
-  mode: "strict",
-  typeSymbol: "dsh-newbe-ide#SecretSet",
-  schema: secretSetSchema
-};
-var secretStatusCodec = {
-  mode: "strict",
-  typeSymbol: "dsh-newbe-ide#SecretStatus",
-  schema: secretStatusSchema
-};
+var stateCodec = strictCodec("dsh-newbe-ide#IdeState", ideStateSchema);
+var loadCodec = strictCodec("dsh-newbe-ide#IdeLoad", ideLoadSchema);
+var targetCodec = strictCodec("dsh-newbe-ide#RunTarget", runTargetSchema);
+var snapshotCodec = strictCodec("dsh-newbe-ide#RunSnapshot", runSnapshotSchema);
+var readRequestCodec = strictCodec("dsh-newbe-ide#RunReadRequest", runReadRequestSchema);
+var readCodec = strictCodec("dsh-newbe-ide#RunRead", runReadSchema);
+var discoveryRequestCodec = strictCodec("dsh-newbe-ide#IdeaDiscoveryRequest", ideaDiscoveryRequestSchema);
+var discoveryCodec = strictCodec("dsh-newbe-ide#IdeaDiscovery", ideaDiscoverySchema);
+var historyRequestCodec = strictCodec("dsh-newbe-ide#LogHistoryRequest", logHistoryRequestSchema);
+var historyCodec = strictCodec("dsh-newbe-ide#LogHistory", logHistorySchema);
+var snapshotListCodec = strictCodec("dsh-newbe-ide#RunSnapshotList", runSnapshotListSchema);
+var secretQueryCodec = strictCodec("dsh-newbe-ide#SecretQuery", secretQuerySchema);
+var secretStatusListCodec = strictCodec("dsh-newbe-ide#SecretStatusList", secretStatusListSchema);
+var secretSetCodec = strictCodec("dsh-newbe-ide#SecretSet", secretSetSchema);
+var secretStatusCodec = strictCodec("dsh-newbe-ide#SecretStatus", secretStatusSchema);
 var TYPERT = {
   package: "dsh-newbe-ide",
   face: "host",
@@ -14800,7 +14743,7 @@ var TYPERT = {
       method: "submit",
       invocation: { kind: "direct" },
       parameters: [
-        { name: "next", wire: "next", source: "json", codec: { mode: "strict", typeSymbol: "dsh-newbe-ide#IdeStateInput", schema: ideStateSchema } }
+        { name: "next", wire: "next", source: "json", codec: strictCodec("dsh-newbe-ide#IdeStateInput", ideStateSchema) }
       ],
       result: stateCodec
     },
