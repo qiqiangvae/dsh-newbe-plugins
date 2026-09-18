@@ -33,6 +33,8 @@ var client_exports = {};
 __export(client_exports, {
   NS: () => NS,
   apply: () => apply,
+  createSessionOpener: () => createSessionOpener,
+  currentSessionId: () => currentSessionId,
   inject: () => inject
 });
 module.exports = __toCommonJS(client_exports);
@@ -14587,6 +14589,24 @@ function strictCodec(typeSymbol, schema) {
   return { mode: "strict", typeSymbol, schema, create: () => schema };
 }
 
+// src/sessionnav.ts
+function currentSessionId(state) {
+  if (state?.current) return state.current;
+  const byId = state?.byId ?? {};
+  for (const id of Object.keys(byId)) if ((byId[id]?.retainedBy?.mainView ?? 0) > 0) return id;
+  return void 0;
+}
+function createSessionOpener(ctx) {
+  return (id) => {
+    const uiWorkspace = typeof ctx.get === "function" ? ctx.get("uiWorkspace") : void 0;
+    if (typeof uiWorkspace?.openSession === "function") {
+      uiWorkspace.openSession(id);
+      return;
+    }
+    ctx.sessions?.open?.(id);
+  };
+}
+
 // src/constants.ts
 var MIN_RECENT = 5;
 var MAX_RECENT = 20;
@@ -14752,7 +14772,7 @@ function SessionFolder({ sessions, scope, useSessions, openSession }) {
   const [dragging, setDragging] = (0, import_react.useState)(null);
   const [target, setTarget] = (0, import_react.useState)(null);
   const roster = useSessions((state) => state.byId ?? {});
-  const current = useSessions((state) => state.current);
+  const current = useSessions(currentSessionId);
   (0, import_react.useEffect)(() => {
     const down = (event) => setCommandDown(event.metaKey);
     const up = () => setCommandDown(false);
@@ -15260,19 +15280,23 @@ async function apply(ctx) {
     void unmount();
   }, "newbe-my-favorites: remote unmount");
   const scope = createFavoritesScope(remote, ctx);
+  const openSession = createSessionOpener(ctx);
   ctx.effect(() => ensureStyles(), "newbe-my-favorites: styles");
   ctx.effect(() => {
     try {
       const sessionsList = ctx.sessions.list;
       const workspacesList = ctx.workspaces.list;
-      switcherMachine.start({ openSession: (id) => ctx.sessions.open(id), getList: () => sessionsList.getSnapshot(), subscribeList: (fn) => sessionsList.subscribe(fn), getWorkspaces: () => workspacesList.getSnapshot(), subscribeWorkspaces: (fn) => workspacesList.subscribe(fn), getSettings: () => scope.getSnapshot().value ?? { sessions: [], urls: [], mode: "favorites", recentCount: DEFAULT_RECENT }, subscribeSettings: (fn) => scope.subscribe(fn), setSettings: (field, value) => scope.set(field, value) });
+      switcherMachine.start({ openSession, getList: () => {
+        const snapshot = sessionsList.getSnapshot();
+        return { ...snapshot, current: currentSessionId(snapshot) };
+      }, subscribeList: (fn) => sessionsList.subscribe(fn), getWorkspaces: () => workspacesList.getSnapshot(), subscribeWorkspaces: (fn) => workspacesList.subscribe(fn), getSettings: () => scope.getSnapshot().value ?? { sessions: [], urls: [], mode: "favorites", recentCount: DEFAULT_RECENT }, subscribeSettings: (fn) => scope.subscribe(fn), setSettings: (field, value) => scope.set(field, value) });
     } catch (e) {
       console.error("[newbe-my-favorites] switcher start FAILED", e);
     }
     return () => switcherMachine.dispose();
   }, "newbe-my-favorites: switcher");
   ctx.slots.inject("conversation.session.header.actions", () => ctx.slots.register({ name: "conversation.session.header.actions", id: "newbe-my-favorites-toggle", order: -5, inject: () => ({ scope }) }, FavoriteToggle));
-  ctx.slots.inject("sidebar.footer.action", () => ctx.slots.register({ name: "sidebar.footer.action", id: "newbe-my-favorites-below-new-session-bridge", order: 5, inject: () => ({ scope, openSession: (id) => ctx.sessions.open(id) }) }, SidebarBelowNewSessionBridge));
+  ctx.slots.inject("sidebar.footer.action", () => ctx.slots.register({ name: "sidebar.footer.action", id: "newbe-my-favorites-below-new-session-bridge", order: 5, inject: () => ({ scope, openSession }) }, SidebarBelowNewSessionBridge));
   ctx.slots.inject("sidebar.footer.action", () => ctx.slots.register({ name: "sidebar.footer.action", id: "newbe-my-favorites-session-switcher", order: 6, inject: () => ({}) }, SessionSwitcherHost));
   ctx.slots.inject("sidebar.footer.action", () => ctx.slots.register({ name: "sidebar.footer.action", id: "newbe-my-favorites-switcher-hint", order: 7, inject: () => ({}) }, SwitcherHintHost));
   ctx.slots.inject("settings.plugins.tab", () => ctx.slots.register({ name: "settings.plugins.tab", id: "newbe-my-favorites", order: 30, label: () => "\u6536\u85CF", inject: () => ({ scope }) }, SettingsCard));

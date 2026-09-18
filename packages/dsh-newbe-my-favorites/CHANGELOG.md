@@ -4,6 +4,14 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [0.5.6] - 2026-09-17
+
+### Fixed
+
+- 修复点击收藏的会话、按 `⌘⌥\`` / `Ctrl+\`` 切换会话都不生效：DSH `0.1.6-alpha.2` 的客户端 `sessions` 服务已删掉 `open`（导航改由 `uiWorkspace.openSession(target)` 承担），旧调用每次都抛 `TypeError: ctx.sessions.open is not a function`，界面上就是"点了没反应"。新增 `src/sessionnav.ts` 做运行时接缝：优先 `uiWorkspace.openSession`、老版本回退 `sessions.open`；**不把 `uiWorkspace` 写进 `inject`**（老版本没有它，硬依赖会让插件根本不挂载）。
+- 同一版本还把 `sessions.list` 快照里的 `current` 字段删了，导致收藏夹里永远没有"当前会话"高亮、快捷键的"上一个会话"也算不准（`quickStep` 只能退化成跳第一条）。改为读 `byId[*].retainedBy.mainView > 0` 反推当前会话（与 layout / cordis / session / agent-preset 四个官方插件同款写法），老版本仍优先读 `current`。
+- 新增 `test/sessionnav.test.mjs`：锁住"新 API 优先、老 API 回退、两代都没有时不抛错"，以及 `uiWorkspace` 不得进 `inject`。
+
 ## [0.5.5] - 2026-09-17
 
 ### Fixed
