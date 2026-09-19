@@ -4,6 +4,14 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [0.5.7] - 2026-09-19
+
+### Fixed
+
+- 修正侧栏「收藏会话」入口整块右偏 8px：容器 `.mf-belowNewSessionBridge` 的 `padding:4px 8px` 叠在行自身之上，而 `.mf-folderButton` 本就逐项等同宿主 `.projectRow`（`padding:0 8px` / `height:34px` / `border-radius:8px` / `gap:6px`），于是整块被推到宿主网格右侧——实测实时 DOM：文件夹图标 x=28，宿主文件夹行图标 x=20。横向 padding 改为 `0` 后，`.mf-folderButton` 与宿主 `.projectRow` 的框（12/268）、图标（20）、文字墨迹（42）四项全等。
+- 展开后的会话行同样与宿主会话行对齐：`.mf-sessionRow` 补 `padding:0 8px`（一字不差镜像宿主 `.YDXeBa_sessionRow`，行框回到 12/268、拖拽 slot 20/36）；`.mf-sessionButton` 补 `padding:0`，重置 Chrome 的 UA `button{padding:1px 6px}`——此前子行文字墨迹落在 46 而宿主在 40，这是一条被「按钮盒子坐标」掩盖的既有偏差（`Range` 量文字才暴露）。
+- `.mf-urlTags` 补 `margin:0 8px`：宿主没有对应的网址标签行，让标签左缘维持 20 不变，不随本次改动左移。
+
 ## [0.5.6] - 2026-09-17
 
 ### Fixed
