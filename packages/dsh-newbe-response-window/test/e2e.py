@@ -130,7 +130,9 @@ def main():
             thinkExpanded: thinks.filter(t => t.getAttribute('data-open') === '1').length,
             nativeThinkVisible: document.querySelectorAll('[data-variant="think"]:not([data-drw-hidethink])').length,
             nativeThinkHidden: document.querySelectorAll('[data-variant="think"][data-drw-hidethink="1"]').length,
-            slotErrors: document.querySelectorAll('[data-slot-error]').length,
+            dock: document.querySelectorAll('[data-drw-dock]').length,
+            slotErrors: Array.from(document.querySelectorAll('[data-slot-error]'))
+              .map(e => e.getAttribute('data-slot-error')),
           };
         }""")
         # Activating the client half is the regression this test guards: a
@@ -138,7 +140,13 @@ def main():
         # slides and a "waiting for service" boot error.
         assert info["slides"] >= 1, "no slides rendered (client half did not activate?)"
         assert info["bounded"], "not all tool-slide bodies are bounded"
-        assert info["slotErrors"] == 0, "a slot entry crashed (%s placeholders)" % info["slotErrors"]
+        # The session dock is this plugin's own entry; the crash placeholder is
+        # per slot, not per entry, so other profile plugins sharing
+        # conversation.input.dock can legitimately own one (the web profile does
+        # on 0.1.7-alpha.1, with this plugin disabled too) — report, don't fail.
+        assert info["dock"] == 1, "the session dock entry did not mount (no [data-drw-dock])"
+        if info["slotErrors"]:
+            print("WARN other slot entries crashed:", info["slotErrors"])
 
         # With per-response segmentation each segment is usually short and fits
         # without scrolling, so prove the mechanism directly: clamp bodies to a
@@ -211,11 +219,14 @@ def main():
             open_session(args.session)
             pg.wait_for_timeout(3000)
         assert pg.evaluate("!!document.querySelector('[data-chat-flow]')"), "chat flow gone after switch"
-        assert not errors, "errors after switch: " + "; ".join(errors[:5])
+        # Only errors naming this plugin are ours: a full profile's other
+        # plugins can log their own (the web profile does on 0.1.7-alpha.1).
+        ours = [e for e in errors if "dsh-newbe-response-window" in e]
+        assert not ours, "errors about this plugin: " + "; ".join(ours[:5])
         print("PASS session-switch crash-safety")
 
         if errors:
-            print("WARN console/page errors:", "; ".join(errors[:8]))
+            print("WARN other console/page errors:", "; ".join(errors[:8]))
         b.close()
     print("ALL PASS")
 
