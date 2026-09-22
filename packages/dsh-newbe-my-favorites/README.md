@@ -4,8 +4,9 @@
 
 ## 兼容性
 
-- 本插件要求 **DSH ≥ `v0.1.2-rc.1`**，并已针对 `v0.1.2-rc.1` ~ `v0.1.6-alpha.2` 适配。
-- Typert 严格 codec 在 `v0.1.6-alpha.2` 从 `{ mode, typeSymbol, schema }` 改成 `{ mode, typeSymbol, create }`（两代的 loader 与 registry 都只查自己认识的字段）。本插件的宿主清单与客户端 descriptors 统一由 `src/schema.ts` 的 `strictCodec()` 构造，**两个字段同时带**，因此在 `v0.1.2-rc.1` ~ `v0.1.6-alpha.2` 都能启动。
+- 本插件要求 **DSH ≥ `v0.1.2-rc.1`**，并已针对 `v0.1.2-rc.1` ~ `v0.1.7-alpha.1` 适配。
+- Typert 严格 codec 在 `v0.1.6-alpha.2` 从 `{ mode, typeSymbol, schema }` 改成 `{ mode, typeSymbol, create }`（两代的 loader 与 registry 都只查自己认识的字段）。本插件的宿主清单与客户端 descriptors 统一由 `src/schema.ts` 的 `strictCodec()` 构造，**两个字段同时带**，因此在 `v0.1.2-rc.1` ~ `v0.1.7-alpha.1` 都能启动。
+- 文件夹图标在 `v0.1.7-alpha.1` 从 `IconFolder*16` 改名成 `IconFolder*Regular`（旧名变成 `undefined`）。插件在运行时二选一，两代都能挂载。
 - **不兼容 DSH `v0.1.2-alpha.1` 及更早版本**：`v0.1.2-rc.1` 存在破坏性更新——
   - `@deepseek-ai/dsh-client-store` 与 `@deepseek-ai/dsh-client-ui-primitives` 不再是独立发布的 npm 包，而是由 Web 外壳以「基线静态模块」（`PLATFORM_MODULES`）注入浏览器模块表；插件 `dsh.client.inject` 已移除对这两个包的包级依赖。
   - 插件设置标签页 `settings.plugins.tab` 改由 `@deepseek-ai/dsh-client-ui-settings-plugins` 声明，`dsh.client.inject` 相应更新。

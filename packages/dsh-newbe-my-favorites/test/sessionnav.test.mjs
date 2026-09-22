@@ -1,10 +1,12 @@
 /**
- * 客户端「切换会话 / 当前会话」接缝的回归测试。
+ * 客户端跨版本接缝的回归测试。
  *
- * 锁住的是实测踩过的坑：0.1.6-alpha.2 把客户端 `sessions.open` 删了（导航改由
- * `uiWorkspace.openSession` 承担），老代码照旧调用 → 点收藏的会话、按快捷键都抛
- * `TypeError: ctx.sessions.open is not a function`，界面上就是"点了没反应"。
- * 同时锁住"不能把 uiWorkspace 写进 inject"——老版本没有它，硬依赖会让插件根本不挂载。
+ * 锁住的是实测踩过的坑：
+ * - 0.1.6-alpha.2 把客户端 `sessions.open` 删了（导航改由 `uiWorkspace.openSession` 承担），
+ *   老代码照旧调用 → 点收藏的会话、按快捷键都抛 `TypeError: ctx.sessions.open is not a function`，
+ *   界面上就是"点了没反应"；同时锁住"不能把 uiWorkspace 写进 inject"。
+ * - 0.1.7 把图标从 `IconFolder*16` 改名成 `IconFolder*Regular`，旧名变成 `undefined`，
+ *   渲染时 "Element type is invalid" 让侧栏收藏条目的槽位条目崩溃退位，收藏栏整块消失。
  *
  * 从 lib 产物取值，所以改 src 之后必须先 build。
  */
@@ -87,4 +89,13 @@ test('切换会话：优先 uiWorkspace.openSession，回退老版本的 session
 
 test('uiWorkspace 不进 inject（老版本没有它，硬依赖会让插件不挂载）', () => {
   assert.deepEqual([...client.inject], ['slots', 'remote', 'sessions', 'workspaces']);
+});
+
+test('文件夹图标：0.1.7 的名字优先，回退 0.1.6 的旧名', () => {
+  // 逐个字段比较：返回值在 vm 上下文里构造，deepEqual(deepStrictEqual) 会连原型一起比。
+  const pick = (icons) => { const { close, open } = client.resolveFolderIcons(icons); return [close, open]; };
+  assert.deepEqual(pick({ IconFolderCloseRegular: 'NEW-CLOSE', IconFolderOpenRegular: 'NEW-OPEN' }), ['NEW-CLOSE', 'NEW-OPEN'], '0.1.7：只有新名时取新名');
+  assert.deepEqual(pick({ IconFolderClose16: 'OLD-CLOSE', IconFolderOpen16: 'OLD-OPEN' }), ['OLD-CLOSE', 'OLD-OPEN'], '≤ 0.1.6：没有新名时回退旧名');
+  assert.deepEqual(pick({ IconFolderCloseRegular: 'NEW-CLOSE', IconFolderOpenRegular: 'NEW-OPEN', IconFolderClose16: 'OLD-CLOSE', IconFolderOpen16: 'OLD-OPEN' }), ['NEW-CLOSE', 'NEW-OPEN'], '两代都在时以新名为准');
+  assert.deepEqual(pick({}), [undefined, undefined], '两代都没有时不抛错');
 });

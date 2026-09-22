@@ -4,6 +4,13 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [0.5.8-alpha.1] - 2026-09-22
+
+### Fixed
+
+- 修复升级到 DSH `v0.1.7-alpha.1` 后侧栏「收藏会话」入口整块消失：该版本把文件夹图标改名，插件取到的图标组件为空值，收藏区渲染失败后被 Harness 判定为崩溃并永久退位。现在图标按版本二选一，`v0.1.2-rc.1` ~ `v0.1.7-alpha.1` 都能正常显示。
+- 顺带在 README 的兼容性说明里补上 `v0.1.7-alpha.1`。
+
 ## [0.5.7] - 2026-09-19
 
 ### Fixed

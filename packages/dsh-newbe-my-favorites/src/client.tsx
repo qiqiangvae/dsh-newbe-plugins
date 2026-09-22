@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import * as ReactDOM from 'react-dom';
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store';
-import { IconFolderClose16, IconFolderOpen16 } from '@deepseek-ai/dsh-client-ui-primitives';
+import * as PrimitiveIcons from '@deepseek-ai/dsh-client-ui-primitives';
 import { favoritesFieldSchema, favoritesFieldValueSchema, favoritesStateSchema, strictCodec } from './schema.js';
 import { createSessionOpener, currentSessionId } from './sessionnav.js';
 import { MIN_RECENT, MAX_RECENT, DEFAULT_RECENT } from './constants.js';
@@ -121,8 +121,17 @@ function Star({ filled }: { filled: boolean }) { return <span aria-hidden="true"
 // 收拢时星落在文件夹内部；展开时文件夹前盖翻开，星随之落到前盖上，两种状态都复用宿主字形，和「工作区」文件夹行同源。
 const FAV_STAR_CLOSED = 'M8 6.25 8.65 8.25 10.76 8.25 9.05 9.49 9.7 11.5 8 10.26 6.3 11.5 6.95 9.49 5.24 8.25 7.35 8.25Z';
 const FAV_STAR_OPEN = 'M8 7.85 8.56 9.58 10.38 9.58 8.91 10.65 9.47 12.37 8 11.3 6.53 12.37 7.09 10.65 5.62 9.58 7.44 9.58Z';
+// 文件夹图标随 DSH 0.1.7 改名（`IconFolder*16` → `IconFolder*Regular`）：旧名在新版模块表里是
+// `undefined`，直接渲染会因 "Element type is invalid" 让整个侧栏收藏条目的槽位条目崩溃退位
+// （abdicate），表现为收藏栏整块消失。运行时空值合并取新名、回退旧名，两代都能挂载。
+// 导出给 `test/sessionnav.test.mjs` 锁住两代契约（与 sessionnav 同款做法）。
+export const resolveFolderIcons = (icons: typeof PrimitiveIcons) => ({
+  close: icons.IconFolderCloseRegular ?? icons.IconFolderClose16,
+  open: icons.IconFolderOpenRegular ?? icons.IconFolderOpen16,
+});
+const { close: FolderCloseIcon, open: FolderOpenIcon } = resolveFolderIcons(PrimitiveIcons);
 function FavoritesFolderIcon({ open }: { open: boolean }) {
-  return <span className="mf-folderIcon">{open ? <IconFolderOpen16 /> : <IconFolderClose16 />}<svg className="mf-folderStar" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d={open ? FAV_STAR_OPEN : FAV_STAR_CLOSED} fill="currentColor" /></svg></span>;
+  return <span className="mf-folderIcon">{open ? <FolderOpenIcon /> : <FolderCloseIcon />}<svg className="mf-folderStar" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d={open ? FAV_STAR_OPEN : FAV_STAR_CLOSED} fill="currentColor" /></svg></span>;
 }
 
 function FavoriteToggle({ sessionId, useSessions, scope }: any) {

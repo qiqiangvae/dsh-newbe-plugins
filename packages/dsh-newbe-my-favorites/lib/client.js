@@ -35,13 +35,14 @@ __export(client_exports, {
   apply: () => apply,
   createSessionOpener: () => createSessionOpener,
   currentSessionId: () => currentSessionId,
-  inject: () => inject
+  inject: () => inject,
+  resolveFolderIcons: () => resolveFolderIcons
 });
 module.exports = __toCommonJS(client_exports);
 var import_react = require("react");
 var ReactDOM = __toESM(require("react-dom"), 1);
 var import_dsh_client_store = require("@deepseek-ai/dsh-client-store");
-var import_dsh_client_ui_primitives = require("@deepseek-ai/dsh-client-ui-primitives");
+var PrimitiveIcons = __toESM(require("@deepseek-ai/dsh-client-ui-primitives"), 1);
 
 // ../../node_modules/.pnpm/zod@4.4.3/node_modules/zod/v4/classic/external.js
 var external_exports = {};
@@ -14739,9 +14740,14 @@ function Star({ filled }) {
 }
 var FAV_STAR_CLOSED = "M8 6.25 8.65 8.25 10.76 8.25 9.05 9.49 9.7 11.5 8 10.26 6.3 11.5 6.95 9.49 5.24 8.25 7.35 8.25Z";
 var FAV_STAR_OPEN = "M8 7.85 8.56 9.58 10.38 9.58 8.91 10.65 9.47 12.37 8 11.3 6.53 12.37 7.09 10.65 5.62 9.58 7.44 9.58Z";
+var resolveFolderIcons = (icons) => ({
+  close: icons.IconFolderCloseRegular ?? icons.IconFolderClose16,
+  open: icons.IconFolderOpenRegular ?? icons.IconFolderOpen16
+});
+var { close: FolderCloseIcon, open: FolderOpenIcon } = resolveFolderIcons(PrimitiveIcons);
 function FavoritesFolderIcon({ open }) {
   return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "mf-folderIcon", children: [
-    open ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.IconFolderOpen16, {}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.IconFolderClose16, {}),
+    open ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(FolderOpenIcon, {}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(FolderCloseIcon, {}),
     /* @__PURE__ */ (0, import_jsx_runtime.jsx)("svg", { className: "mf-folderStar", width: "16", height: "16", viewBox: "0 0 16 16", fill: "none", "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: open ? FAV_STAR_OPEN : FAV_STAR_CLOSED, fill: "currentColor" }) })
   ] });
 }

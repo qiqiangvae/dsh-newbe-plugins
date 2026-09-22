@@ -19,8 +19,9 @@ declare module '@deepseek-ai/dsh-client-store' {
 }
 
 /**
- * DSH v0.1.2-alpha.1 官方图标集（私有包，未发布 npm）。宿主编译产物无 .d.ts，
- * 此处仅垫需要用到的一对「文件夹关/开」图标。
+ * DSH 官方图标集（私有包，未发布 npm）。宿主编译产物无 .d.ts，此处仅垫需要用到的一对
+ * 「文件夹关/开」图标。两代命名都声明：≤ 0.1.6 是 `IconFolder*16`，0.1.7 起改成
+ * `IconFolder*Regular`，`client.tsx` 运行时二选一（缺的那个在模块表里是 `undefined`）。
  */
 declare module '@deepseek-ai/dsh-client-ui-primitives' {
   import type { ReactElement } from 'react';
@@ -30,4 +31,6 @@ declare module '@deepseek-ai/dsh-client-ui-primitives' {
   }
   export function IconFolderClose16(props?: DshIconProps): ReactElement;
   export function IconFolderOpen16(props?: DshIconProps): ReactElement;
+  export function IconFolderCloseRegular(props?: DshIconProps): ReactElement;
+  export function IconFolderOpenRegular(props?: DshIconProps): ReactElement;
 }
