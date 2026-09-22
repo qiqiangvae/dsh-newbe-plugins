@@ -2,28 +2,72 @@
 """E2E test for dsh-response-window against a running `dsh web` instance.
 
 Usage:
-    python3 test/e2e.py [--url http://127.0.0.1:3639] [--session "架构重构不顺原因分析"]
+    uv run --with playwright python3 test/e2e.py [--url http://127.0.0.1:3639] \
+        [--session "修复 dsh 升级后的插件不兼容"]
 
 Requires: python3 + playwright (chromium). Assumes a session with tool calls
 (and ideally some reasoning/think blocks).
-Asserts: per-turn slides render (think rows inside, one line each, collapsible,
-native Think rows hidden), windows are bounded+scrollable, the assistant text
-window applies, collapse/expand works, and switching sessions does not crash
-(rows are never reparented).
+
+Asserts the DSH 0.1.7-alpha.1 contract, i.e. the regressions this file exists
+to catch:
+  * the client half ACTIVATES at all (a missing inject service parks it and
+    renders zero slides),
+  * per-turn slides render bounded + scrollable,
+  * think rows are one line each and expand on click,
+  * native Think rows are hidden wherever the segment has a slide — including
+    inside the process-group containers 0.1.7 nests flow rows in,
+  * the two Settings -> General rows mount and are wired,
+  * switching sessions does not crash (rows are never reparented).
 """
 import argparse, json, sys
 
 from playwright.sync_api import sync_playwright
 
+# Native Think rows are hidden by the plugin; a visible one whose segment owns
+# a slide would be a duplicate of that slide's own Think row. Flow rows are read
+# in document order because 0.1.7 nests them inside process-group containers.
+NATIVE_DUPLICATE_PROBE = """() => {
+  const rows = Array.from(document.querySelectorAll('[data-chat-flow-kind]'));
+  const keyOf = (n) => n.getAttribute('data-chat-flow-key');
+  const boundary = (n) => {
+    const kind = n.getAttribute('data-chat-flow-kind');
+    return kind === 'user' || kind === 'steering' || kind === 'turn-tail' || kind === 'turn-process';
+  };
+  const inSlideSegment = (i) => {
+    for (let j = i - 1; j >= 0; j--) {
+      if (boundary(rows[j])) break;
+      if (rows[j].querySelector('.drw-slide')) return true;
+    }
+    for (let k = i + 1; k < rows.length; k++) {
+      if (boundary(rows[k])) break;
+      if (rows[k].querySelector('.drw-slide')) return true;
+    }
+    return false;
+  };
+  const visible = [];
+  rows.forEach((row, i) => {
+    const own = row.matches('[data-variant="think"]')
+      ? row
+      : row.querySelector('[data-variant="think"]:not([data-drw-hidethink])');
+    if (own && inSlideSegment(i)) visible.push(keyOf(row));
+  });
+  return visible;
+}"""
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--url", default="http://127.0.0.1:3639")
-    ap.add_argument("--session", default="架构重构不顺原因分析")
+    ap.add_argument("--session", default="修复 dsh 升级后的插件不兼容")
+    ap.add_argument("--workspace", default="dsh-newbe-plugins",
+                    help="workspace node to expand when the session list hides the session")
+    ap.add_argument("--channel", default=None,
+                    help="use an installed browser instead of the bundled one, e.g. 'chrome'")
     args = ap.parse_args()
 
     errors = []
     with sync_playwright() as p:
-        b = p.chromium.launch(headless=True, args=["--no-sandbox"])
+        b = p.chromium.launch(headless=True, channel=args.channel, args=["--no-sandbox"])
         pg = b.new_page(viewport={"width": 1440, "height": 900})
         pg.on("pageerror", lambda e: errors.append("pageerror: " + str(e)))
         # Console noise from unrelated profile plugins (e.g. their own API
@@ -41,12 +85,32 @@ def main():
         pg.wait_for_timeout(3500)
 
         def open_session(title):
-            return pg.evaluate("""(t) => {
-                const el = Array.from(document.querySelectorAll('[role=button],button,div'))
-                  .find(e => (e.innerText||'').includes(t) && e.innerText.trim().length < 40);
+            probe = """(t) => {
+                const el = Array.from(document.querySelectorAll('[role=treeitem]'))
+                  .find(e => (e.innerText||'').includes(t));
                 if (el) { el.click(); return true; }
                 return false;
-            }""", title)
+            }"""
+            if pg.evaluate(probe, title):
+                return True
+            # The session sits under its workspace node; that node is collapsed
+            # unless that workspace is the active one. Clicking through the page
+            # goes through plain .click() because the first-run notice mounts a
+            # pointer-blocking mask.
+            pg.evaluate("""(w) => {
+                const el = Array.from(document.querySelectorAll('[role=treeitem]'))
+                  .find(e => (e.innerText||'').trim().startsWith(w));
+                if (el) el.click();
+            }""", args.workspace)
+            pg.wait_for_timeout(1500)
+            # history beyond the newest few hides behind "展开其余 N 个会话"
+            pg.evaluate("""() => {
+                const more = Array.from(document.querySelectorAll('button,div'))
+                  .find(e => (e.innerText||'').trim().startsWith('展开其余'));
+                if (more) more.click();
+            }""")
+            pg.wait_for_timeout(800)
+            return pg.evaluate(probe, title)
 
         if not open_session(args.session):
             sys.exit("session not found: " + args.session)
@@ -56,7 +120,7 @@ def main():
           const thinks = Array.from(document.querySelectorAll('.drw-think'));
           return {
             slides: document.querySelectorAll('.drw-slide').length,
-            heads: Array.from(document.querySelectorAll('.drw-slide .drw-head-title')).map(e=>e.innerText),
+            heads: Array.from(document.querySelectorAll('.drw-slide .drw-head-title')).map(e=>e.textContent),
             bounded: Array.from(document.querySelectorAll('.drw-slide .drw-body')).every(bb => {
               const cs = getComputedStyle(bb);
               return bb.style.maxHeight !== '' && cs.overflowY === 'auto';
@@ -64,26 +128,17 @@ def main():
             calls: document.querySelectorAll('.drw-call').length,
             thinks: thinks.length,
             thinkExpanded: thinks.filter(t => t.getAttribute('data-open') === '1').length,
-            thinkCollapsed: thinks.filter(t => !t.getAttribute('data-open')).length,
             nativeThinkVisible: document.querySelectorAll('[data-variant="think"]:not([data-drw-hidethink])').length,
             nativeThinkHidden: document.querySelectorAll('[data-variant="think"][data-drw-hidethink="1"]').length,
-            // a visible native Think that still has a slide somewhere in its
-            // segment would be a duplicate of the slide's own Think row
-            nativeVisibleInSlideSeg: Array.from(document.querySelectorAll('[data-variant="think"]:not([data-drw-hidethink])')).filter(t => {
-              let r = t.closest('[data-chat-flow-kind]');
-              let c = 0;
-              while (r && c < 30) {
-                r = r.previousElementSibling;
-                c++;
-                if (r && r.querySelector && r.querySelector('.drw-slide')) return true;
-                if (r && r.getAttribute && r.getAttribute('data-chat-flow-kind') === 'user') break;
-              }
-              return false;
-            }).length,
+            slotErrors: document.querySelectorAll('[data-slot-error]').length,
           };
         }""")
-        assert info["slides"] >= 1, "no slides rendered"
+        # Activating the client half is the regression this test guards: a
+        # declared-but-unprovided inject service parks the plugin with zero
+        # slides and a "waiting for service" boot error.
+        assert info["slides"] >= 1, "no slides rendered (client half did not activate?)"
         assert info["bounded"], "not all tool-slide bodies are bounded"
+        assert info["slotErrors"] == 0, "a slot entry crashed (%s placeholders)" % info["slotErrors"]
 
         # With per-response segmentation each segment is usually short and fits
         # without scrolling, so prove the mechanism directly: clamp bodies to a
@@ -94,9 +149,10 @@ def main():
         scrollable = pg.evaluate("Array.from(document.querySelectorAll('.drw-slide .drw-body')).some(bb => bb.scrollHeight > bb.clientHeight)")
         assert scrollable, "no bounded body overflows once clamped (check session has content)"
 
+        duplicates = pg.evaluate(NATIVE_DUPLICATE_PROBE)
+        assert duplicates == [], "native Think rows still visible in slide segments: %s" % duplicates
         if info["thinks"]:
             assert info["thinkExpanded"] == 0, "think rows should be collapsed by default (one line each)"
-            assert info["nativeVisibleInSlideSeg"] == 0, "a native Think inside a slide segment is still visible (duplicate)"
         print("PASS slides:", info["slides"], "heads:", json.dumps(info["heads"], ensure_ascii=False),
               "calls:", info["calls"], "thinks:", info["thinks"],
               "(native hidden:", info["nativeThinkHidden"], "/ visible:", info["nativeThinkVisible"], ")")
@@ -121,12 +177,39 @@ def main():
         after = pg.evaluate("document.querySelector('.drw-slide .drw-body').className")
         assert "drw-collapsed" in after and "drw-collapsed" not in before, "collapse toggle failed"
 
+        # Settings -> General rows (durable namespace migrated off settingsScope)
+        opened = pg.evaluate("""() => {
+            const el = Array.from(document.querySelectorAll('button')).find(e => (e.innerText||'').trim() === '设置');
+            if (el) { el.click(); return true; }
+            return false;
+        }""")
+        assert opened, "settings button not found"
+        pg.wait_for_timeout(2000)
+        rows = pg.evaluate("""() => Array.from(document.querySelectorAll('.drw-set-row')).map(r => ({
+            title: (r.querySelector('.drw-set-title')||{}).textContent,
+            control: (r.querySelector('.drw-set-control')||{}).innerText,
+            input: (r.querySelector('.drw-set-input')||{}).value,
+        }))""")
+        assert len(rows) == 2, "expected 2 settings rows, got %s" % json.dumps(rows, ensure_ascii=False)
+        assert rows[0]["title"] and rows[0]["title"].startswith("响应窗口大小"), "settings row 1 wrong: %s" % rows[0]
+        assert rows[0]["input"] == "10", "settings row 1 did not show the durable/default value: %s" % rows[0]
+        print("PASS settings rows:", json.dumps([r["title"] for r in rows], ensure_ascii=False))
+        pg.evaluate("""() => {
+            const el = Array.from(document.querySelectorAll('button')).find(e => (e.getAttribute('aria-label')||'').includes('关闭'));
+            if (el) el.click();
+        }""")
+        pg.wait_for_timeout(500)
+
         # switch session and come back (crash-safety: rows are not reparented)
         switched = pg.evaluate("""() => {
-            const el = Array.from(document.querySelectorAll('[role=button],button,div')).find(e => (e.innerText||'').trim()==='test');
+            const el = Array.from(document.querySelectorAll('[role=treeitem],[role=button],button,div'))
+              .find(e => (e.innerText||'').trim() === 'dsh-newbe-plugins');
             if (el) { el.click(); return true; } return false;
         }""")
         pg.wait_for_timeout(3500)
+        if switched:
+            open_session(args.session)
+            pg.wait_for_timeout(3000)
         assert pg.evaluate("!!document.querySelector('[data-chat-flow]')"), "chat flow gone after switch"
         assert not errors, "errors after switch: " + "; ".join(errors[:5])
         print("PASS session-switch crash-safety")
@@ -135,6 +218,7 @@ def main():
             print("WARN console/page errors:", "; ".join(errors[:8]))
         b.close()
     print("ALL PASS")
+
 
 if __name__ == "__main__":
     main()

@@ -7,3 +7,5 @@ allowBuilds:
 
 minimumReleaseAgeExclude:
   - '@deepseek-ai/dsh-home-paths@0.1.2-rc.1'
+  - '@deepseek-ai/cosmokit@1.8.4'
+  - '@deepseek-ai/schemastery@3.18.3'
