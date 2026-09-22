@@ -96,19 +96,19 @@ dsh plugin --profile web add dsh-newbe-input-enhancer
 dsh plugin --profile web add 'dsh-newbe-input-enhancer@1.1.0'
 ```
 
-### 方式二：从合集仓库 GitHub 安装（子目录）
+### 方式二：从合集仓库 GitHub 安装（子目录，alpha 通道）
 
 ```sh
-dsh plugin --profile web add github:qiqiangvae/dsh-newbe-plugins#path:packages/dsh-newbe-input-enhancer
+dsh plugin --profile web add 'github:qiqiangvae/dsh-newbe-plugins#alpha&path:packages/dsh-newbe-input-enhancer'
 ```
 
-也可以显式使用 Git URL：
+也可以显式使用 Git URL（换 `#rc` 装 rc 通道）：
 
 ```sh
-dsh plugin --profile web add https://github.com/qiqiangvae/dsh-newbe-plugins.git#path:packages/dsh-newbe-input-enhancer
+dsh plugin --profile web add 'https://github.com/qiqiangvae/dsh-newbe-plugins.git#alpha&path:packages/dsh-newbe-input-enhancer'
 ```
 
-建议锁定到某个 commit 以保证可重复安装（`&path:` 同时锁定分支与子目录）：
+建议锁定到某次发布以保证可重复安装（`&path:` 同时锁定子目录）：
 
 ```sh
 dsh plugin --profile web add 'github:qiqiangvae/dsh-newbe-plugins#<commit-sha>&path:packages/dsh-newbe-input-enhancer'

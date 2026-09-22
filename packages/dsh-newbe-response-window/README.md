@@ -31,16 +31,16 @@ DeepSeek Harness (DSH) Web 插件：把一轮里的 think（推理）和工具�
 
 ## 安装
 
-从 npm 安装：
+从 npm 安装（跟 `latest`，即最近一次稳定发布）：
 
 ```bash
 dsh plugin --profile web add dsh-newbe-response-window
 ```
 
-或从合集仓库 GitHub 子目录安装：
+或从合集仓库 GitHub 子目录安装（`alpha` 通道；换 `#rc` 装 rc 通道，换 `#<commit-sha>` 锁死某次发布）：
 
 ```bash
-dsh plugin --profile web add github:qiqiangvae/dsh-newbe-plugins#path:packages/dsh-newbe-response-window
+dsh plugin --profile web add 'github:qiqiangvae/dsh-newbe-plugins#alpha&path:packages/dsh-newbe-response-window'
 ```
 
 或本地 link 方式（开发调试）：

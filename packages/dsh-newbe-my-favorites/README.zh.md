@@ -12,8 +12,8 @@ DSH Desktop 的本机收藏插件。
 ## 安装
 
 ```bash
-# 从合集仓库 GitHub 安装（子目录）
-dsh plugin --profile web add github:qiqiangvae/dsh-newbe-plugins#path:packages/dsh-newbe-my-favorites
+# 从合集仓库 GitHub 安装（alpha 通道；换 #rc 装 rc 通道）
+dsh plugin --profile web add 'github:qiqiangvae/dsh-newbe-plugins#alpha&path:packages/dsh-newbe-my-favorites'
 
 # 本机开发：本地路径软链接
 dsh plugin --profile web add "link:$(pwd)/packages/dsh-newbe-my-favorites"

@@ -30,9 +30,19 @@ Multi-context: root `CONTEXT-MAP.md` points at one `CONTEXT.md` per package unde
 
 ### tag
 
-- 命名：`v` + 该分支 `package.json` 的完整版本号，例 `v0.5.8-alpha`、`v0.5.8-rc`。必须是 annotated tag，且指向声明该版本的那个提交。
-- 消歧：monorepo 内同版本号已被另一个包占用时，改用 `<包名>-v<版本>`，例 `dsh-newbe-ide-v0.4.2-alpha`。
+- 命名：`<包名>-v<该分支 package.json 的完整版本号>`，例 `dsh-newbe-my-favorites-v0.5.8-alpha`、`dsh-newbe-ide-v0.4.2-alpha`。**包名前缀不能省**：一个仓库共用一个 tag 命名空间，裸 `v0.5.8-alpha` 看不出属于哪个插件，不同包的版本号还会直接撞名。
+- 必须是 annotated tag，指向该包该版本的发布提交（= 打 tag 时该通道分支上的 tip）。
 - Release 标题写成 `<包名> v<版本>`，通道 Release 一律勾 pre-release。
+
+### 文档里的安装命令
+
+README 里的 Git 安装命令必须锁通道分支。不锁就会静默装到默认分支 `main`（集成分支、不发版）上：
+
+```bash
+dsh plugin --profile web add 'github:qiqiangvae/dsh-newbe-plugins#alpha&path:packages/<包名>'
+```
+
+`&` 会被 shell 当成后台执行，所以整条 spec 必须加引号（`#path:` 时代没有 `&`，历史命令可以不加）。npm 侧只有 `latest`（最近一次稳定发布）；要装通道版本就用上面的 Git 方式。
 
 ## Release notes
 

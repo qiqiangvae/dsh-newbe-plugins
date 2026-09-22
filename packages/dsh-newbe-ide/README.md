@@ -31,13 +31,13 @@ DSH Web 会话视图 tab「**IDE**」：按项目组织**启动配置**，一键
 ## 安装
 
 ```bash
-# npm（推荐）
+# npm（跟 latest = 最近一次稳定发布）
 dsh plugin --profile web add dsh-newbe-ide
 
-# GitHub 子目录
-dsh plugin --profile web add github:qiqiangvae/dsh-newbe-plugins#path:packages/dsh-newbe-ide
+# GitHub 子目录（alpha 通道；换 #rc 装 rc 通道）
+dsh plugin --profile web add 'github:qiqiangvae/dsh-newbe-plugins#alpha&path:packages/dsh-newbe-ide'
 
-# 锁定 commit
+# 锁定某次发布
 dsh plugin --profile web add 'github:qiqiangvae/dsh-newbe-plugins#<commit-sha>&path:packages/dsh-newbe-ide'
 ```
 
