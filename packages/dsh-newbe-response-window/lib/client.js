@@ -1,9 +1,15 @@
 // dsh-newbe-response-window — browser half.
 //
-// Adapted for DSH 0.1.2-alpha.5 (the current client-module / slot-runtime
-// generation). Breaking changes vs. the older alpha this plugin shipped for:
+// Adapted for DSH 0.1.7-alpha.1 (the current client-module / slot-runtime
+// generation). Breaking changes vs. the alpha this plugin last shipped for:
 //
-//  - `@deepseek-ai/dsh-client-runtime` is gone. The browser shell now seeds
+//  - The `settingsScope` client service is gone. Durable preferences now go
+//    through the `configForms` service, keyed by profile entry id, and the host
+//    half has to mark its user-editable fields `volatile()` and call
+//    `settings.configure({ auto: false }, ctx.fiber)`. Declaring the old
+//    service in `inject` parks the plugin forever ("waiting for service:
+//    settingsScope") — that, and only that, is what upgrading DSH broke.
+//  - `@deepseek-ai/dsh-client-runtime` is gone. The browser shell seeds
 //    `@deepseek-ai/dsh-client-store` (createSnapshotStore) as a static module,
 //    so the bundle requires that instead — no dsh.client.inject needed.
 //  - `conversation.chat.node` moved from dsh-client-ui-conversation to
@@ -706,10 +712,15 @@ window.__ModuleLoader__.load({
     // reasoning does not appear both inside the slide and inline in the flow.
     // Only DOM class toggling — never reparents React-owned rows.
     function hideNativeThink(root, textIndex) {
-      var flow = root.querySelector('[data-chat-flow]')
-      if (!flow || !flow.children) return
-      var rows = []
-      for (var i = 0; i < flow.children.length; i++) rows.push(flow.children[i])
+      // 0.1.7-alpha.1 nests flow rows inside process-group containers
+      // (`[data-chat-flow] > group root > content > rows`) instead of keeping
+      // every row a direct child of one flow element, so walking
+      // `flow.children` only ever saw the group wrappers and never matched a
+      // Think against the slide that sits beside it in the same group. Read the
+      // flow rows in document order instead — that is still reading order —
+      // while keeping the segment-boundary walk unchanged.
+      var rows = root.querySelectorAll('[data-chat-flow-kind]')
+      if (rows.length === 0) return
       // Segment boundary in the DOM: a user/steering row, a turn-level row
       // (turn-process / turn-tail), or an assistant-step row that carries
       // visible staged text (a response shown to the user mid-turn).
@@ -866,20 +877,26 @@ window.__ModuleLoader__.load({
     // ---- plugin entry -------------------------------------------------------
     var currentConfig = readConfig(null)
 
-    var INJECT = ['slots', 'settingsScope']
+    // 0.1.7-alpha.1 replaced the `settingsScope` service with `configForms`:
+    // one controller per profile entry id, exposing getSnapshot/subscribe/set
+    // over the host settings document. Same shape we already used, so the bind
+    // is a rename — but the service is a hard inject dependency, and a missing
+    // one silently parks the whole plugin (no slides at all).
+    var INJECT = ['slots', 'configForms']
     function apply(ctx, config) {
       currentConfig = readConfig(config)
       injectStyles()
 
-      // Durable settings binding: the host half registered the `dsh-newbe-response-window`
-      // namespace; the browser scope mirrors it and persists user overrides.
+      // Durable settings binding: the host half declares the volatile fields of
+      // the `dsh-newbe-response-window` entry; this controller mirrors them and
+      // persists user overrides.
       linesStore = createSnapshotStore(currentConfig.lines)
       liveStreamThinkStore = createSnapshotStore(currentConfig.liveStreamThink)
       var scopeService = null
-      try { scopeService = ctx.get('settingsScope') } catch (e) { scopeService = null }
-      if (scopeService && typeof scopeService.bind === 'function') {
+      try { scopeService = ctx.get('configForms') } catch (e) { scopeService = null }
+      if (scopeService && typeof scopeService.get === 'function') {
         try {
-          settingsScope = scopeService.bind({ namespace: NS })
+          settingsScope = scopeService.get(NS)
         } catch (e) {
           settingsScope = null
         }
