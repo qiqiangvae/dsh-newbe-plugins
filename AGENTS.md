@@ -35,7 +35,7 @@ Multi-context: root `CONTEXT-MAP.md` points at one `CONTEXT.md` per package unde
 ### 仓库版本（GitHub 侧）
 
 - `y.y.y` = **仓库根 `package.json` 的 `version`**，每发一批就 bump 一次（`main` 上 bump，合并进 `rc` 后打 tag）。
-- tag 命名 `v<y.y.y>`（如 `v0.1.0`），annotated，指向 `rc` 上该批次的提交；Release 标题 `dsh-newbe-plugins v<y.y.y>`，不勾 pre-release。
+- tag 命名 `v<y.y.y>`（如 `v0.1.0`），annotated，指向 `rc` 上该批次的提交；Release 标题同样只写 `v<y.y.y>`（不带仓库名），不勾 pre-release。
 - **`rc` 上不再打子包级 tag**（`<包名>-v<子包版本>` 那一套作废）：一个仓库一个 tag 命名空间，子包版本号会互相撞名。子包的通道版本记录在 npm dist-tag 和 Release 说明里。
 - GitHub 的 tag / Release **只作留档**，不是安装来源。
 
@@ -43,7 +43,7 @@ Multi-context: root `CONTEXT-MAP.md` points at one `CONTEXT.md` per package unde
 
 - 这批把哪些子包更新到了哪个版本，逐条写「将 `dsh-newbe-response-window` 更新至 `0.3.1`」；alpha 版写 `0.3.2-alpha`。
 - **alpha 版（子包版本带 `-alpha`）必须写明对应最新的哪个 DSH 版本**，如「对应 DSH `0.1.7-alpha.1`」。
-- 安装命令只给 npm：`dsh plugin --profile web add <包名>`（`latest`）/ `… add <包名>@alpha`（alpha 通道）。
+- 安装命令只给 npm，且**给全**：rc 稳定线 `dsh plugin --profile web add <包名>`、alpha 通道 `dsh plugin --profile web add <包名>@alpha`，每行都写完整（不要只写一句"包名后加 `@alpha`"）。
 - **不再写 GitHub 安装命令**（`github:…#alpha&path:…` 那套已废弃），README 里也不留。
 
 ### 文档里的安装命令
