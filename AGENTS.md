@@ -18,21 +18,25 @@ Multi-context: root `CONTEXT-MAP.md` points at one `CONTEXT.md` per package unde
 
 上游 DSH 按 alpha / rc 通道发布，本仓库镜像这两个通道：长期并存 `alpha` 与 `rc` 两条通道分支，`main` 是集成分支。
 
-- `main`：集成分支、默认分支。修复与特性先落到这里；**不在 main 上 bump 通道版本，也不在 main 上打 tag**。
-- `alpha`：对应上游 DSH 的 alpha 通道（如 `0.1.7-alpha.1`）。
-- `rc`：对应上游 DSH 的 rc 通道。
+- `main`：集成分支、默认分支。修复与特性先落到这里；**不在 main 上 bump 通道版本，也不在 main 上打 tag**——main 的 `package.json` 停在「上一个稳定号」，版本只在通道分支上说话。
+- `rc`：稳定线。版本号**不带后缀**（`1.0.0`），发到 npm `latest`。
+- `alpha`：试验线。版本号带 `-alpha`（`1.0.1-alpha`），**永远领先 rc 一个补丁号**。
+
+不变量：**`alpha 版本 = rc 版本 + 补丁号 1，且带 -alpha`**。同一份内容先以 `X.Y.Z-alpha` 存在于 alpha；稳定化＝合并进 `rc` 并把后缀去掉（`X.Y.Z`），alpha 随即 bump 到 `X.Y.(Z+1)-alpha`。所以稳定号住在 rc 上：alpha 上不出现不带后缀的号，rc 上不出现 `-alpha`。
 
 发版流程：改动合进 `main` → 合并进目标通道分支 → 在通道分支上改版本号 → 打 tag → 推送 → 建 Release。
 
 ### 版本号
 
-通道分支上的版本后缀必须**等于分支名，且不带序号**：alpha 分支上是 `0.5.8-alpha`，rc 分支上是 `0.5.8-rc`。同一个版本号只发一次——同一通道上再发修版就 bump 补丁号（`0.5.9-alpha`），不要写成 `-alpha.1`。
+- `rc` 上是裸稳定号（`0.5.8`）；`alpha` 上是 `0.5.9-alpha`（= rc + 1 补丁）。
+- 后缀只等于通道名、不带序号（不要 `-alpha.1`）；同一个版本号只发一次，同一通道再发修版就 bump 补丁号。
 
 ### tag
 
 - 命名：`<包名>-v<该分支 package.json 的完整版本号>`，例 `dsh-newbe-my-favorites-v0.5.8-alpha`、`dsh-newbe-ide-v0.4.2-alpha`。**包名前缀不能省**：一个仓库共用一个 tag 命名空间，裸 `v0.5.8-alpha` 看不出属于哪个插件，不同包的版本号还会直接撞名。
 - 必须是 annotated tag，指向该包该版本的发布提交（= 打 tag 时该通道分支上的 tip）。
 - Release 标题写成 `<包名> v<版本>`，通道 Release 一律勾 pre-release。
+- 例外：发到 npm 的**稳定版**（rc 上的号）用裸 `v<版本>`（如 `v0.5.8`），Release 不勾 pre-release——npm 上每个包各自独立，稳定号撞名之前不必带前缀；真撞了再改成 `<包名>-v<版本>`。
 
 ### 文档里的安装命令
 
