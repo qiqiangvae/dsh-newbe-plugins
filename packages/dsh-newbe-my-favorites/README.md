@@ -71,15 +71,17 @@ pnpm run build
 DSH 通过 `dsh plugin` 子命令管理 profile 插件（等价于在 profile 目录内执行 `pnpm`）。安装本插件：
 
 ```bash
-# 从合集仓库 GitHub 安装（alpha 通道；换 #rc 装 rc 通道，换 #<commit-sha> 锁死某次发布）
-dsh plugin --profile web add 'github:qiqiangvae/dsh-newbe-plugins#alpha&path:packages/dsh-newbe-my-favorites'
+# rc 稳定线（npm latest）
+dsh plugin --profile web add dsh-newbe-my-favorites
+
+# alpha 通道（npm alpha dist-tag，版本形如 x.x.x-alpha）
+dsh plugin --profile web add dsh-newbe-my-favorites@alpha
 
 # 本机/开发：从本地路径软链接安装
 dsh plugin --profile web add "link:$(pwd)/packages/dsh-newbe-my-favorites"
-
-# 从 npm 安装
-dsh plugin --profile web add dsh-newbe-my-favorites
 ```
+
+GitHub 侧只保留仓库级 tag 作版本更新留档，不再提供 GitHub 安装命令。
 
 将 `<profile>` 换成你的目标 profile（如 `web`、`desktop`、`tui`）。
 
