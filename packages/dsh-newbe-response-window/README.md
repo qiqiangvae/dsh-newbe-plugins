@@ -31,16 +31,16 @@ DeepSeek Harness (DSH) Web 插件：把一轮里的 think（推理）和工具�
 
 ## 安装
 
-从 npm 安装（跟 `latest`，即最近一次稳定发布）：
+从 npm 安装（rc 稳定线，跟 `latest`）：
 
 ```bash
 dsh plugin --profile web add dsh-newbe-response-window
 ```
 
-或从合集仓库 GitHub 子目录安装（`alpha` 通道；换 `#rc` 装 rc 通道，换 `#<commit-sha>` 锁死某次发布）：
+装 alpha 通道（跟 npm 的 `alpha` dist-tag，版本形如 `x.x.x-alpha`）：
 
 ```bash
-dsh plugin --profile web add 'github:qiqiangvae/dsh-newbe-plugins#alpha&path:packages/dsh-newbe-response-window'
+dsh plugin --profile web add dsh-newbe-response-window@alpha
 ```
 
 或本地 link 方式（开发调试）：
@@ -55,7 +55,7 @@ dsh plugin --profile web add "link:$(pwd)/packages/dsh-newbe-response-window"
 
 卸载：`dsh plugin --profile web remove dsh-newbe-response-window`
 
-> 迁移提示：本插件已从独立仓库迁入 newbe monorepo，老安装地址（仓库根 `github:qiqiangvae/dsh-newbe-plugins`）已失效。插件名仍是 `dsh-newbe-response-window`——先 `dsh plugin --profile web remove dsh-newbe-response-window`，再用上方新地址重装即可。
+> 迁移提示：本插件已从独立仓库迁入 newbe monorepo，老安装地址（仓库根 `github:qiqiangvae/dsh-newbe-plugins`）已失效。插件名仍是 `dsh-newbe-response-window`——先 `dsh plugin --profile web remove dsh-newbe-response-window`，再用上面的 npm 命令重装即可。GitHub 侧只留仓库级 tag 作版本更新留档，不再提供 GitHub 安装命令。
 
 ## 配置
 

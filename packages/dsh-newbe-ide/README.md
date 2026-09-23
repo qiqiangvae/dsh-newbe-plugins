@@ -30,15 +30,14 @@ DSH Web 会话视图 tab「**IDE**」：按项目组织**启动配置**，一键
 
 ## 安装
 
+只从 npm 装：
+
 ```bash
-# npm（跟 latest = 最近一次稳定发布）
+# rc 稳定线（npm latest）
 dsh plugin --profile web add dsh-newbe-ide
 
-# GitHub 子目录（alpha 通道；换 #rc 装 rc 通道）
-dsh plugin --profile web add 'github:qiqiangvae/dsh-newbe-plugins#alpha&path:packages/dsh-newbe-ide'
-
-# 锁定某次发布
-dsh plugin --profile web add 'github:qiqiangvae/dsh-newbe-plugins#<commit-sha>&path:packages/dsh-newbe-ide'
+# alpha 通道（npm alpha dist-tag）
+dsh plugin --profile web add dsh-newbe-ide@alpha
 ```
 
 安装后需重启 `dsh web`（宿主侧的服务、接口、工具与 skill 都在进程启动时装配）。
