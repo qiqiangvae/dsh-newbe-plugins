@@ -57,6 +57,8 @@ dsh plugin --profile web add <包名>@alpha    # alpha 通道（npm alpha）
 
 开发调试仍可用 `link:` 本地软链。
 
+**从 `link:` / Git 件换成 npm 件时要带显式版本号**（`… add <包名>@<版本>`）：依赖已存在时 pnpm 不会因为裸包名就改写 spec——实测 `add dsh-newbe-ide` 会原样留着 `link:…`，`add dsh-newbe-ide@0.4.1` 才换成 npm 件。
+
 ## Release notes
 
 CHANGELOG entries and GitHub Release notes are user-visible prose: one or two lines saying what changed in behaviour and what the user now sees. A short mechanism clause is fine when it explains the effect.
