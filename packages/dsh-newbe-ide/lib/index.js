@@ -14833,6 +14833,11 @@ function readLostLines(from, chunk) {
 }
 
 // src/runtime.ts
+function launch(shell, spec) {
+  const method = shell.execute ?? shell.start;
+  if (method === void 0) throw new Error("shell \u670D\u52A1\u65E2\u6CA1\u6709 execute \u4E5F\u6CA1\u6709 start\uFF0C\u65E0\u6CD5\u542F\u52A8\u8FDB\u7A0B");
+  return method.call(shell, spec);
+}
 var DEFAULT_MAX_LINES = 5e3;
 var MAX_PENDING_CHARS = 65536;
 function createRunRegistry(provideShell, options = {}) {
@@ -14988,9 +14993,11 @@ function createRunRegistry(provideShell, options = {}) {
           workdir: spec.cwd,
           env,
           // 不给策略 = 套上环境默认沙箱 = 连 target/ 与 ~/.m2 都写不了（见 ShellServiceLike 的注释）
-          sandboxPolicy: { mode: "danger-full-access", workspaceRoot: spec.cwd }
+          sandboxPolicy: { mode: "danger-full-access", workspaceRoot: spec.cwd },
+          // 不给 onExpiry = 默认 'kill' = 120 s 后进程被宿主自己杀掉（同上）
+          onExpiry: "none"
         });
-        run.proc = await shell.start(resolved);
+        run.proc = await launch(shell, resolved);
         run.status = "running";
       } catch (error51) {
         run.proc = null;

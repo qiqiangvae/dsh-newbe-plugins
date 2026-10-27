@@ -54,7 +54,7 @@ DSH 会话视图里的第四个 tab「IDE」（**对话 / 轨迹 / 上下文 / I
 
 ## 进程语义
 
-- 启动：`shell.resolve(request)` → `shell.start(spec)`；工作目录 = 项目路径。
+- 启动：`shell.resolve(request)` → `shell.execute(spec)`（0.1.x 上这个方法是 `start(spec)`，两者都是 async）；工作目录 = 项目路径。
 - 停止：`ShellProcess.kill()`；超时未退再 SIGKILL。
 - **实测结论**：DSH 的 shell 服务把每次运行放进独立进程组（`pgid == 顶层 pid`），杀组能连孙进程一起回收——所以 `mvn spring-boot:run` fork 出的 java 不会变孤儿占端口。
 - 插件禁用 / DSH 退出：组合销毁时自动回收仍在跑的进程（`ctx.effect` 兜底再杀一次）。
@@ -92,10 +92,10 @@ DSH 会话视图里的第四个 tab「IDE」（**对话 / 轨迹 / 上下文 / I
 ## 技术要点（已实证，不是推测）
 
 - 面板承载点：`conversation.view`（list，scope=session，注册 `{ id, order, label }`）——运行时 slot 树已确认占用者 对话 0 / 轨迹 10 / 上下文 20，`dsh-context` 插件是第三方先例；本插件注册 id `dsh-newbe-ide`、order 30、label「IDE」。
-- Host：`shell`（`resolve`/`start`/`ShellProcess.readOutput`/`kill`）、`workspaceRegistry.list()`、`settings`、`clientModules`。
+- Host：`shell`（`resolve`/`execute`（0.1.x 叫 `start`）/`ShellProcess.readOutput`/`kill`）、`workspaceRegistry.list()`、`settings`、`clientModules`。
 - Client：`host.call`、`styles.insert`、`ctx.interval`、`React.createElement`；唯一注册点 `conversation.view`（id `dsh-newbe-ide`、order 30、label `IDE`）。
 - 打包契约：`dsh.bundle.patch` + `dsh.client`（`exports["./client"]` + `platform: web`）、`lib/` 预构建且提交、安装不触发构建、不声明未发布的 `@deepseek-ai/dsh-client-*` 依赖。
-- 已验证 DSH 版本：`0.1.5-alpha.2`。
+- 已验证 DSH 版本：`0.1.5-alpha.2`（面板整体）、`0.2.0-rc.2` / `0.2.1-rc.3`（宿主 shell 契约，见 issue 14）。
 
 ## 待办（见 `issues/`）
 

@@ -1,7 +1,7 @@
 /**
  * 运行注册表：一条启动配置对应一个受管进程，输出增量采集进内存环形缓冲。
  *
- * 只依赖 DSH `shell` 服务的公开契约（resolve / start / ShellProcess.readOutput / kill），
+ * 只依赖 DSH `shell` 服务的公开契约（resolve / execute（0.1.x 叫 start）/ ShellProcess.readOutput / kill），
  * 因此可以用假 shell 完整验证；真实进程组回收另有实测覆盖。
  */
 import { cleanLine, isSecretName, maskSecrets, splitLines } from './lines.js';
@@ -33,21 +33,42 @@ interface ShellServiceLike {
    * 构建工具必须能写自己的 `target/`、`node_modules/` 与全局缓存——与 IDEA 点 Run 同类。
    * （策略结构只有 mode / workspaceRoot / sessionId，没有"额外可写路径"可加，
    * 所以只能整体放行；`workspaceRoot` 在放行模式下不参与判定，给 cwd 占位。）
+   *
+   * `onExpiry` 也**必须显式给 `'none'`**：不给时 resolve 会填默认 `'kill'`，
+   * 而默认 `timeoutMs` 是 120 s（上限 600 s）——`execute` 到点就把进程杀成 `timedOut`。
+   * 面板启的是 dev server / 长驻进程，两分钟后被宿主自己收掉正是"点了没反应"的近亲。
+   * `'none'` 不装截止时间，谁来停由面板决定。
    */
   resolve(request: {
     command: string;
     workdir?: string;
     env?: Record<string, string>;
     sandboxPolicy?: { mode: 'read-only' | 'workspace-write' | 'danger-full-access'; workspaceRoot: string };
+    onExpiry?: 'kill' | 'none';
   }): unknown;
   /**
-   * **可能是 async 的**：0.1.5 的 `start()` 同步返回 `ShellProcess`，0.1.6-alpha.1 起
-   * `LocalBashExecutor` / `SandboxBashExecutor` 都把它写成了 `async`，于是返回 Promise。
+   * 启动一个后台进程。**方法名换过代**：0.1.x 叫 `start()`，0.2.0 起
+   * `ShellExecutor` 只留 `execute(spec)`（`start` 已从契约里删掉，调用它就得到
+   * `shell.start is not a function`）。两个名字都试，谁在跑谁。
+   *
+   * 两者**都可能是 async 的**：0.1.5 的 `start()` 同步返回 `ShellProcess`，0.1.6-alpha.1 起
+   * 返回 Promise；`execute()` 亦然（resolve 之后给句柄，不等进程结束）。
    * 按同步写就会把 Promise 当成进程对象：`proc.readOutput` 不存在 → 每次泵都抛 TypeError
    * （被 drainInto 的 catch 静默吞掉）→ **输出一条不落、状态永远停在「运行中」**。
-   * 所以这里统一 `await`——对非 Promise 是空操作，两个版本都能跑。
+   * 所以这里统一 `await`——对非 Promise 是空操作。
    */
-  start(spec: unknown): ShellProcessLike | Promise<ShellProcessLike>;
+  execute?(spec: unknown): ShellProcessLike | Promise<ShellProcessLike>;
+  start?(spec: unknown): ShellProcessLike | Promise<ShellProcessLike>;
+}
+
+/**
+ * 取当前 DSH 版本提供的那个启动方法。分离调用是因为两者都是原型方法，
+ * 直接 `const f = shell.execute` 会丢掉 `this`。
+ */
+function launch(shell: ShellServiceLike, spec: unknown): ShellProcessLike | Promise<ShellProcessLike> {
+  const method = shell.execute ?? shell.start;
+  if (method === undefined) throw new Error('shell 服务既没有 execute 也没有 start，无法启动进程');
+  return method.call(shell, spec);
 }
 
 export interface RunSpec {
@@ -57,7 +78,7 @@ export interface RunSpec {
 }
 
 interface RunRegistry {
-  /** 异步：`shell.start()` 在 0.1.6 起返回 Promise（见 ShellServiceLike 的注释）。 */
+  /** 异步：`shell.start()` / `shell.execute()` 都返回 Promise（见 ShellServiceLike 的注释）。 */
   start(key: string, spec: RunSpec): Promise<RunSnapshot>;
   stop(key: string): RunSnapshot;
   read(key: string, from: number): RunRead;
@@ -269,8 +290,10 @@ export function createRunRegistry(provideShell: ShellProvider, options: RunRegis
           env,
           // 不给策略 = 套上环境默认沙箱 = 连 target/ 与 ~/.m2 都写不了（见 ShellServiceLike 的注释）
           sandboxPolicy: { mode: 'danger-full-access', workspaceRoot: spec.cwd },
+          // 不给 onExpiry = 默认 'kill' = 120 s 后进程被宿主自己杀掉（同上）
+          onExpiry: 'none',
         });
-        run.proc = await shell.start(resolved);
+        run.proc = await launch(shell, resolved);
         run.status = 'running';
       } catch (error) {
         run.proc = null;
