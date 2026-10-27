@@ -4,6 +4,8 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [0.5.9] - 2026-10-27
+
 ### Changed
 
 - 侧栏「收藏会话」入口的图标列对齐 DSH 0.2 的「插件」「自动化任务」等全局面板行：图标左缘、行高与行内间距不再各差 2px，看起来与这些行同属一列导航。
