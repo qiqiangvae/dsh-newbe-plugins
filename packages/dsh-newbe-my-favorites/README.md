@@ -71,11 +71,7 @@ pnpm run build
 DSH 通过 `dsh plugin` 子命令管理 profile 插件（等价于在 profile 目录内执行 `pnpm`）。安装本插件：
 
 ```bash
-# rc 稳定线（npm latest）
 dsh plugin --profile web add dsh-newbe-my-favorites
-
-# alpha 通道（npm alpha dist-tag，版本形如 x.x.x-alpha）
-dsh plugin --profile web add dsh-newbe-my-favorites@alpha
 
 # 本机/开发：从本地路径软链接安装
 dsh plugin --profile web add "link:$(pwd)/packages/dsh-newbe-my-favorites"

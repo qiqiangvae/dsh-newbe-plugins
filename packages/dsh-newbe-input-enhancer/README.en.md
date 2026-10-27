@@ -104,24 +104,6 @@ For reproducible installs, pin to a specific version:
 dsh plugin --profile web add 'dsh-newbe-input-enhancer@1.1.0'
 ```
 
-### Install from the monorepo (subdirectory, alpha channel)
-
-```sh
-dsh plugin --profile web add 'github:qiqiangvae/dsh-newbe-plugins#alpha&path:packages/dsh-newbe-input-enhancer'
-```
-
-Or use the explicit Git URL (`#rc` for the rc channel):
-
-```sh
-dsh plugin --profile web add 'https://github.com/qiqiangvae/dsh-newbe-plugins.git#alpha&path:packages/dsh-newbe-input-enhancer'
-```
-
-For reproducible installs, pin a commit (`&path:` also pins the subdirectory):
-
-```sh
-dsh plugin --profile web add 'github:qiqiangvae/dsh-newbe-plugins#<commit-sha>&path:packages/dsh-newbe-input-enhancer'
-```
-
 ### Install from a local directory
 
 ```sh

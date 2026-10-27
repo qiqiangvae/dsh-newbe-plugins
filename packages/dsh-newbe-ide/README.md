@@ -34,11 +34,7 @@ DSH Web 会话视图 tab「**IDE**」：按项目组织**启动配置**，一键
 只从 npm 装：
 
 ```bash
-# rc 稳定线（npm latest）
 dsh plugin --profile web add dsh-newbe-ide
-
-# alpha 通道（npm alpha dist-tag）
-dsh plugin --profile web add dsh-newbe-ide@alpha
 ```
 
 安装后需重启 `dsh web`（宿主侧的服务、接口、工具与 skill 都在进程启动时装配）。

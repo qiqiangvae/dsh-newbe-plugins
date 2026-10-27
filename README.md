@@ -11,21 +11,15 @@
 | [dsh-newbe-input-enhancer](./packages/dsh-newbe-input-enhancer) | `packages/dsh-newbe-input-enhancer` | 增强输入框：Enter 锁定防误发、三击发送、字数统计、长文本提醒、草稿交换 | 1.1.0 |
 | [dsh-newbe-my-favorites](./packages/dsh-newbe-my-favorites) | `packages/dsh-newbe-my-favorites` | 会话与网址的本机快捷收藏（标题栏星标 + 侧栏收藏入口 + 快捷切换） | 0.5.8 |
 
-alpha 通道走 npm 的 `alpha` dist-tag：response-window `0.3.2-alpha`、my-favorites `0.5.9-alpha`；其余插件尚未出 alpha 版，与 `latest` 同号。
-
 ## 安装
 
-只从 npm 装。`latest` 是 rc 稳定线，`@alpha` 是 alpha 通道（版本形如 `x.x.x-alpha`）：
+只从 npm 装（`latest`，rc 稳定线）：
 
 ```bash
-# rc 稳定线（npm latest）
 dsh plugin --profile web add dsh-newbe-ide
 dsh plugin --profile web add dsh-newbe-response-window
 dsh plugin --profile web add dsh-newbe-input-enhancer
 dsh plugin --profile web add dsh-newbe-my-favorites
-
-# alpha 通道（npm alpha dist-tag）
-dsh plugin --profile web add dsh-newbe-response-window@alpha
 ```
 
 GitHub 侧只保留仓库级 tag `v<y.y.y>`（每次版本更新的留档），**不再提供 GitHub 安装命令**；要回看某次更新改了什么，看对应的 Release 说明。
