@@ -211,32 +211,50 @@ function ensureStyles(): () => void {
   const style = document.createElement('style');
   style.dataset.plugin = STYLE_ID;
   style.textContent = `
-.ide-root{display:flex;flex-direction:column;height:100%;min-height:0;font-size:13px;color:var(--dsw-alias-label-primary,#1f2329)}
-.ide-tabrow{display:flex;align-items:stretch;gap:2px;border-bottom:1px solid var(--dsw-alias-border-l2,#d9dce1);flex:none;overflow-x:auto;scrollbar-width:none}
+.ide-root{display:flex;flex-direction:column;height:100%;min-height:0;font-size:13px;line-height:1.45;color:var(--dsw-alias-label-primary,#1f2329)}
+/* 键盘可达性：所有可聚焦控件都要看得见焦点环，输入框用更贴边的偏移。 */
+.ide-root :focus-visible{outline:2px solid var(--dsw-alias-brand-primary,#3370ff);outline-offset:2px}
+.ide-root :focus:not(:focus-visible){outline:none}
+.ide-tab,.ide-btn,.ide-chip,.ide-tabx,.ide-mitem,.ide-menu-item,.ide-overflow>summary{transition:background-color .14s ease,color .14s ease,border-color .14s ease,box-shadow .14s ease,opacity .14s ease}
+.ide-tabrow{display:flex;align-items:stretch;gap:2px;border-bottom:1px solid var(--dsw-alias-border-l2,#d9dce1);flex:none;overflow-x:auto;scrollbar-width:none;padding-left:4px}
 .ide-tabrow::-webkit-scrollbar{display:none}
-.ide-tab{display:flex;align-items:center;gap:7px;padding:9px 10px 8px;color:var(--dsw-alias-label-secondary,#697586);white-space:nowrap;border-bottom:2px solid transparent;margin-bottom:-1px;cursor:pointer;flex:none;background:none;border-left:0;border-right:0;border-top:0;font:inherit}
+/* tab 是「主按钮 + 收起按钮」的组合：两个 <button> 不能嵌套，所以外面包一层。
+   选中下划线画在包裹层上，hover 底色也画在包裹层上，收起键据此定位。 */
+.ide-tabwrap{position:relative;display:flex;align-items:stretch;flex:none;border-bottom:2px solid transparent;margin-bottom:-1px;border-radius:7px 7px 0 0}
+.ide-tabwrap:hover{background:var(--dsw-alias-interactive-bg-hover,rgba(0,0,0,.05))}
+.ide-tabwrap[data-sel=true]{border-bottom-color:var(--dsw-alias-brand-primary,#3370ff);background:var(--dsw-alias-interactive-bg-hover,rgba(51,112,255,.10))}
+.ide-tab{display:flex;align-items:center;gap:7px;padding:9px 26px 8px 11px;color:var(--dsw-alias-label-secondary,#697586);white-space:nowrap;cursor:pointer;flex:none;background:none;border:0;font:inherit}
 .ide-tab:hover{color:var(--dsw-alias-label-primary,#1f2329)}
-.ide-tab[data-sel=true]{color:var(--dsw-alias-label-primary,#1f2329);border-bottom-color:var(--dsw-alias-brand-primary,#3370ff)}
+.ide-tabwrap[data-sel=true] .ide-tab{color:var(--dsw-alias-label-primary,#1f2329)}
 .ide-tabrow[data-dragging=true]{cursor:grabbing;user-select:none}
-.ide-tab .ide-x{opacity:0;font-size:13px;line-height:1;padding:0 2px;border-radius:4px;color:var(--dsw-alias-label-secondary,#697586)}
-.ide-tab:hover .ide-x{opacity:1}
-.ide-tab .ide-x:hover{background:var(--dsw-alias-interactive-bg-hover,rgba(0,0,0,.07))}
+/* 计数是「这个项目下有几条配置」的信息，不是名字的一部分：用小胶囊与标题分开。 */
+.ide-count{font-size:10.5px;line-height:1;padding:2px 5px;border-radius:999px;background:var(--dsw-alias-interactive-bg-hover,rgba(0,0,0,.07));color:var(--dsw-alias-label-secondary,#697586);font-variant-numeric:tabular-nums}
+.ide-tabwrap[data-sel=true] .ide-count{background:var(--dsw-alias-interactive-bg-hover,rgba(51,112,255,.16));color:var(--dsw-alias-label-secondary,#697586)}
+/* 收起键平时隐身，hover 或键盘聚焦时才出现；它仍是真按钮，可用 Tab 到达。 */
+.ide-tabx{position:absolute;right:5px;top:50%;transform:translateY(-50%);display:grid;place-items:center;width:18px;height:18px;padding:0;border:0;border-radius:5px;background:none;color:var(--dsw-alias-label-secondary,#697586);font:inherit;font-size:14px;line-height:1;cursor:pointer;opacity:0}
+.ide-tabwrap:hover .ide-tabx,.ide-tabwrap:focus-within .ide-tabx{opacity:1}
+.ide-tabx:hover{background:var(--dsw-alias-interactive-bg-hover,rgba(0,0,0,.10));color:var(--dsw-alias-label-primary,#1f2329)}
 .ide-tools{margin-left:auto;display:flex;align-items:center;gap:6px;padding-left:12px;flex:none}
 .ide-overflow{position:relative}
-.ide-overflow>summary{list-style:none;cursor:pointer;min-width:26px;height:24px;border:1px solid var(--dsw-alias-border-l2,#d9dce1);border-radius:7px;display:grid;place-items:center;color:var(--dsw-alias-label-secondary,#697586);font-size:12px}
+.ide-overflow>summary{list-style:none;cursor:pointer;min-width:26px;height:26px;border:1px solid var(--dsw-alias-border-l2,#d9dce1);border-radius:7px;display:grid;place-items:center;color:var(--dsw-alias-label-secondary,#697586);font-size:12px;background:var(--dsw-alias-bg-module-platform,#fff)}
 .ide-overflow>summary::-webkit-details-marker{display:none}
 .ide-overflow>summary:hover{background:var(--dsw-alias-interactive-bg-hover,rgba(0,0,0,.07))}
-.ide-overflow ul{position:absolute;right:0;top:30px;z-index:30;background:var(--dsw-alias-bg-module-platform,#fff);border:1px solid var(--dsw-alias-border-l2,#d9dce1);border-radius:9px;box-shadow:0 14px 34px rgba(0,0,0,.28);padding:6px;margin:0;list-style:none;min-width:240px;max-height:320px;overflow:auto}
-.ide-overflow li{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;cursor:pointer;font-size:12px;color:var(--dsw-alias-label-secondary,#697586);white-space:nowrap}
-.ide-overflow li:hover{background:var(--dsw-alias-interactive-bg-hover,rgba(0,0,0,.07));color:var(--dsw-alias-label-primary,#1f2329)}
-.ide-overflow li[data-danger]{color:var(--dsw-alias-state-error-primary,#d83931)}
-.ide-overflow li[data-armed=true]{background:var(--dsw-alias-state-error-primary,#d83931);color:#fff;font-weight:600}
+.ide-overflow ul{position:absolute;right:0;top:32px;z-index:30;background:var(--dsw-alias-bg-module-platform,#fff);border:1px solid var(--dsw-alias-border-l2,#d9dce1);border-radius:9px;box-shadow:0 14px 34px rgba(0,0,0,.28);padding:6px;margin:0;list-style:none;min-width:240px;max-height:320px;overflow:auto}
+.ide-overflow li{display:flex;align-items:center;gap:8px;padding:0;border-radius:6px;font-size:12px;color:var(--dsw-alias-label-secondary,#697586);white-space:nowrap}
+.ide-menu-item{display:flex;align-items:center;gap:8px;width:100%;padding:6px 8px;border:0;border-radius:6px;background:none;font:inherit;font-size:12px;color:inherit;text-align:left;cursor:pointer}
+.ide-menu-item:hover{background:var(--dsw-alias-interactive-bg-hover,rgba(0,0,0,.07));color:var(--dsw-alias-label-primary,#1f2329)}
+.ide-menu-item[data-danger]{color:var(--dsw-alias-state-error-primary,#d83931)}
+.ide-menu-item[data-danger]:hover{background:var(--dsw-alias-interactive-bg-hover,rgba(0,0,0,.07));color:var(--dsw-alias-state-error-primary,#d83931)}
+.ide-menu-item[data-armed=true],.ide-menu-item[data-armed=true]:hover{background:var(--dsw-alias-state-error-primary,#d83931);color:#fff;font-weight:600}
 .ide-board{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px;align-content:start;overflow:auto;flex:1;min-height:0}
-/* 一行一条配置：名字与状态各自单行省略，否则窄卡里会折成"停 / 止"那样的竖排 */
-.ide-cardrow{display:flex;align-items:center;gap:8px;padding:5px 7px;border-radius:7px;background:var(--dsw-alias-interactive-bg-hover,rgba(128,128,128,.08));font-size:12px;min-width:0}
-.ide-cardrow .ide-name{font-weight:600;cursor:pointer;flex:none;max-width:9.5em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* 一行一条配置：名字与状态各自单行省略，否则窄卡里会折成"停 / 止"那样的竖排。
+   行本身不铺底色（卡里再套一层灰块会显得很重），hover 才浮出可点区域的底色。 */
+.ide-cardrow{display:flex;align-items:center;gap:8px;padding:4px 7px;border-radius:7px;background:none;font-size:12px;min-width:0;transition:background-color .14s ease}
+.ide-cardrow:hover{background:var(--dsw-alias-interactive-bg-hover,rgba(128,128,128,.08))}
+.ide-cardrow .ide-name{font:inherit;font-size:12px;font-weight:600;color:inherit;cursor:pointer;flex:none;max-width:9.5em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left;border:0;background:none;padding:0}
+.ide-cardrow .ide-name:hover{text-decoration:underline;text-underline-offset:2px}
 .ide-cardrow .ide-note{flex:none;white-space:nowrap}
-.ide-cardrow .ide-btn{flex:none;white-space:nowrap;padding:2px 9px}
+.ide-cardrow .ide-btn{flex:none;white-space:nowrap;padding:2px 9px;min-height:24px}
 .ide-addpath{display:flex;align-items:center;gap:6px}
 .ide-addpath .ide-field{flex:1;min-width:0}
 .ide-addlist{display:flex;flex-direction:column;gap:6px;max-height:224px;overflow:auto}
@@ -248,23 +266,37 @@ function ensureStyles(): () => void {
 .ide-cmd{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;color:var(--dsw-alias-label-secondary,#697586);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ide-configtitle{font-size:15px;font-weight:600}
 .ide-title{font-size:14px;font-weight:600}
-.ide-chip{border:1px solid var(--dsw-alias-border-l2,#d9dce1);border-radius:999px;padding:2px 9px;font-size:12px;color:var(--dsw-alias-label-secondary,#697586);background:none;font:inherit;cursor:pointer;white-space:nowrap}
-.ide-chip:hover{border-color:var(--dsw-alias-label-secondary,#697586)}
+.ide-chip{border:1px solid var(--dsw-alias-border-l2,#d9dce1);border-radius:999px;padding:2px 9px;min-height:24px;line-height:1.2;font-size:12px;color:var(--dsw-alias-label-secondary,#697586);background:none;font:inherit;cursor:pointer;white-space:nowrap}
+.ide-chip:hover{border-color:var(--dsw-alias-label-secondary,#697586);color:var(--dsw-alias-label-primary,#1f2329)}
 .ide-chip[data-sel=true]{background:var(--dsw-alias-interactive-bg-hover,rgba(51,112,255,.12));border-color:var(--dsw-alias-brand-primary,#3370ff);color:var(--dsw-alias-brand-primary,#3370ff)}
-.ide-btn{border:1px solid var(--dsw-alias-border-l2,#d9dce1);border-radius:7px;padding:4px 11px;font:inherit;font-size:12px;color:var(--dsw-alias-label-primary,#1f2329);background:none;cursor:pointer}
+.ide-btn{border:1px solid var(--dsw-alias-border-l2,#d9dce1);border-radius:7px;padding:4px 11px;min-height:26px;line-height:1.2;font:inherit;font-size:12px;color:var(--dsw-alias-label-primary,#1f2329);background:none;cursor:pointer}
 .ide-btn:hover{background:var(--dsw-alias-interactive-bg-hover,rgba(0,0,0,.07))}
 .ide-btn[data-kind=primary]{background:var(--dsw-alias-brand-primary,#3370ff);border-color:transparent;color:#fff}
+.ide-btn[data-kind=primary]:hover{background:var(--dsw-alias-brand-primary,#3370ff);filter:brightness(.94)}
 .ide-btn[data-kind=danger]:hover{color:var(--dsw-alias-state-error-primary,#d83931);border-color:var(--dsw-alias-state-error-primary,#d83931)}
-.ide-btn:disabled{opacity:.5;cursor:default}
+.ide-btn:disabled{opacity:.5;cursor:default;filter:none}
+/* 图标按钮（行内 ×）：比文字按钮窄，但视觉上仍是按钮；hover 才转成危险色。 */
+.ide-iconbtn{padding:2px 7px;min-height:24px;color:var(--dsw-alias-label-secondary,#697586)}
+.ide-iconbtn:hover{color:var(--dsw-alias-state-error-primary,#d83931);border-color:var(--dsw-alias-state-error-primary,#d83931)}
 /* data-on = 按钮处于「已按下 / 已开启」态（⚙ 配置展开、日志跟随暂停）。此前只有属性没有样式，等于没反馈。 */
 .ide-btn[data-on=true]{background:var(--dsw-alias-interactive-bg-hover,rgba(51,112,255,.12));border-color:var(--dsw-alias-brand-primary,#3370ff);color:var(--dsw-alias-brand-primary,#3370ff)}
-.ide-field{background:var(--dsw-alias-bg-module-platform,#fff);border:1px solid var(--dsw-alias-border-l2,#d9dce1);border-radius:7px;padding:5px 9px;font:inherit;font-size:12px;color:var(--dsw-alias-label-primary,#1f2329);outline:none}
+/* data-armed = 两步删除已武装：整块变红，第二下的语义一目了然。 */
+.ide-btn[data-armed=true],.ide-btn[data-armed=true]:hover{background:var(--dsw-alias-state-error-primary,#d83931);border-color:transparent;color:#fff;filter:none}
+.ide-field{background:var(--dsw-alias-bg-module-platform,#fff);border:1px solid var(--dsw-alias-border-l2,#d9dce1);border-radius:7px;padding:5px 9px;font:inherit;font-size:12px;color:var(--dsw-alias-label-primary,#1f2329);transition:border-color .14s ease,box-shadow .14s ease}
 .ide-field:focus{border-color:var(--dsw-alias-brand-primary,#3370ff)}
+.ide-field:focus-visible{outline-offset:1px}
 .ide-mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
 .ide-empty{margin:auto;text-align:center;color:var(--dsw-alias-label-secondary,#697586);display:flex;flex-direction:column;gap:8px;align-items:center}
+.ide-empty .ide-title{color:var(--dsw-alias-label-primary,#1f2329)}
+.ide-loading{display:flex;align-items:center;gap:8px;color:var(--dsw-alias-label-secondary,#697586);font-size:12px;padding:4px 0}
+.ide-spinner{width:13px;height:13px;flex:none;border-radius:50%;border:2px solid var(--dsw-alias-border-l2,#d9dce1);border-top-color:var(--dsw-alias-brand-primary,#3370ff);animation:ide-spin .8s linear infinite}
+@keyframes ide-spin{to{transform:rotate(360deg)}}
 .ide-note{font-size:11px;color:var(--dsw-alias-label-secondary,#697586)}
 .ide-warn{border:1px dashed var(--dsw-alias-state-warn-primary,#e7a100);color:var(--dsw-alias-state-warn-primary,#e7a100);border-radius:8px;padding:7px 10px;font-size:12px}
-.ide-err{color:var(--dsw-alias-state-error-primary,#d83931);font-size:12px}
+.ide-err{display:flex;align-items:flex-start;gap:8px;color:var(--dsw-alias-state-error-primary,#d83931);font-size:12px}
+.ide-err>span{flex:1;min-width:0}
+.ide-errx{flex:none;border:0;background:none;color:inherit;font:inherit;line-height:1;padding:1px 4px;border-radius:4px;cursor:pointer}
+.ide-errx:hover{background:var(--dsw-alias-interactive-bg-hover,rgba(0,0,0,.07))}
 .ide-logbox{display:flex;flex-direction:column;gap:4px;flex:1;min-height:0}
 .ide-logfoot{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .ide-logstats{min-width:0;overflow:hidden;text-overflow:ellipsis}
@@ -315,7 +347,9 @@ function ensureStyles(): () => void {
 .ide-port{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;opacity:.85}
 
 .ide-filterbar{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
-.ide-filterbar .ide-field{padding:3px 8px;min-width:180px}
+/* 过滤输入吃掉剩下的横向空间：空着的输入框旁边挂一排级别胶囊，比中间留一大块空白好读。 */
+.ide-filterbar .ide-filtersearch{flex:1 1 200px;min-width:150px;max-width:360px;padding:3px 8px}
+.ide-lvgroup{display:flex;align-items:center;gap:4px;margin-left:auto}
 .ide-hit{background:rgba(255,196,0,.18)}
 .ide-lv-ERROR{color:var(--dsw-alias-state-error-primary,#d83931)}
 .ide-lv-INFO{color:var(--dsw-alias-label-primary,#1f2329)}
@@ -340,6 +374,17 @@ function ensureStyles(): () => void {
   min-height:0;
   overflow:hidden;
 }
+/* 面板被拖窄时（会话栏与侧栏同时占用宽度）别让主从卡片挤出横向滚动。 */
+@media (max-width:820px){
+  .ide-mlist{width:184px}
+  .ide-board{grid-template-columns:1fr}
+  .ide-tools{padding-left:6px}
+}
+/* 动效只做状态变化的过渡，尊重系统的减少动态设置。 */
+@media (prefers-reduced-motion: reduce){
+  .ide-root *{transition-duration:0s!important;animation-duration:0s!important}
+  .ide-spinner{animation:none}
+}
 `;
   document.head.appendChild(style);
   return () => { style.remove(); };
@@ -363,6 +408,18 @@ function describeRun(run: RunSnapshot | undefined): string {
   if (run.status === 'failed' && run.error !== '') return `启动失败：${run.error}`;
   if (run.exitCode === 127) return '命令不存在（码 127）';
   return `已退出（码 ${run.exitCode ?? '?'}）`;
+}
+
+/**
+ * 一级 tab 的聚合状态文案：状态灯只有颜色，颜色不能单独承载信息——
+ * tab 的 title / 无障碍名会把这句话带上，读屏与悬停都能拿到"这个项目在不在跑"。
+ */
+function describeAggregate(status: RunStatus): string {
+  if (status === 'running') return '运行中';
+  if (status === 'failed') return '有配置启动失败';
+  if (status === 'exited') return '有配置已退出';
+  if (status === 'stopped') return '有配置已停止';
+  return '未运行';
 }
 
 /**
@@ -481,6 +538,13 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
   /** 运行代次：重启后自增，用来丢弃上一代进程还在飞的读取结果。 */
   const genRef = useRef(0);
   const tickRef = useRef(0);
+  /**
+   * 正在执行的启停动作（键 = runKey）：按钮据此禁用并显示「启动中…」。
+   * 启动要把进程拉起来，这段时间按钮若不给反馈，手会再点第二下。
+   */
+  const [busyRun, setBusyRun] = useState<Record<string, 'start' | 'stop' | 'restart'>>({});
+  /** 与 busyRun 同步的守卫：state 在同一帧里还是旧值，挡不住连点。 */
+  const busyRunRef = useRef<Set<string>>(new Set());
 
   /** 局部选中项：切换启动配置只动这里，不等磁盘回读（回读会把它盖回去）。 */
   const [activeConfigIds, setActiveConfigIds] = useState<Record<string, string>>({});
@@ -494,6 +558,7 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
     ? { workspaceId: active.workspaceId, configId: activeConfig.id }
     : null;
   const runState = runKey !== '' ? runs[runKey] : undefined;
+  const runBusy = runKey !== '' ? busyRun[runKey] : undefined;
   const runText = describeRun(runState);
   /**
    * 配置块里正在编辑的那条：草稿优先，没改过就用盘上的值。
@@ -695,6 +760,33 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
     if (el === null || !following) return;
     el.scrollTop = el.scrollHeight;
   }, [logLines, following]);
+
+  /**
+   * 两个 `<details>` 菜单（`»` 全部项目、卡片 `…`）点外面或按 Esc 就收起。
+   * 原生 details 不会自己关，两个菜单同时开着时尤其乱；Esc 顺带解除两步删除的武装。
+   */
+  useEffect(() => {
+    const closeMenus = (except?: Node) => {
+      document.querySelectorAll<HTMLDetailsElement>('details.ide-overflow[open]').forEach((menu) => {
+        if (except !== undefined && menu.contains(except)) return;
+        menu.removeAttribute('open');
+      });
+    };
+    const onPointerDown = (event: PointerEvent) => {
+      closeMenus(event.target instanceof Node ? event.target : undefined);
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      closeMenus();
+      setArmed('');
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, []);
 
   /**
    * 写入配置：先本地生效（乐观），再落盘并以宿主返回的状态为准。
@@ -983,48 +1075,101 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
     })), false);
   };
 
+  /** 一次启停的实质动作；busy 记账在外层，重启才好在两个动作之间保持「重启中」。 */
+  const performRun = async (action: 'start' | 'stop', target: RunTarget) => {
+    if (api === undefined) return;
+    const key = runKeyOf(target);
+    if (action === 'start') {
+      // 宿主在 start 时把该配置的缓冲归零，所以这条配置的偏移必须跟着归零
+      // （哪怕启动的不是当前正在看的那条——否则下次切过去会拿着一代前的偏移）。
+      offsetsRef.current.set(key, 0);
+    }
+    if (action === 'start' && runKey === key) {
+      genRef.current += 1; // 让上一代在飞的读取结果失效
+      setFollowing(true);
+      setPendingLines(0);
+      historyTriedRef.current = true; // 新进程的输出从零开始，不再补历史
+      sawLiveRef.current = false;
+      fromHistoryRef.current = false;
+      setFromHistory(false);
+      setTruncated(false);
+      logLinesRef.current = [];
+      setSeqBase(0);
+      setLogLines([]);
+    }
+    const call = action === 'start' ? api.start(target) : api.stop(target);
+    const snap = envelopeValue(await call, action === 'start' ? '启动' : '停止') as RunSnapshot;
+    setRuns((prev) => ({ ...prev, [snap.key]: snap }));
+  };
+
+  /** 占住一条配置的启停位；返回 false 表示这次点击该被忽略（上一次还没回来）。 */
+  const beginRun = (key: string, kind: 'start' | 'stop' | 'restart'): boolean => {
+    if (busyRunRef.current.has(key)) return false;
+    busyRunRef.current.add(key);
+    setBusyRun((prev) => ({ ...prev, [key]: kind }));
+    return true;
+  };
+
+  const endRun = (key: string) => {
+    busyRunRef.current.delete(key);
+    setBusyRun((prev) => {
+      const copy = { ...prev };
+      delete copy[key];
+      return copy;
+    });
+  };
+
   const runAction = async (action: 'start' | 'stop', explicit?: RunTarget) => {
     const target = explicit ?? (active !== undefined && activeConfig !== undefined
       ? { workspaceId: active.workspaceId, configId: activeConfig.id }
       : undefined);
     if (api === undefined || target === undefined) return;
+    const key = runKeyOf(target);
+    if (!beginRun(key, action)) return;
     setError('');
     try {
-      const startedViewedOne = explicit === undefined || runKey === runKeyOf(explicit);
-      const startedKey = runKeyOf(target);
-      if (action === 'start') {
-        // 宿主在 start 时把该配置的缓冲归零，所以这条配置的偏移必须跟着归零
-        // （哪怕启动的不是当前正在看的那条——否则下次切过去会拿着一代前的偏移）。
-        offsetsRef.current.set(startedKey, 0);
-      }
-      if (action === 'start' && startedViewedOne) {
-        genRef.current += 1; // 让上一代在飞的读取结果失效
-        setFollowing(true);
-        setPendingLines(0);
-        historyTriedRef.current = true; // 新进程的输出从零开始，不再补历史
-        sawLiveRef.current = false;
-        fromHistoryRef.current = false;
-        setFromHistory(false);
-        setTruncated(false);
-        logLinesRef.current = [];
-        setSeqBase(0);
-        setLogLines([]);
-      }
-      const call = action === 'start' ? api.start(target) : api.stop(target);
-      const snap = envelopeValue(await call, action === 'start' ? '启动' : '停止') as RunSnapshot;
-      setRuns((prev) => ({ ...prev, [snap.key]: snap }));
+      await performRun(action, target);
     } catch (e) {
       setError(describeRpcFailure(action === 'start' ? '启动' : '停止', e));
+    } finally {
+      endRun(key);
+    }
+  };
+
+  /** 重启 = 先停再起，但按钮上只显示一个「重启中…」，不闪两个状态。 */
+  const restartRun = async (explicit?: RunTarget) => {
+    const target = explicit ?? (active !== undefined && activeConfig !== undefined
+      ? { workspaceId: active.workspaceId, configId: activeConfig.id }
+      : undefined);
+    if (api === undefined || target === undefined) return;
+    const key = runKeyOf(target);
+    if (!beginRun(key, 'restart')) return;
+    setError('');
+    try {
+      await performRun('stop', target).catch(() => { /* 本来就没在跑 */ });
+      await performRun('start', target);
+    } catch (e) {
+      setError(describeRpcFailure('重启', e));
+    } finally {
+      endRun(key);
     }
   };
 
   if (config === null) {
     return (
       <div className="ide-root ide-view">
-        <div className="ide-body">
-          <div className="ide-note">正在加载启动配置…</div>
+        <div className="ide-body" aria-busy="true">
+          <div className="ide-loading" role="status">
+            <span className="ide-spinner" aria-hidden="true" />
+            <span>正在加载启动配置…</span>
+          </div>
           {api === undefined ? <div className="ide-warn">remote.ideConfig 不可用</div> : null}
-          {error !== '' ? <div className="ide-err">{error}</div> : null}
+          {error !== '' ? (
+            <div className="ide-err" role="alert">
+              <span>{error}</span>
+              <button type="button" className="ide-errx" aria-label="关闭错误提示" onClick={() => setError('')}>×</button>
+            </div>
+          ) : null}
         </div>
       </div>
     );
@@ -1033,55 +1178,88 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
   return (
     <div className="ide-root ide-view">
       <div className="ide-tabrow" ref={tabRowRef}>
-        <button type="button" className="ide-tab" data-sel={overview} onClick={() => setOverview(true)}>
-          <span>总览</span>
-        </button>
-        {visibleProjects.map((p) => (
+        <div className="ide-tabwrap" data-sel={overview}>
           <button
-            key={p.workspaceId}
             type="button"
             className="ide-tab"
-            data-sel={!overview && p.workspaceId === active?.workspaceId}
-            onClick={() => revealProject(p.workspaceId)}
+            aria-current={overview ? 'page' : undefined}
+            onClick={() => setOverview(true)}
           >
-            <span className="ide-dot" data-state={statusOfProject(p)} title="任一条配置在跑就是绿的" />
-            <span>{p.title}</span>
-            {p.configs.length > 0 ? <span className="ide-note">{p.configs.length}</span> : null}
-            <span
-              className="ide-x"
-              title="收起这个项目（配置全部保留，可从 » 里恢复）"
-              onClick={(event) => { event.stopPropagation(); setHidden(p.workspaceId, true); }}
-            >
-              ×
-            </span>
+            <span>总览</span>
           </button>
-        ))}
+        </div>
+        {visibleProjects.map((p) => {
+          const selected = !overview && p.workspaceId === active?.workspaceId;
+          const aggregate = statusOfProject(p);
+          return (
+            <div className="ide-tabwrap" key={p.workspaceId} data-sel={selected}>
+              <button
+                type="button"
+                className="ide-tab"
+                aria-current={selected ? 'page' : undefined}
+                title={`${p.title} · ${describeAggregate(aggregate)} · ${p.configs.length} 条启动配置`}
+                onClick={() => revealProject(p.workspaceId)}
+              >
+                <span className="ide-dot" data-state={aggregate} aria-hidden="true" />
+                <span>{p.title}</span>
+                {p.configs.length > 0 ? <span className="ide-count">{p.configs.length}</span> : null}
+              </button>
+              <button
+                type="button"
+                className="ide-tabx"
+                aria-label={`收起项目 ${p.title}`}
+                title="收起这个项目（配置全部保留，可从 » 里恢复）"
+                onClick={() => setHidden(p.workspaceId, true)}
+              >
+                ×
+              </button>
+            </div>
+          );
+        })}
         <span className="ide-tools">
-          <button type="button" className="ide-chip" data-sel={onlyRunning} onClick={() => setOnlyRunning((v) => !v)}>只看运行中</button>
+          <button
+            type="button"
+            className="ide-chip"
+            data-sel={onlyRunning}
+            aria-pressed={onlyRunning}
+            onClick={() => setOnlyRunning((v) => !v)}
+          >
+            只看运行中
+          </button>
           <details className="ide-overflow">
-            <summary title="全部项目">»</summary>
+            <summary title="全部项目" aria-label="全部项目">»</summary>
             <ul>
               {cfg.projects.map((p) => (
-                <li
-                  key={p.workspaceId}
-                  onClick={() => revealProject(p.workspaceId)}
-                >
-                  <span className="ide-dot" data-state={statusOfProject(p)} />
-                  <span>{p.title}</span>
-                  <span className="ide-note" style={{ marginLeft: 'auto' }}>
-                    {p.hidden ? '已收起' : `${p.configs.length} 条配置`}
-                  </span>
+                <li key={p.workspaceId}>
+                  <button
+                    type="button"
+                    className="ide-menu-item"
+                    onClick={(event) => { closeMenu(event); revealProject(p.workspaceId); }}
+                  >
+                    <span className="ide-dot" data-state={statusOfProject(p)} aria-hidden="true" />
+                    <span>{p.title}</span>
+                    <span className="ide-note" style={{ marginLeft: 'auto' }}>
+                      {p.hidden ? '已收起' : `${p.configs.length} 条配置`}
+                    </span>
+                  </button>
                 </li>
               ))}
-              {cfg.projects.length === 0 ? <li className="ide-note">还没有项目配置</li> : null}
+              {cfg.projects.length === 0 ? (
+                <li><span className="ide-note" style={{ padding: '6px 8px' }}>还没有项目配置</span></li>
+              ) : null}
             </ul>
           </details>
         </span>
       </div>
 
       <div className="ide-body ide-fill">
-        {warning !== '' ? <div className="ide-warn">{warning}</div> : null}
-        {error !== '' ? <div className="ide-err">{error}</div> : null}
+        {warning !== '' ? <div className="ide-warn" role="status">{warning}</div> : null}
+        {error !== '' ? (
+          <div className="ide-err" role="alert">
+            <span>{error}</span>
+            <button type="button" className="ide-errx" aria-label="关闭错误提示" onClick={() => setError('')}>×</button>
+          </div>
+        ) : null}
 
         {overview ? (
           <div className="ide-board">
@@ -1091,12 +1269,18 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
             {cfg.projects.map((p) => (
               <div className="ide-card" key={p.workspaceId}>
                 <div className="ide-cardhead">
-                  <span className="ide-dot" data-state={statusOfProject(p)} />
+                  <span
+                    className="ide-dot"
+                    data-state={statusOfProject(p)}
+                    title={describeAggregate(statusOfProject(p))}
+                    aria-hidden="true"
+                  />
                   {renaming === p.workspaceId ? (
                     <>
                       <input
                         className="ide-field"
                         style={{ maxWidth: 200 }}
+                        aria-label="项目配置名称"
                         value={renameText}
                         autoFocus
                         onChange={(e) => setRenameText(e.target.value)}
@@ -1118,19 +1302,37 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
                   <button type="button" className="ide-btn" onClick={() => revealProject(p.workspaceId)}>打开</button>
                   {/* 卡片级动作都收进 `…` 里：总览是默认落地页，把红色删除按钮摆在「打开」旁边就是给手滑创造条件 */}
                   <details className="ide-overflow">
-                    <summary title="更多操作">…</summary>
+                    <summary title="更多操作" aria-label="更多操作">…</summary>
                     <ul>
-                      <li onClick={(e) => { closeMenu(e); setHidden(p.workspaceId, !p.hidden); }}>
-                        {p.hidden ? '恢复显示' : '收起'}
+                      <li>
+                        <button
+                          type="button"
+                          className="ide-menu-item"
+                          onClick={(e) => { closeMenu(e); setHidden(p.workspaceId, !p.hidden); }}
+                        >
+                          {p.hidden ? '恢复显示' : '收起'}
+                        </button>
                       </li>
-                      <li onClick={(e) => { closeMenu(e); startRename(p); }}>重命名</li>
-                      <li
-                        data-danger
-                        data-armed={armed === p.workspaceId}
-                        title={armed === p.workspaceId ? '再点一次：删除这条项目配置，连同它的全部启动配置与磁盘日志' : '删除这条项目配置'}
-                        onClick={(e) => armDelete(p.workspaceId, () => { closeMenu(e); removeProject(p.workspaceId); })}
-                      >
-                        {armed === p.workspaceId ? '确认删除（含日志）' : '删除'}
+                      <li>
+                        <button
+                          type="button"
+                          className="ide-menu-item"
+                          onClick={(e) => { closeMenu(e); startRename(p); }}
+                        >
+                          重命名
+                        </button>
+                      </li>
+                      <li>
+                        <button
+                          type="button"
+                          className="ide-menu-item"
+                          data-danger
+                          data-armed={armed === p.workspaceId}
+                          title={armed === p.workspaceId ? '再点一次：删除这条项目配置，连同它的全部启动配置与磁盘日志' : '删除这条项目配置'}
+                          onClick={(e) => armDelete(p.workspaceId, () => { closeMenu(e); removeProject(p.workspaceId); })}
+                        >
+                          {armed === p.workspaceId ? '确认删除（含日志）' : '删除'}
+                        </button>
                       </li>
                     </ul>
                   </details>
@@ -1138,11 +1340,20 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
                 <div className="ide-note ide-mono">{p.path}</div>
                 {p.configs.length === 0 ? <div className="ide-note">还没有启动配置 —— 点右上角「打开」进去加第一条</div> : null}
                 {p.configs.map((c) => {
-                  const snapshot = runs[runKeyOf({ workspaceId: p.workspaceId, configId: c.id })];
+                  const rowKey = runKeyOf({ workspaceId: p.workspaceId, configId: c.id });
+                  const snapshot = runs[rowKey];
+                  const rowBusy = busyRun[rowKey];
                   return (
                     <div className="ide-cardrow" key={c.id}>
-                      <span className="ide-dot" data-state={snapshot?.status ?? 'idle'} />
-                      <span className="ide-name" onClick={() => revealProject(p.workspaceId, c.id)}>{c.name}</span>
+                      <span className="ide-dot" data-state={snapshot?.status ?? 'idle'} aria-hidden="true" />
+                      <button
+                        type="button"
+                        className="ide-name"
+                        title={c.name}
+                        onClick={() => revealProject(p.workspaceId, c.id)}
+                      >
+                        {c.name}
+                      </button>
                       {snapshot !== undefined && snapshot.port !== '' ? <span className="ide-port">:{snapshot.port}</span> : null}
                       <span className="ide-note">
                         {describeRun(snapshot)}
@@ -1150,15 +1361,31 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
                       </span>
                       <span className="ide-last" title={snapshot?.lastLine ?? ''}>{snapshot?.lastLine ?? '（无输出）'}</span>
                       {isRunning(snapshot?.status) ? (
-                        <button type="button" className="ide-btn" onClick={() => { void runAction('stop', { workspaceId: p.workspaceId, configId: c.id }); }}>停止</button>
+                        <button
+                          type="button"
+                          className="ide-btn"
+                          disabled={rowBusy !== undefined}
+                          onClick={() => { void runAction('stop', { workspaceId: p.workspaceId, configId: c.id }); }}
+                        >
+                          {rowBusy === 'stop' ? '停止中…' : '停止'}
+                        </button>
                       ) : (
-                        <button type="button" className="ide-btn" data-kind="primary" onClick={() => { void runAction('start', { workspaceId: p.workspaceId, configId: c.id }); }}>启动</button>
+                        <button
+                          type="button"
+                          className="ide-btn"
+                          disabled={rowBusy !== undefined}
+                          title={`启动 ${c.name}`}
+                          onClick={() => { void runAction('start', { workspaceId: p.workspaceId, configId: c.id }); }}
+                        >
+                          {rowBusy === 'start' ? '启动中…' : '启动'}
+                        </button>
                       )}
                       {/* 行内删除（同样是两步确认）：先在面板里看到这条，就地删，不必先进 ⚙ 配置 */}
                       <button
                         type="button"
-                        className="ide-btn"
-                        data-kind={armed === p.workspaceId + '/' + c.id ? 'danger' : undefined}
+                        className="ide-btn ide-iconbtn"
+                        data-armed={armed === p.workspaceId + '/' + c.id}
+                        aria-label={armed === p.workspaceId + '/' + c.id ? `确认删除启动配置 ${c.name}` : `删除启动配置 ${c.name}`}
                         title={armed === p.workspaceId + '/' + c.id ? '再点一次：删掉这条启动配置（连它的日志）' : '删除这条启动配置'}
                         onClick={() => armDelete(p.workspaceId + '/' + c.id, () => removeConfig(p, c.id))}
                       >
@@ -1181,6 +1408,7 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
               <div className="ide-addpath">
                 <input
                   className="ide-field ide-mono"
+                  aria-label="项目配置路径"
                   placeholder="/任意/路径（不限于 DSH 工作区）"
                   value={newPath}
                   onChange={(e) => setNewPath(e.target.value)}
@@ -1221,8 +1449,9 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
           </div>
         ) : active === undefined ? (
           <div className="ide-empty">
-            <div>还没有项目配置</div>
-            <div className="ide-note">打开上面的「总览」，在最下面那张卡片里填一个路径</div>
+            <div className="ide-title">还没有项目配置</div>
+            <div className="ide-note">总览最下面那张卡片可以填路径，把任意目录加进来</div>
+            <button type="button" className="ide-btn" data-kind="primary" onClick={() => setOverview(true)}>去总览添加</button>
           </div>
         ) : (
           <>
@@ -1232,7 +1461,7 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
               {folded ? (
                 <div className="ide-foldrow">
                   <span className="ide-mdot-title" onDoubleClick={() => setFolded(false)} title="双击展开">
-                    <span className="ide-dot" data-state={runState?.status ?? 'idle'} />
+                    <span className="ide-dot" data-state={runState?.status ?? 'idle'} aria-hidden="true" />
                     <span className="ide-mname">{activeConfig === undefined ? '（还没有启动配置）' : activeConfig.name}</span>
                     {runState !== undefined && runState.port !== '' ? <span className="ide-port">:{runState.port}</span> : null}
                     {isRunning(runState?.status) ? <span className="ide-note">{formatUptime(runState?.startedAtMs ?? 0, Date.now())}</span> : null}
@@ -1242,11 +1471,33 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
                   {activeConfig === undefined ? null : (
                     <>
                       {isRunning(runState?.status) ? (
-                        <button type="button" className="ide-btn" onClick={() => { void runAction('stop'); }}>停止</button>
+                        <button
+                          type="button"
+                          className="ide-btn"
+                          disabled={runBusy !== undefined}
+                          onClick={() => { void runAction('stop'); }}
+                        >
+                          {runBusy === 'stop' ? '停止中…' : '停止'}
+                        </button>
                       ) : (
-                        <button type="button" className="ide-btn" data-kind="primary" onClick={() => { void runAction('start'); }}>启动</button>
+                        <button
+                          type="button"
+                          className="ide-btn"
+                          data-kind="primary"
+                          disabled={runBusy !== undefined}
+                          onClick={() => { void runAction('start'); }}
+                        >
+                          {runBusy === 'start' ? '启动中…' : '启动'}
+                        </button>
                       )}
-                      <button type="button" className="ide-btn" disabled={runState?.status !== 'running'} onClick={() => { void (async () => { await runAction('stop'); await runAction('start'); })(); }}>重启</button>
+                      <button
+                        type="button"
+                        className="ide-btn"
+                        disabled={runState?.status !== 'running' || runBusy !== undefined}
+                        onClick={() => { void restartRun(); }}
+                      >
+                        {runBusy === 'restart' ? '重启中…' : '重启'}
+                      </button>
                     </>
                   )}
                   <button type="button" className="ide-btn" onClick={() => setFolded(false)} title="展开控制区">展开</button>
@@ -1260,7 +1511,15 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
                     {/* ⚙ 配置挂在项目名这一行的**最右端**：与折叠行的按钮对齐成同一条竖线，
                         免得折叠/展开时按钮位置左右横跳（配置编辑本来就是"这个项目的配置"）。 */}
                     <span style={{ flex: 1 }} />
-                    <button type="button" className="ide-btn" data-on={editing} onClick={() => setEditing((v) => !v)}>⚙ 配置</button>
+                    <button
+                      type="button"
+                      className="ide-btn"
+                      data-on={editing}
+                      aria-expanded={editing}
+                      onClick={() => setEditing((v) => !v)}
+                    >
+                      ⚙ 配置
+                    </button>
                   </div>
                   <div className="ide-note ide-mono ide-mpath" title={active.path}>{active.path}</div>
                 </div>
@@ -1276,7 +1535,7 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
                       title={`${c.name} — ${describeRun(snapshot)}`}
                       onClick={() => selectConfig(c.id)}
                     >
-                      <span className="ide-dot" data-state={snapshot?.status ?? 'idle'} />
+                      <span className="ide-dot" data-state={snapshot?.status ?? 'idle'} aria-hidden="true" />
                       <span className="ide-mname">{c.name}</span>
                       {c.origin === 'agent' ? <span className="ide-chip" title="这条配置由 agent 写入（ide_launch_save）">agent</span> : null}
                       {snapshot !== undefined && snapshot.port !== '' ? <span className="ide-port">:{snapshot.port}</span> : null}
@@ -1299,7 +1558,7 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
                   <div className="ide-dhead">
                     <span className="ide-configtitle">{activeConfig.name}</span>
                     <span style={{ flex: 1 }} />
-                    <span className="ide-note">{flash}</span>
+                    <span className="ide-note" role="status">{flash}</span>
                     <button type="button" className="ide-btn" onClick={() => setFolded(true)} title="折叠控制区，把高度让给日志（双击紧凑行也能展开）">折叠</button>
                   </div>
 
@@ -1320,19 +1579,26 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
                       type="button"
                       className="ide-btn"
                       data-kind="primary"
-                      disabled={isRunning(runState?.status)}
+                      disabled={isRunning(runState?.status) || runBusy !== undefined}
                       onClick={() => { void runAction('start'); }}
                     >
-                      启动
+                      {runBusy === 'start' ? '启动中…' : '启动'}
                     </button>
-                    <button type="button" className="ide-btn" disabled={runState?.status !== 'running'} onClick={() => { void runAction('stop'); }}>停止</button>
                     <button
                       type="button"
                       className="ide-btn"
-                      disabled={runState?.status !== 'running'}
-                      onClick={() => { void (async () => { await runAction('stop'); await runAction('start'); })(); }}
+                      disabled={runState?.status !== 'running' || runBusy !== undefined}
+                      onClick={() => { void runAction('stop'); }}
                     >
-                      重启
+                      {runBusy === 'stop' ? '停止中…' : '停止'}
+                    </button>
+                    <button
+                      type="button"
+                      className="ide-btn"
+                      disabled={runState?.status !== 'running' || runBusy !== undefined}
+                      onClick={() => { void restartRun(); }}
+                    >
+                      {runBusy === 'restart' ? '重启中…' : '重启'}
                     </button>
                   </div>
 
@@ -1343,25 +1609,43 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
 
                   <div className="ide-filterbar">
                     <input
-                      className="ide-field ide-mono"
+                      className="ide-field ide-mono ide-filtersearch"
+                      aria-label="日志过滤关键字"
                       placeholder="过滤关键字"
                       value={filterQ}
                       onChange={(e) => setFilterQ(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Escape' && filterQ !== '') setFilterQ('');
+                      }}
                     />
-                    <button type="button" className="ide-chip" data-sel={filterRegex} onClick={() => setFilterRegex((v) => !v)}>正则</button>
-                    <button type="button" className="ide-chip" data-sel={onlyMatch} onClick={() => setOnlyMatch((v) => !v)}>仅看匹配</button>
-                    <span style={{ flex: 1 }} />
-                    {LEVELS.map((lv) => (
+                    {filterQ !== '' ? (
                       <button
-                        key={lv}
                         type="button"
-                        className="ide-chip"
-                        data-sel={levels[lv]}
-                        onClick={() => setLevels((prev) => ({ ...prev, [lv]: !prev[lv] }))}
+                        className="ide-btn ide-iconbtn"
+                        aria-label="清除过滤关键字"
+                        title="清除过滤关键字（Esc）"
+                        onClick={() => setFilterQ('')}
                       >
-                        {lv}
+                        ×
                       </button>
-                    ))}
+                    ) : null}
+                    <button type="button" className="ide-chip" data-sel={filterRegex} aria-pressed={filterRegex} onClick={() => setFilterRegex((v) => !v)}>正则</button>
+                    <button type="button" className="ide-chip" data-sel={onlyMatch} aria-pressed={onlyMatch} onClick={() => setOnlyMatch((v) => !v)}>仅看匹配</button>
+                    <span className="ide-lvgroup">
+                      {LEVELS.map((lv) => (
+                        <button
+                          key={lv}
+                          type="button"
+                          className="ide-chip"
+                          data-sel={levels[lv]}
+                          aria-pressed={levels[lv]}
+                          title={`${lv} 级别：${levels[lv] ? '显示中，点击隐藏' : '已隐藏，点击显示'}`}
+                          onClick={() => setLevels((prev) => ({ ...prev, [lv]: !prev[lv] }))}
+                        >
+                          {lv}
+                        </button>
+                      ))}
+                    </span>
                   </div>
                 </div>
               )}
@@ -1383,7 +1667,18 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
                   >
                     {discoveryBusy ? '正在扫描…' : '从 IDEA 导入'}
                   </button>
-                  <button type="button" className="ide-btn" data-kind="danger" onClick={() => removeProject(active.workspaceId)}>移除项目配置</button>
+                  <button
+                    type="button"
+                    className="ide-btn"
+                    data-kind="danger"
+                    data-armed={armed === 'project:' + active.workspaceId}
+                    title={armed === 'project:' + active.workspaceId
+                      ? '再点一次：删除这条项目配置，连同它的全部启动配置与磁盘日志'
+                      : '删除这条项目配置（连同它的全部启动配置与磁盘日志）'}
+                    onClick={() => armDelete('project:' + active.workspaceId, () => removeProject(active.workspaceId))}
+                  >
+                    {armed === 'project:' + active.workspaceId ? '确认删除项目配置' : '删除项目配置'}
+                  </button>
                 </div>
 
                 {discovery !== null ? (
@@ -1397,7 +1692,7 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
                       <button type="button" className="ide-btn" onClick={() => setDiscovery(null)}>收起</button>
                     </div>
                     {discovery.errors.length > 0 ? discovery.errors.map((message, index) => (
-                      <div className="ide-err" key={index}>{message}</div>
+                      <div className="ide-err" role="alert" key={index}><span>{message}</span></div>
                     )) : null}
                     {discovery.candidates.length === 0 ? (
                       <div className="ide-note">没找到可导入的 Spring Boot 运行配置（只认 .idea/workspace.xml 与 .run/*.xml）</div>
@@ -1435,18 +1730,36 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
                   <div className="ide-form">
                     <div className="ide-line">
                       <span className="ide-label">名称</span>
-                      <input className="ide-field" style={{ maxWidth: 240 }} value={activeDraft.name} onChange={(e) => patchDraft(activeDraft, { name: e.target.value })} />
+                      <input
+                        className="ide-field"
+                        style={{ maxWidth: 240 }}
+                        aria-label="配置名称"
+                        value={activeDraft.name}
+                        onChange={(e) => patchDraft(activeDraft, { name: e.target.value })}
+                      />
                       {activeDraft.origin === 'agent' ? (
                         <span className="ide-chip" data-sel title="这条配置是 agent 通过 ide_launch_save 写的：保存一次就归你，标记消失">agent 写入</span>
                       ) : null}
                       <span style={{ flex: 1 }} />
-                      <button type="button" className="ide-btn" data-kind="danger" onClick={() => removeConfig(active, activeDraft.id)}>删除</button>
+                      <button
+                        type="button"
+                        className="ide-btn"
+                        data-kind="danger"
+                        data-armed={armed === 'config:' + activeDraft.id}
+                        title={armed === 'config:' + activeDraft.id
+                          ? '再点一次：删掉这条启动配置（连它的日志）'
+                          : '删除这条启动配置（连它的日志）'}
+                        onClick={() => armDelete('config:' + activeDraft.id, () => removeConfig(active, activeDraft.id))}
+                      >
+                        {armed === 'config:' + activeDraft.id ? '确认删除' : '删除'}
+                      </button>
                     </div>
                     <div className="ide-line">
                       <span className="ide-label">启动命令</span>
                       <input
                         className="ide-field ide-mono"
                         style={{ flex: 1, minWidth: 280 }}
+                        aria-label="启动命令"
                         placeholder="例如：mvn -o -pl kun-ai-web spring-boot:run"
                         value={activeDraft.command}
                         onChange={(e) => patchDraft(activeDraft, { command: e.target.value })}
@@ -1454,7 +1767,13 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
                     </div>
                     <div className="ide-line">
                       <span className="ide-label">工作目录</span>
-                      <input className="ide-field ide-mono" style={{ flex: 1, minWidth: 280 }} value={activeDraft.cwd} onChange={(e) => patchDraft(activeDraft, { cwd: e.target.value })} />
+                      <input
+                        className="ide-field ide-mono"
+                        style={{ flex: 1, minWidth: 280 }}
+                        aria-label="工作目录（留空 = 项目路径）"
+                        value={activeDraft.cwd}
+                        onChange={(e) => patchDraft(activeDraft, { cwd: e.target.value })}
+                      />
                     </div>
                     <div className="ide-line" style={{ alignItems: 'flex-start' }}>
                       <span className="ide-label">环境变量</span>
@@ -1468,6 +1787,7 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
                                 <td style={{ width: '38%' }}>
                                   <input
                                     className="ide-field ide-mono"
+                                    aria-label={`环境变量 ${index + 1} 名称`}
                                     value={env.name}
                                     placeholder="NAME"
                                     onChange={(e) => patchDraft(activeDraft, { envs: activeDraft.envs.map((x, i) => (i === index ? { ...x, name: e.target.value } : x)) })}
@@ -1486,6 +1806,7 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
                                         className="ide-field ide-mono"
                                         type="password"
                                         style={{ maxWidth: 220 }}
+                                        aria-label={`${env.name} 的密钥值`}
                                         placeholder="填入值（存进 DSH 凭据库）"
                                         value={secretInput[env.name] ?? ''}
                                         onChange={(e) => setSecretInput((prev) => ({ ...prev, [env.name]: e.target.value }))}
@@ -1504,6 +1825,7 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
                                     <input
                                       className="ide-field ide-mono"
                                       type={isSecretName(env.name) ? 'password' : 'text'}
+                                      aria-label={`${env.name || `环境变量 ${index + 1}`} 的值`}
                                       title={isSecretName(env.name) ? '密钥类变量在界面上掩码显示' : undefined}
                                       value={env.value}
                                       placeholder="value"
@@ -1512,7 +1834,15 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
                                   )}
                                 </td>
                                 <td style={{ width: 32 }}>
-                                  <button type="button" className="ide-btn" onClick={() => patchDraft(activeDraft, { envs: activeDraft.envs.filter((_, i) => i !== index) })}>×</button>
+                                  <button
+                                    type="button"
+                                    className="ide-btn ide-iconbtn"
+                                    aria-label={`删除环境变量 ${env.name || index + 1}`}
+                                    title="删除这个环境变量"
+                                    onClick={() => patchDraft(activeDraft, { envs: activeDraft.envs.filter((_, i) => i !== index) })}
+                                  >
+                                    ×
+                                  </button>
                                 </td>
                               </tr>
                               );
@@ -1581,6 +1911,7 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
                     type="button"
                     className="ide-btn"
                     data-on={!following}
+                    aria-pressed={!following}
                     title={following
                       ? '跟随最新日志；点一下冻结视图（也可以直接上滚）'
                       : '已暂停；点一下恢复跟随并跳到最新'}
@@ -1612,6 +1943,7 @@ function IdeView({ api, ctx }: ViewProps): React.ReactElement {
                   <button
                     type="button"
                     className="ide-btn"
+                    aria-label="清空日志视图（不删除磁盘日志）"
                     title="只清面板里的显示；宿主缓冲与磁盘上的日志文件都不动（刷新页面可重新读到）"
                     onClick={clearLogView}
                   >
