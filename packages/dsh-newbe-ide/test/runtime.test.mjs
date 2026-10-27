@@ -1,5 +1,5 @@
 /**
- * 运行注册表接缝：与 DSH `shell` 服务的契约（resolve / start / readOutput / kill），
+ * 运行注册表接缝：与 DSH `shell` 服务的契约（resolve / execute（0.1.x 叫 start）/ readOutput / kill），
  * 用假 shell 驱动，不依赖真实进程。真实进程组回收已由动态插件原型的实测覆盖。
  *
  * 假进程如实模拟两件真实语义：
@@ -59,6 +59,43 @@ test('必须显式放行沙箱：不给策略时 dsh-bash-sandbox 会套上默�
     mode: 'danger-full-access',
     workspaceRoot: '/tmp/kun-ai',
   });
+});
+
+test('必须显式 onExpiry:none：不给就套上 120 s 默认截止，dev server 会被宿主自己杀掉', async () => {
+  const shell = makeShell();
+  const runs = createRunRegistry(() => shell);
+  await runs.start('w/c', SPEC);
+  // dsh-bash-local 的 resolve：onExpiry: request.onExpiry ?? "kill"，默认 timeoutMs = 120 s（上限 600 s）。
+  // 面板启的是 dev server / 长驻进程，到点被杀的表现是"跑了两分钟自己没了"。
+  assert.equal(shell.started[0].spec.onExpiry, 'none');
+});
+
+test('DSH 0.2.0 起 shell 只留 execute（start 已从契约里删掉）：照样起得来、采得到', async () => {
+  // 实测：0.2.0-rc.2 的 ShellExecutor 只有 execute(spec)；照旧调 shell.start 会得到
+  // 「shell.start is not a function」，面板上就是点启动即报错。
+  const sync = makeShell();
+  const executeOnly = {
+    started: sync.started,
+    resolve: (r) => sync.resolve(r),
+    execute: (spec) => Promise.resolve(sync.start(spec)),
+  };
+  assert.equal(executeOnly.start, undefined, '这个假 shell 必须只有 execute，不许偷偷靠 start 兜底');
+  const runs = createRunRegistry(() => executeOnly);
+
+  await runs.start('w/c', SPEC);
+  assert.equal(sync.started[0].spec.command, 'mvn -o test');
+  sync.started[0].proc.emit('booted on port 8080\n');
+  runs.pump();
+  assert.deepEqual(runs.read('w/c', 0).lines, ['booted on port 8080']);
+  assert.equal(runs.snapshot('w/c').port, '8080', 'execute 形态下状态与端口都要正常结算');
+  sync.started[0].proc.finish(0);
+  assert.equal(runs.snapshot('w/c').status, 'exited');
+});
+
+test('shell 服务两个启动方法都没有时给出可读错误，而不是 TypeError', async () => {
+  const bare = { resolve: (r) => r };
+  const runs = createRunRegistry(() => bare);
+  await assert.rejects(() => runs.start('w/c', SPEC), /既没有 execute 也没有 start/);
 });
 
 test('读取是增量的：第二次读不重复已给过的行', async () => {

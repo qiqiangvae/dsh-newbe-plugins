@@ -78,7 +78,10 @@ dsh plugin --profile web add dsh-newbe-ide@alpha
 
 ## 已验证
 
-DSH **0.1.5-alpha.2 / 0.1.6-alpha.1 / 0.1.6-alpha.2**（macOS）。其他平台与版本未验证。
+DSH **0.2.0-rc.2 / 0.2.1-rc.3**（macOS）：宿主 `shell` 契约按 0.2.x 的 `execute(spec)` + `onExpiry: 'none'` 实测通过
+（起进程 → 增量读输出 → 停止 → 结算）。面板整体另在
+**0.1.5-alpha.2 / 0.1.6-alpha.1 / 0.1.6-alpha.2** 上验证过（那三代 `shell` 的启动方法叫 `start()`，
+本插件两条路都留着）。其他平台与版本未验证。
 
 ## 限制
 
