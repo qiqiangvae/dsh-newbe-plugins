@@ -87,13 +87,25 @@ skill `ctx.skills.register(...)`，都从宿主行进全局层，**不需要改�
 `runtime.ts` 的 `shell.resolve()` 传 `{ mode: 'danger-full-access', workspaceRoot: spec.cwd }`
 （放行模式下 root 不参与判定）。`test/runtime.test.mjs` 有一条断言守着——删掉那行它就会红。
 
-**`shell.start()` 在 0.1.6 起是 async**。0.1.5 同步返回 `ShellProcess`；0.1.6-alpha.1 把
-`LocalBashExecutor` / `SandboxBashExecutor` 的 `start()` 都改成了 `async`（返回 Promise）。
-按同步写就会把 Promise 存进 `run.proc`：`proc.readOutput` 不存在 → 每次泵抛 TypeError，
-**被 `drainInto` 的 `catch { return; }` 静默吞掉** → 输出一条不落、状态永远停在「运行中」，
-面板看起来像"点了没反应"。所以 `runtime.start` 现在 `await shell.start(...)`（对非 Promise 是空操作，
-0.1.5/0.1.6 都能跑），`test/runtime.test.mjs` 有一条 Promise 形态的回归测试守着。
-排查这类"进程明明起来了、面板却没输出"时，先怀疑这个 catch——它会把契约错误变成静默。
+**启动方法的名字换过代：0.1.x 是 `start()`，0.2.0 起是 `execute()`**。`ShellExecutor` 在
+0.2.0 只剩 `execute(spec): Promise<ShellExecution>`，`start` 已从契约里删掉——照旧调它会拿到
+`shell.start is not a function`，面板上就是**点启动即报错**（实测 0.2.0-rc.2 / 0.2.1-rc.3）。所以
+`runtime.ts` 的 `launch()` 两个名字都试（`shell.execute ?? shell.start`，分离调用以免丢 `this`），
+两代都能跑；`test/runtime.test.mjs` 对两个形态各有一条断言守着。
+
+**两者都可能是 async**：0.1.5 的 `start()` 同步返回 `ShellProcess`，0.1.6-alpha.1 起返回 Promise，
+`execute()` 亦然（resolve 之后给句柄，**不等进程结束**）。按同步写就会把 Promise 存进 `run.proc`：
+`proc.readOutput` 不存在 → 每次泵抛 TypeError，**被 `drainInto` 的 `catch { return; }` 静默吞掉**
+→ 输出一条不落、状态永远停在「运行中」，面板看起来像"点了没反应"。所以统一 `await`
+（对非 Promise 是空操作）。排查这类"进程明明起来了、面板却没输出"时，先怀疑这个 catch——
+它会把契约错误变成静默。
+
+**`onExpiry` 必须显式给 `'none'`**。`dsh-bash-local` 的 resolve 是 `onExpiry: request.onExpiry ?? "kill"`，
+默认 `timeoutMs` = 120 s（上限 600 s），到点进程被杀成 `timedOut`（`status: killed`、无输出）。
+面板启的是 dev server / 长驻进程，不显式给 'none' 就会"跑两分钟自己没了"，而且按 killed 记账会
+误报成「启动失败」。`'none'` 不装任何截止时间，谁来停由面板决定。实测对照：同一个
+`timeoutMs: 100` 下，`'none'` 的进程活过 100 ms 并 `completed`，默认 `'kill'` 的当场被杀、delta 为空。
+`test/runtime.test.mjs` 有一条断言守着。
 
 **DSH 的 `ShellProcess` 没有 pid**。它只暴露 status / exitCode / done / readOutput / kill / sandbox。
 面板因此显示端口（从输出里认）与运行时长（宿主记启动时刻），不显示 pid。
