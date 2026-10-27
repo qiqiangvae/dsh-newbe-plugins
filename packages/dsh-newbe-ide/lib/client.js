@@ -14928,32 +14928,50 @@ function ensureStyles() {
   const style = document.createElement("style");
   style.dataset.plugin = STYLE_ID;
   style.textContent = `
-.ide-root{display:flex;flex-direction:column;height:100%;min-height:0;font-size:13px;color:var(--dsw-alias-label-primary,#1f2329)}
-.ide-tabrow{display:flex;align-items:stretch;gap:2px;border-bottom:1px solid var(--dsw-alias-border-l2,#d9dce1);flex:none;overflow-x:auto;scrollbar-width:none}
+.ide-root{display:flex;flex-direction:column;height:100%;min-height:0;font-size:13px;line-height:1.45;color:var(--dsw-alias-label-primary,#1f2329)}
+/* \u952E\u76D8\u53EF\u8FBE\u6027\uFF1A\u6240\u6709\u53EF\u805A\u7126\u63A7\u4EF6\u90FD\u8981\u770B\u5F97\u89C1\u7126\u70B9\u73AF\uFF0C\u8F93\u5165\u6846\u7528\u66F4\u8D34\u8FB9\u7684\u504F\u79FB\u3002 */
+.ide-root :focus-visible{outline:2px solid var(--dsw-alias-brand-primary,#3370ff);outline-offset:2px}
+.ide-root :focus:not(:focus-visible){outline:none}
+.ide-tab,.ide-btn,.ide-chip,.ide-tabx,.ide-mitem,.ide-menu-item,.ide-overflow>summary{transition:background-color .14s ease,color .14s ease,border-color .14s ease,box-shadow .14s ease,opacity .14s ease}
+.ide-tabrow{display:flex;align-items:stretch;gap:2px;border-bottom:1px solid var(--dsw-alias-border-l2,#d9dce1);flex:none;overflow-x:auto;scrollbar-width:none;padding-left:4px}
 .ide-tabrow::-webkit-scrollbar{display:none}
-.ide-tab{display:flex;align-items:center;gap:7px;padding:9px 10px 8px;color:var(--dsw-alias-label-secondary,#697586);white-space:nowrap;border-bottom:2px solid transparent;margin-bottom:-1px;cursor:pointer;flex:none;background:none;border-left:0;border-right:0;border-top:0;font:inherit}
+/* tab \u662F\u300C\u4E3B\u6309\u94AE + \u6536\u8D77\u6309\u94AE\u300D\u7684\u7EC4\u5408\uFF1A\u4E24\u4E2A <button> \u4E0D\u80FD\u5D4C\u5957\uFF0C\u6240\u4EE5\u5916\u9762\u5305\u4E00\u5C42\u3002
+   \u9009\u4E2D\u4E0B\u5212\u7EBF\u753B\u5728\u5305\u88F9\u5C42\u4E0A\uFF0Chover \u5E95\u8272\u4E5F\u753B\u5728\u5305\u88F9\u5C42\u4E0A\uFF0C\u6536\u8D77\u952E\u636E\u6B64\u5B9A\u4F4D\u3002 */
+.ide-tabwrap{position:relative;display:flex;align-items:stretch;flex:none;border-bottom:2px solid transparent;margin-bottom:-1px;border-radius:7px 7px 0 0}
+.ide-tabwrap:hover{background:var(--dsw-alias-interactive-bg-hover,rgba(0,0,0,.05))}
+.ide-tabwrap[data-sel=true]{border-bottom-color:var(--dsw-alias-brand-primary,#3370ff);background:var(--dsw-alias-interactive-bg-hover,rgba(51,112,255,.10))}
+.ide-tab{display:flex;align-items:center;gap:7px;padding:9px 26px 8px 11px;color:var(--dsw-alias-label-secondary,#697586);white-space:nowrap;cursor:pointer;flex:none;background:none;border:0;font:inherit}
 .ide-tab:hover{color:var(--dsw-alias-label-primary,#1f2329)}
-.ide-tab[data-sel=true]{color:var(--dsw-alias-label-primary,#1f2329);border-bottom-color:var(--dsw-alias-brand-primary,#3370ff)}
+.ide-tabwrap[data-sel=true] .ide-tab{color:var(--dsw-alias-label-primary,#1f2329)}
 .ide-tabrow[data-dragging=true]{cursor:grabbing;user-select:none}
-.ide-tab .ide-x{opacity:0;font-size:13px;line-height:1;padding:0 2px;border-radius:4px;color:var(--dsw-alias-label-secondary,#697586)}
-.ide-tab:hover .ide-x{opacity:1}
-.ide-tab .ide-x:hover{background:var(--dsw-alias-interactive-bg-hover,rgba(0,0,0,.07))}
+/* \u8BA1\u6570\u662F\u300C\u8FD9\u4E2A\u9879\u76EE\u4E0B\u6709\u51E0\u6761\u914D\u7F6E\u300D\u7684\u4FE1\u606F\uFF0C\u4E0D\u662F\u540D\u5B57\u7684\u4E00\u90E8\u5206\uFF1A\u7528\u5C0F\u80F6\u56CA\u4E0E\u6807\u9898\u5206\u5F00\u3002 */
+.ide-count{font-size:10.5px;line-height:1;padding:2px 5px;border-radius:999px;background:var(--dsw-alias-interactive-bg-hover,rgba(0,0,0,.07));color:var(--dsw-alias-label-secondary,#697586);font-variant-numeric:tabular-nums}
+.ide-tabwrap[data-sel=true] .ide-count{background:var(--dsw-alias-interactive-bg-hover,rgba(51,112,255,.16));color:var(--dsw-alias-label-secondary,#697586)}
+/* \u6536\u8D77\u952E\u5E73\u65F6\u9690\u8EAB\uFF0Chover \u6216\u952E\u76D8\u805A\u7126\u65F6\u624D\u51FA\u73B0\uFF1B\u5B83\u4ECD\u662F\u771F\u6309\u94AE\uFF0C\u53EF\u7528 Tab \u5230\u8FBE\u3002 */
+.ide-tabx{position:absolute;right:5px;top:50%;transform:translateY(-50%);display:grid;place-items:center;width:18px;height:18px;padding:0;border:0;border-radius:5px;background:none;color:var(--dsw-alias-label-secondary,#697586);font:inherit;font-size:14px;line-height:1;cursor:pointer;opacity:0}
+.ide-tabwrap:hover .ide-tabx,.ide-tabwrap:focus-within .ide-tabx{opacity:1}
+.ide-tabx:hover{background:var(--dsw-alias-interactive-bg-hover,rgba(0,0,0,.10));color:var(--dsw-alias-label-primary,#1f2329)}
 .ide-tools{margin-left:auto;display:flex;align-items:center;gap:6px;padding-left:12px;flex:none}
 .ide-overflow{position:relative}
-.ide-overflow>summary{list-style:none;cursor:pointer;min-width:26px;height:24px;border:1px solid var(--dsw-alias-border-l2,#d9dce1);border-radius:7px;display:grid;place-items:center;color:var(--dsw-alias-label-secondary,#697586);font-size:12px}
+.ide-overflow>summary{list-style:none;cursor:pointer;min-width:26px;height:26px;border:1px solid var(--dsw-alias-border-l2,#d9dce1);border-radius:7px;display:grid;place-items:center;color:var(--dsw-alias-label-secondary,#697586);font-size:12px;background:var(--dsw-alias-bg-module-platform,#fff)}
 .ide-overflow>summary::-webkit-details-marker{display:none}
 .ide-overflow>summary:hover{background:var(--dsw-alias-interactive-bg-hover,rgba(0,0,0,.07))}
-.ide-overflow ul{position:absolute;right:0;top:30px;z-index:30;background:var(--dsw-alias-bg-module-platform,#fff);border:1px solid var(--dsw-alias-border-l2,#d9dce1);border-radius:9px;box-shadow:0 14px 34px rgba(0,0,0,.28);padding:6px;margin:0;list-style:none;min-width:240px;max-height:320px;overflow:auto}
-.ide-overflow li{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;cursor:pointer;font-size:12px;color:var(--dsw-alias-label-secondary,#697586);white-space:nowrap}
-.ide-overflow li:hover{background:var(--dsw-alias-interactive-bg-hover,rgba(0,0,0,.07));color:var(--dsw-alias-label-primary,#1f2329)}
-.ide-overflow li[data-danger]{color:var(--dsw-alias-state-error-primary,#d83931)}
-.ide-overflow li[data-armed=true]{background:var(--dsw-alias-state-error-primary,#d83931);color:#fff;font-weight:600}
+.ide-overflow ul{position:absolute;right:0;top:32px;z-index:30;background:var(--dsw-alias-bg-module-platform,#fff);border:1px solid var(--dsw-alias-border-l2,#d9dce1);border-radius:9px;box-shadow:0 14px 34px rgba(0,0,0,.28);padding:6px;margin:0;list-style:none;min-width:240px;max-height:320px;overflow:auto}
+.ide-overflow li{display:flex;align-items:center;gap:8px;padding:0;border-radius:6px;font-size:12px;color:var(--dsw-alias-label-secondary,#697586);white-space:nowrap}
+.ide-menu-item{display:flex;align-items:center;gap:8px;width:100%;padding:6px 8px;border:0;border-radius:6px;background:none;font:inherit;font-size:12px;color:inherit;text-align:left;cursor:pointer}
+.ide-menu-item:hover{background:var(--dsw-alias-interactive-bg-hover,rgba(0,0,0,.07));color:var(--dsw-alias-label-primary,#1f2329)}
+.ide-menu-item[data-danger]{color:var(--dsw-alias-state-error-primary,#d83931)}
+.ide-menu-item[data-danger]:hover{background:var(--dsw-alias-interactive-bg-hover,rgba(0,0,0,.07));color:var(--dsw-alias-state-error-primary,#d83931)}
+.ide-menu-item[data-armed=true],.ide-menu-item[data-armed=true]:hover{background:var(--dsw-alias-state-error-primary,#d83931);color:#fff;font-weight:600}
 .ide-board{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px;align-content:start;overflow:auto;flex:1;min-height:0}
-/* \u4E00\u884C\u4E00\u6761\u914D\u7F6E\uFF1A\u540D\u5B57\u4E0E\u72B6\u6001\u5404\u81EA\u5355\u884C\u7701\u7565\uFF0C\u5426\u5219\u7A84\u5361\u91CC\u4F1A\u6298\u6210"\u505C / \u6B62"\u90A3\u6837\u7684\u7AD6\u6392 */
-.ide-cardrow{display:flex;align-items:center;gap:8px;padding:5px 7px;border-radius:7px;background:var(--dsw-alias-interactive-bg-hover,rgba(128,128,128,.08));font-size:12px;min-width:0}
-.ide-cardrow .ide-name{font-weight:600;cursor:pointer;flex:none;max-width:9.5em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* \u4E00\u884C\u4E00\u6761\u914D\u7F6E\uFF1A\u540D\u5B57\u4E0E\u72B6\u6001\u5404\u81EA\u5355\u884C\u7701\u7565\uFF0C\u5426\u5219\u7A84\u5361\u91CC\u4F1A\u6298\u6210"\u505C / \u6B62"\u90A3\u6837\u7684\u7AD6\u6392\u3002
+   \u884C\u672C\u8EAB\u4E0D\u94FA\u5E95\u8272\uFF08\u5361\u91CC\u518D\u5957\u4E00\u5C42\u7070\u5757\u4F1A\u663E\u5F97\u5F88\u91CD\uFF09\uFF0Chover \u624D\u6D6E\u51FA\u53EF\u70B9\u533A\u57DF\u7684\u5E95\u8272\u3002 */
+.ide-cardrow{display:flex;align-items:center;gap:8px;padding:4px 7px;border-radius:7px;background:none;font-size:12px;min-width:0;transition:background-color .14s ease}
+.ide-cardrow:hover{background:var(--dsw-alias-interactive-bg-hover,rgba(128,128,128,.08))}
+.ide-cardrow .ide-name{font:inherit;font-size:12px;font-weight:600;color:inherit;cursor:pointer;flex:none;max-width:9.5em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left;border:0;background:none;padding:0}
+.ide-cardrow .ide-name:hover{text-decoration:underline;text-underline-offset:2px}
 .ide-cardrow .ide-note{flex:none;white-space:nowrap}
-.ide-cardrow .ide-btn{flex:none;white-space:nowrap;padding:2px 9px}
+.ide-cardrow .ide-btn{flex:none;white-space:nowrap;padding:2px 9px;min-height:24px}
 .ide-addpath{display:flex;align-items:center;gap:6px}
 .ide-addpath .ide-field{flex:1;min-width:0}
 .ide-addlist{display:flex;flex-direction:column;gap:6px;max-height:224px;overflow:auto}
@@ -14965,23 +14983,37 @@ function ensureStyles() {
 .ide-cmd{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;color:var(--dsw-alias-label-secondary,#697586);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ide-configtitle{font-size:15px;font-weight:600}
 .ide-title{font-size:14px;font-weight:600}
-.ide-chip{border:1px solid var(--dsw-alias-border-l2,#d9dce1);border-radius:999px;padding:2px 9px;font-size:12px;color:var(--dsw-alias-label-secondary,#697586);background:none;font:inherit;cursor:pointer;white-space:nowrap}
-.ide-chip:hover{border-color:var(--dsw-alias-label-secondary,#697586)}
+.ide-chip{border:1px solid var(--dsw-alias-border-l2,#d9dce1);border-radius:999px;padding:2px 9px;min-height:24px;line-height:1.2;font-size:12px;color:var(--dsw-alias-label-secondary,#697586);background:none;font:inherit;cursor:pointer;white-space:nowrap}
+.ide-chip:hover{border-color:var(--dsw-alias-label-secondary,#697586);color:var(--dsw-alias-label-primary,#1f2329)}
 .ide-chip[data-sel=true]{background:var(--dsw-alias-interactive-bg-hover,rgba(51,112,255,.12));border-color:var(--dsw-alias-brand-primary,#3370ff);color:var(--dsw-alias-brand-primary,#3370ff)}
-.ide-btn{border:1px solid var(--dsw-alias-border-l2,#d9dce1);border-radius:7px;padding:4px 11px;font:inherit;font-size:12px;color:var(--dsw-alias-label-primary,#1f2329);background:none;cursor:pointer}
+.ide-btn{border:1px solid var(--dsw-alias-border-l2,#d9dce1);border-radius:7px;padding:4px 11px;min-height:26px;line-height:1.2;font:inherit;font-size:12px;color:var(--dsw-alias-label-primary,#1f2329);background:none;cursor:pointer}
 .ide-btn:hover{background:var(--dsw-alias-interactive-bg-hover,rgba(0,0,0,.07))}
 .ide-btn[data-kind=primary]{background:var(--dsw-alias-brand-primary,#3370ff);border-color:transparent;color:#fff}
+.ide-btn[data-kind=primary]:hover{background:var(--dsw-alias-brand-primary,#3370ff);filter:brightness(.94)}
 .ide-btn[data-kind=danger]:hover{color:var(--dsw-alias-state-error-primary,#d83931);border-color:var(--dsw-alias-state-error-primary,#d83931)}
-.ide-btn:disabled{opacity:.5;cursor:default}
+.ide-btn:disabled{opacity:.5;cursor:default;filter:none}
+/* \u56FE\u6807\u6309\u94AE\uFF08\u884C\u5185 \xD7\uFF09\uFF1A\u6BD4\u6587\u5B57\u6309\u94AE\u7A84\uFF0C\u4F46\u89C6\u89C9\u4E0A\u4ECD\u662F\u6309\u94AE\uFF1Bhover \u624D\u8F6C\u6210\u5371\u9669\u8272\u3002 */
+.ide-iconbtn{padding:2px 7px;min-height:24px;color:var(--dsw-alias-label-secondary,#697586)}
+.ide-iconbtn:hover{color:var(--dsw-alias-state-error-primary,#d83931);border-color:var(--dsw-alias-state-error-primary,#d83931)}
 /* data-on = \u6309\u94AE\u5904\u4E8E\u300C\u5DF2\u6309\u4E0B / \u5DF2\u5F00\u542F\u300D\u6001\uFF08\u2699 \u914D\u7F6E\u5C55\u5F00\u3001\u65E5\u5FD7\u8DDF\u968F\u6682\u505C\uFF09\u3002\u6B64\u524D\u53EA\u6709\u5C5E\u6027\u6CA1\u6709\u6837\u5F0F\uFF0C\u7B49\u4E8E\u6CA1\u53CD\u9988\u3002 */
 .ide-btn[data-on=true]{background:var(--dsw-alias-interactive-bg-hover,rgba(51,112,255,.12));border-color:var(--dsw-alias-brand-primary,#3370ff);color:var(--dsw-alias-brand-primary,#3370ff)}
-.ide-field{background:var(--dsw-alias-bg-module-platform,#fff);border:1px solid var(--dsw-alias-border-l2,#d9dce1);border-radius:7px;padding:5px 9px;font:inherit;font-size:12px;color:var(--dsw-alias-label-primary,#1f2329);outline:none}
+/* data-armed = \u4E24\u6B65\u5220\u9664\u5DF2\u6B66\u88C5\uFF1A\u6574\u5757\u53D8\u7EA2\uFF0C\u7B2C\u4E8C\u4E0B\u7684\u8BED\u4E49\u4E00\u76EE\u4E86\u7136\u3002 */
+.ide-btn[data-armed=true],.ide-btn[data-armed=true]:hover{background:var(--dsw-alias-state-error-primary,#d83931);border-color:transparent;color:#fff;filter:none}
+.ide-field{background:var(--dsw-alias-bg-module-platform,#fff);border:1px solid var(--dsw-alias-border-l2,#d9dce1);border-radius:7px;padding:5px 9px;font:inherit;font-size:12px;color:var(--dsw-alias-label-primary,#1f2329);transition:border-color .14s ease,box-shadow .14s ease}
 .ide-field:focus{border-color:var(--dsw-alias-brand-primary,#3370ff)}
+.ide-field:focus-visible{outline-offset:1px}
 .ide-mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
 .ide-empty{margin:auto;text-align:center;color:var(--dsw-alias-label-secondary,#697586);display:flex;flex-direction:column;gap:8px;align-items:center}
+.ide-empty .ide-title{color:var(--dsw-alias-label-primary,#1f2329)}
+.ide-loading{display:flex;align-items:center;gap:8px;color:var(--dsw-alias-label-secondary,#697586);font-size:12px;padding:4px 0}
+.ide-spinner{width:13px;height:13px;flex:none;border-radius:50%;border:2px solid var(--dsw-alias-border-l2,#d9dce1);border-top-color:var(--dsw-alias-brand-primary,#3370ff);animation:ide-spin .8s linear infinite}
+@keyframes ide-spin{to{transform:rotate(360deg)}}
 .ide-note{font-size:11px;color:var(--dsw-alias-label-secondary,#697586)}
 .ide-warn{border:1px dashed var(--dsw-alias-state-warn-primary,#e7a100);color:var(--dsw-alias-state-warn-primary,#e7a100);border-radius:8px;padding:7px 10px;font-size:12px}
-.ide-err{color:var(--dsw-alias-state-error-primary,#d83931);font-size:12px}
+.ide-err{display:flex;align-items:flex-start;gap:8px;color:var(--dsw-alias-state-error-primary,#d83931);font-size:12px}
+.ide-err>span{flex:1;min-width:0}
+.ide-errx{flex:none;border:0;background:none;color:inherit;font:inherit;line-height:1;padding:1px 4px;border-radius:4px;cursor:pointer}
+.ide-errx:hover{background:var(--dsw-alias-interactive-bg-hover,rgba(0,0,0,.07))}
 .ide-logbox{display:flex;flex-direction:column;gap:4px;flex:1;min-height:0}
 .ide-logfoot{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .ide-logstats{min-width:0;overflow:hidden;text-overflow:ellipsis}
@@ -15032,7 +15064,9 @@ function ensureStyles() {
 .ide-port{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;opacity:.85}
 
 .ide-filterbar{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
-.ide-filterbar .ide-field{padding:3px 8px;min-width:180px}
+/* \u8FC7\u6EE4\u8F93\u5165\u5403\u6389\u5269\u4E0B\u7684\u6A2A\u5411\u7A7A\u95F4\uFF1A\u7A7A\u7740\u7684\u8F93\u5165\u6846\u65C1\u8FB9\u6302\u4E00\u6392\u7EA7\u522B\u80F6\u56CA\uFF0C\u6BD4\u4E2D\u95F4\u7559\u4E00\u5927\u5757\u7A7A\u767D\u597D\u8BFB\u3002 */
+.ide-filterbar .ide-filtersearch{flex:1 1 200px;min-width:150px;max-width:360px;padding:3px 8px}
+.ide-lvgroup{display:flex;align-items:center;gap:4px;margin-left:auto}
 .ide-hit{background:rgba(255,196,0,.18)}
 .ide-lv-ERROR{color:var(--dsw-alias-state-error-primary,#d83931)}
 .ide-lv-INFO{color:var(--dsw-alias-label-primary,#1f2329)}
@@ -15057,6 +15091,17 @@ function ensureStyles() {
   min-height:0;
   overflow:hidden;
 }
+/* \u9762\u677F\u88AB\u62D6\u7A84\u65F6\uFF08\u4F1A\u8BDD\u680F\u4E0E\u4FA7\u680F\u540C\u65F6\u5360\u7528\u5BBD\u5EA6\uFF09\u522B\u8BA9\u4E3B\u4ECE\u5361\u7247\u6324\u51FA\u6A2A\u5411\u6EDA\u52A8\u3002 */
+@media (max-width:820px){
+  .ide-mlist{width:184px}
+  .ide-board{grid-template-columns:1fr}
+  .ide-tools{padding-left:6px}
+}
+/* \u52A8\u6548\u53EA\u505A\u72B6\u6001\u53D8\u5316\u7684\u8FC7\u6E21\uFF0C\u5C0A\u91CD\u7CFB\u7EDF\u7684\u51CF\u5C11\u52A8\u6001\u8BBE\u7F6E\u3002 */
+@media (prefers-reduced-motion: reduce){
+  .ide-root *{transition-duration:0s!important;animation-duration:0s!important}
+  .ide-spinner{animation:none}
+}
 `;
   document.head.appendChild(style);
   return () => {
@@ -15076,6 +15121,13 @@ function describeRun(run) {
   if (run.status === "failed" && run.error !== "") return `\u542F\u52A8\u5931\u8D25\uFF1A${run.error}`;
   if (run.exitCode === 127) return "\u547D\u4EE4\u4E0D\u5B58\u5728\uFF08\u7801 127\uFF09";
   return `\u5DF2\u9000\u51FA\uFF08\u7801 ${run.exitCode ?? "?"}\uFF09`;
+}
+function describeAggregate(status) {
+  if (status === "running") return "\u8FD0\u884C\u4E2D";
+  if (status === "failed") return "\u6709\u914D\u7F6E\u542F\u52A8\u5931\u8D25";
+  if (status === "exited") return "\u6709\u914D\u7F6E\u5DF2\u9000\u51FA";
+  if (status === "stopped") return "\u6709\u914D\u7F6E\u5DF2\u505C\u6B62";
+  return "\u672A\u8FD0\u884C";
 }
 function activeOf(config2, activeProjectId) {
   const projects = config2.projects;
@@ -15131,6 +15183,8 @@ function IdeView({ api, ctx }) {
   followingRef.current = following;
   const genRef = (0, import_react.useRef)(0);
   const tickRef = (0, import_react.useRef)(0);
+  const [busyRun, setBusyRun] = (0, import_react.useState)({});
+  const busyRunRef = (0, import_react.useRef)(/* @__PURE__ */ new Set());
   const [activeConfigIds, setActiveConfigIds] = (0, import_react.useState)({});
   const cfg = config2 ?? defaultState();
   const { projects: entries, active } = activeOf(cfg, activeProjectId);
@@ -15138,6 +15192,7 @@ function IdeView({ api, ctx }) {
   const runKey = active !== void 0 && activeConfig !== void 0 ? runKeyOf({ workspaceId: active.workspaceId, configId: activeConfig.id }) : "";
   targetRef.current = active !== void 0 && activeConfig !== void 0 ? { workspaceId: active.workspaceId, configId: activeConfig.id } : null;
   const runState = runKey !== "" ? runs[runKey] : void 0;
+  const runBusy = runKey !== "" ? busyRun[runKey] : void 0;
   const runText = describeRun(runState);
   const activeDraft = activeConfig !== void 0 ? drafts[activeConfig.id] ?? activeConfig : void 0;
   const matcher = (0, import_react.useMemo)(() => compileMatcher({ q: filterQ, regex: filterRegex }), [filterQ, filterRegex]);
@@ -15308,6 +15363,28 @@ function IdeView({ api, ctx }) {
     if (el === null || !following) return;
     el.scrollTop = el.scrollHeight;
   }, [logLines, following]);
+  (0, import_react.useEffect)(() => {
+    const closeMenus = (except) => {
+      document.querySelectorAll("details.ide-overflow[open]").forEach((menu) => {
+        if (except !== void 0 && menu.contains(except)) return;
+        menu.removeAttribute("open");
+      });
+    };
+    const onPointerDown = (event) => {
+      closeMenus(event.target instanceof Node ? event.target : void 0);
+    };
+    const onKeyDown = (event) => {
+      if (event.key !== "Escape") return;
+      closeMenus();
+      setArmed("");
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, []);
   const commit = (0, import_react.useCallback)(async (next, showFlash) => {
     if (api === void 0) {
       setError("remote.ideConfig \u4E0D\u53EF\u7528\uFF0C\u6539\u52A8\u672A\u4FDD\u5B58");
@@ -15536,108 +15613,191 @@ function IdeView({ api, ctx }) {
       activeConfigId: fresh.id
     })), false);
   };
+  const performRun = async (action, target) => {
+    if (api === void 0) return;
+    const key = runKeyOf(target);
+    if (action === "start") {
+      offsetsRef.current.set(key, 0);
+    }
+    if (action === "start" && runKey === key) {
+      genRef.current += 1;
+      setFollowing(true);
+      setPendingLines(0);
+      historyTriedRef.current = true;
+      sawLiveRef.current = false;
+      fromHistoryRef.current = false;
+      setFromHistory(false);
+      setTruncated(false);
+      logLinesRef.current = [];
+      setSeqBase(0);
+      setLogLines([]);
+    }
+    const call = action === "start" ? api.start(target) : api.stop(target);
+    const snap = envelopeValue(await call, action === "start" ? "\u542F\u52A8" : "\u505C\u6B62");
+    setRuns((prev) => ({ ...prev, [snap.key]: snap }));
+  };
+  const beginRun = (key, kind) => {
+    if (busyRunRef.current.has(key)) return false;
+    busyRunRef.current.add(key);
+    setBusyRun((prev) => ({ ...prev, [key]: kind }));
+    return true;
+  };
+  const endRun = (key) => {
+    busyRunRef.current.delete(key);
+    setBusyRun((prev) => {
+      const copy = { ...prev };
+      delete copy[key];
+      return copy;
+    });
+  };
   const runAction = async (action, explicit) => {
     const target = explicit ?? (active !== void 0 && activeConfig !== void 0 ? { workspaceId: active.workspaceId, configId: activeConfig.id } : void 0);
     if (api === void 0 || target === void 0) return;
+    const key = runKeyOf(target);
+    if (!beginRun(key, action)) return;
     setError("");
     try {
-      const startedViewedOne = explicit === void 0 || runKey === runKeyOf(explicit);
-      const startedKey = runKeyOf(target);
-      if (action === "start") {
-        offsetsRef.current.set(startedKey, 0);
-      }
-      if (action === "start" && startedViewedOne) {
-        genRef.current += 1;
-        setFollowing(true);
-        setPendingLines(0);
-        historyTriedRef.current = true;
-        sawLiveRef.current = false;
-        fromHistoryRef.current = false;
-        setFromHistory(false);
-        setTruncated(false);
-        logLinesRef.current = [];
-        setSeqBase(0);
-        setLogLines([]);
-      }
-      const call = action === "start" ? api.start(target) : api.stop(target);
-      const snap = envelopeValue(await call, action === "start" ? "\u542F\u52A8" : "\u505C\u6B62");
-      setRuns((prev) => ({ ...prev, [snap.key]: snap }));
+      await performRun(action, target);
     } catch (e) {
       setError(describeRpcFailure(action === "start" ? "\u542F\u52A8" : "\u505C\u6B62", e));
+    } finally {
+      endRun(key);
+    }
+  };
+  const restartRun = async (explicit) => {
+    const target = explicit ?? (active !== void 0 && activeConfig !== void 0 ? { workspaceId: active.workspaceId, configId: activeConfig.id } : void 0);
+    if (api === void 0 || target === void 0) return;
+    const key = runKeyOf(target);
+    if (!beginRun(key, "restart")) return;
+    setError("");
+    try {
+      await performRun("stop", target).catch(() => {
+      });
+      await performRun("start", target);
+    } catch (e) {
+      setError(describeRpcFailure("\u91CD\u542F", e));
+    } finally {
+      endRun(key);
     }
   };
   if (config2 === null) {
-    return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-root ide-view", children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-body", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-note", children: "\u6B63\u5728\u52A0\u8F7D\u542F\u52A8\u914D\u7F6E\u2026" }),
+    return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-root ide-view", children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-body", "aria-busy": "true", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-loading", role: "status", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-spinner", "aria-hidden": "true" }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "\u6B63\u5728\u52A0\u8F7D\u542F\u52A8\u914D\u7F6E\u2026" })
+      ] }),
       api === void 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-warn", children: "remote.ideConfig \u4E0D\u53EF\u7528" }) : null,
-      error51 !== "" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-err", children: error51 }) : null
+      error51 !== "" ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-err", role: "alert", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: error51 }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-errx", "aria-label": "\u5173\u95ED\u9519\u8BEF\u63D0\u793A", onClick: () => setError(""), children: "\xD7" })
+      ] }) : null
     ] }) });
   }
   return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-root ide-view", children: [
     /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-tabrow", ref: tabRowRef, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-tab", "data-sel": overview, onClick: () => setOverview(true), children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "\u603B\u89C8" }) }),
-      visibleProjects.map((p) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-tabwrap", "data-sel": overview, children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
         "button",
         {
           type: "button",
           className: "ide-tab",
-          "data-sel": !overview && p.workspaceId === active?.workspaceId,
-          onClick: () => revealProject(p.workspaceId),
-          children: [
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-dot", "data-state": statusOfProject(p), title: "\u4EFB\u4E00\u6761\u914D\u7F6E\u5728\u8DD1\u5C31\u662F\u7EFF\u7684" }),
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: p.title }),
-            p.configs.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-note", children: p.configs.length }) : null,
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-              "span",
-              {
-                className: "ide-x",
-                title: "\u6536\u8D77\u8FD9\u4E2A\u9879\u76EE\uFF08\u914D\u7F6E\u5168\u90E8\u4FDD\u7559\uFF0C\u53EF\u4ECE \xBB \u91CC\u6062\u590D\uFF09",
-                onClick: (event) => {
-                  event.stopPropagation();
-                  setHidden(p.workspaceId, true);
-                },
-                children: "\xD7"
-              }
-            )
-          ]
-        },
-        p.workspaceId
-      )),
+          "aria-current": overview ? "page" : void 0,
+          onClick: () => setOverview(true),
+          children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "\u603B\u89C8" })
+        }
+      ) }),
+      visibleProjects.map((p) => {
+        const selected = !overview && p.workspaceId === active?.workspaceId;
+        const aggregate = statusOfProject(p);
+        return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-tabwrap", "data-sel": selected, children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
+            "button",
+            {
+              type: "button",
+              className: "ide-tab",
+              "aria-current": selected ? "page" : void 0,
+              title: `${p.title} \xB7 ${describeAggregate(aggregate)} \xB7 ${p.configs.length} \u6761\u542F\u52A8\u914D\u7F6E`,
+              onClick: () => revealProject(p.workspaceId),
+              children: [
+                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-dot", "data-state": aggregate, "aria-hidden": "true" }),
+                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: p.title }),
+                p.configs.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-count", children: p.configs.length }) : null
+              ]
+            }
+          ),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+            "button",
+            {
+              type: "button",
+              className: "ide-tabx",
+              "aria-label": `\u6536\u8D77\u9879\u76EE ${p.title}`,
+              title: "\u6536\u8D77\u8FD9\u4E2A\u9879\u76EE\uFF08\u914D\u7F6E\u5168\u90E8\u4FDD\u7559\uFF0C\u53EF\u4ECE \xBB \u91CC\u6062\u590D\uFF09",
+              onClick: () => setHidden(p.workspaceId, true),
+              children: "\xD7"
+            }
+          )
+        ] }, p.workspaceId);
+      }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "ide-tools", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-chip", "data-sel": onlyRunning, onClick: () => setOnlyRunning((v) => !v), children: "\u53EA\u770B\u8FD0\u884C\u4E2D" }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+          "button",
+          {
+            type: "button",
+            className: "ide-chip",
+            "data-sel": onlyRunning,
+            "aria-pressed": onlyRunning,
+            onClick: () => setOnlyRunning((v) => !v),
+            children: "\u53EA\u770B\u8FD0\u884C\u4E2D"
+          }
+        ),
         /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("details", { className: "ide-overflow", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("summary", { title: "\u5168\u90E8\u9879\u76EE", children: "\xBB" }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("summary", { title: "\u5168\u90E8\u9879\u76EE", "aria-label": "\u5168\u90E8\u9879\u76EE", children: "\xBB" }),
           /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("ul", { children: [
-            cfg.projects.map((p) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
-              "li",
+            cfg.projects.map((p) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("li", { children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
+              "button",
               {
-                onClick: () => revealProject(p.workspaceId),
+                type: "button",
+                className: "ide-menu-item",
+                onClick: (event) => {
+                  closeMenu(event);
+                  revealProject(p.workspaceId);
+                },
                 children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-dot", "data-state": statusOfProject(p) }),
+                  /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-dot", "data-state": statusOfProject(p), "aria-hidden": "true" }),
                   /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: p.title }),
                   /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-note", style: { marginLeft: "auto" }, children: p.hidden ? "\u5DF2\u6536\u8D77" : `${p.configs.length} \u6761\u914D\u7F6E` })
                 ]
-              },
-              p.workspaceId
-            )),
-            cfg.projects.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("li", { className: "ide-note", children: "\u8FD8\u6CA1\u6709\u9879\u76EE\u914D\u7F6E" }) : null
+              }
+            ) }, p.workspaceId)),
+            cfg.projects.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("li", { children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-note", style: { padding: "6px 8px" }, children: "\u8FD8\u6CA1\u6709\u9879\u76EE\u914D\u7F6E" }) }) : null
           ] })
         ] })
       ] })
     ] }),
     /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-body ide-fill", children: [
-      warning !== "" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-warn", children: warning }) : null,
-      error51 !== "" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-err", children: error51 }) : null,
+      warning !== "" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-warn", role: "status", children: warning }) : null,
+      error51 !== "" ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-err", role: "alert", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: error51 }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-errx", "aria-label": "\u5173\u95ED\u9519\u8BEF\u63D0\u793A", onClick: () => setError(""), children: "\xD7" })
+      ] }) : null,
       overview ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-board", children: [
         cfg.projects.map((p) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-card", children: [
           /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-cardhead", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-dot", "data-state": statusOfProject(p) }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+              "span",
+              {
+                className: "ide-dot",
+                "data-state": statusOfProject(p),
+                title: describeAggregate(statusOfProject(p)),
+                "aria-hidden": "true"
+              }
+            ),
             renaming === p.workspaceId ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
               /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
                 "input",
                 {
                   className: "ide-field",
                   style: { maxWidth: 200 },
+                  "aria-label": "\u9879\u76EE\u914D\u7F6E\u540D\u79F0",
                   value: renameText,
                   autoFocus: true,
                   onChange: (e) => setRenameText(e.target.value),
@@ -15658,19 +15818,37 @@ function IdeView({ api, ctx }) {
             ] }),
             /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-btn", onClick: () => revealProject(p.workspaceId), children: "\u6253\u5F00" }),
             /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("details", { className: "ide-overflow", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("summary", { title: "\u66F4\u591A\u64CD\u4F5C", children: "\u2026" }),
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("summary", { title: "\u66F4\u591A\u64CD\u4F5C", "aria-label": "\u66F4\u591A\u64CD\u4F5C", children: "\u2026" }),
               /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("ul", { children: [
-                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("li", { onClick: (e) => {
-                  closeMenu(e);
-                  setHidden(p.workspaceId, !p.hidden);
-                }, children: p.hidden ? "\u6062\u590D\u663E\u793A" : "\u6536\u8D77" }),
-                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("li", { onClick: (e) => {
-                  closeMenu(e);
-                  startRename(p);
-                }, children: "\u91CD\u547D\u540D" }),
-                /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-                  "li",
+                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("li", { children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                  "button",
                   {
+                    type: "button",
+                    className: "ide-menu-item",
+                    onClick: (e) => {
+                      closeMenu(e);
+                      setHidden(p.workspaceId, !p.hidden);
+                    },
+                    children: p.hidden ? "\u6062\u590D\u663E\u793A" : "\u6536\u8D77"
+                  }
+                ) }),
+                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("li", { children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                  "button",
+                  {
+                    type: "button",
+                    className: "ide-menu-item",
+                    onClick: (e) => {
+                      closeMenu(e);
+                      startRename(p);
+                    },
+                    children: "\u91CD\u547D\u540D"
+                  }
+                ) }),
+                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("li", { children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                  "button",
+                  {
+                    type: "button",
+                    className: "ide-menu-item",
                     "data-danger": true,
                     "data-armed": armed === p.workspaceId,
                     title: armed === p.workspaceId ? "\u518D\u70B9\u4E00\u6B21\uFF1A\u5220\u9664\u8FD9\u6761\u9879\u76EE\u914D\u7F6E\uFF0C\u8FDE\u540C\u5B83\u7684\u5168\u90E8\u542F\u52A8\u914D\u7F6E\u4E0E\u78C1\u76D8\u65E5\u5FD7" : "\u5220\u9664\u8FD9\u6761\u9879\u76EE\u914D\u7F6E",
@@ -15680,17 +15858,28 @@ function IdeView({ api, ctx }) {
                     }),
                     children: armed === p.workspaceId ? "\u786E\u8BA4\u5220\u9664\uFF08\u542B\u65E5\u5FD7\uFF09" : "\u5220\u9664"
                   }
-                )
+                ) })
               ] })
             ] })
           ] }),
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-note ide-mono", children: p.path }),
           p.configs.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-note", children: "\u8FD8\u6CA1\u6709\u542F\u52A8\u914D\u7F6E \u2014\u2014 \u70B9\u53F3\u4E0A\u89D2\u300C\u6253\u5F00\u300D\u8FDB\u53BB\u52A0\u7B2C\u4E00\u6761" }) : null,
           p.configs.map((c) => {
-            const snapshot = runs[runKeyOf({ workspaceId: p.workspaceId, configId: c.id })];
+            const rowKey = runKeyOf({ workspaceId: p.workspaceId, configId: c.id });
+            const snapshot = runs[rowKey];
+            const rowBusy = busyRun[rowKey];
             return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-cardrow", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-dot", "data-state": snapshot?.status ?? "idle" }),
-              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-name", onClick: () => revealProject(p.workspaceId, c.id), children: c.name }),
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-dot", "data-state": snapshot?.status ?? "idle", "aria-hidden": "true" }),
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                "button",
+                {
+                  type: "button",
+                  className: "ide-name",
+                  title: c.name,
+                  onClick: () => revealProject(p.workspaceId, c.id),
+                  children: c.name
+                }
+              ),
               snapshot !== void 0 && snapshot.port !== "" ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "ide-port", children: [
                 ":",
                 snapshot.port
@@ -15700,17 +15889,37 @@ function IdeView({ api, ctx }) {
                 isRunning(snapshot?.status) ? ` \xB7 ${formatUptime(snapshot?.startedAtMs ?? 0, Date.now())}` : ""
               ] }),
               /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-last", title: snapshot?.lastLine ?? "", children: snapshot?.lastLine ?? "\uFF08\u65E0\u8F93\u51FA\uFF09" }),
-              isRunning(snapshot?.status) ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-btn", onClick: () => {
-                void runAction("stop", { workspaceId: p.workspaceId, configId: c.id });
-              }, children: "\u505C\u6B62" }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-btn", "data-kind": "primary", onClick: () => {
-                void runAction("start", { workspaceId: p.workspaceId, configId: c.id });
-              }, children: "\u542F\u52A8" }),
-              /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+              isRunning(snapshot?.status) ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
                 "button",
                 {
                   type: "button",
                   className: "ide-btn",
-                  "data-kind": armed === p.workspaceId + "/" + c.id ? "danger" : void 0,
+                  disabled: rowBusy !== void 0,
+                  onClick: () => {
+                    void runAction("stop", { workspaceId: p.workspaceId, configId: c.id });
+                  },
+                  children: rowBusy === "stop" ? "\u505C\u6B62\u4E2D\u2026" : "\u505C\u6B62"
+                }
+              ) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                "button",
+                {
+                  type: "button",
+                  className: "ide-btn",
+                  disabled: rowBusy !== void 0,
+                  title: `\u542F\u52A8 ${c.name}`,
+                  onClick: () => {
+                    void runAction("start", { workspaceId: p.workspaceId, configId: c.id });
+                  },
+                  children: rowBusy === "start" ? "\u542F\u52A8\u4E2D\u2026" : "\u542F\u52A8"
+                }
+              ),
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                "button",
+                {
+                  type: "button",
+                  className: "ide-btn ide-iconbtn",
+                  "data-armed": armed === p.workspaceId + "/" + c.id,
+                  "aria-label": armed === p.workspaceId + "/" + c.id ? `\u786E\u8BA4\u5220\u9664\u542F\u52A8\u914D\u7F6E ${c.name}` : `\u5220\u9664\u542F\u52A8\u914D\u7F6E ${c.name}`,
                   title: armed === p.workspaceId + "/" + c.id ? "\u518D\u70B9\u4E00\u6B21\uFF1A\u5220\u6389\u8FD9\u6761\u542F\u52A8\u914D\u7F6E\uFF08\u8FDE\u5B83\u7684\u65E5\u5FD7\uFF09" : "\u5220\u9664\u8FD9\u6761\u542F\u52A8\u914D\u7F6E",
                   onClick: () => armDelete(p.workspaceId + "/" + c.id, () => removeConfig(p, c.id)),
                   children: armed === p.workspaceId + "/" + c.id ? "\u786E\u8BA4" : "\xD7"
@@ -15730,6 +15939,7 @@ function IdeView({ api, ctx }) {
               "input",
               {
                 className: "ide-field ide-mono",
+                "aria-label": "\u9879\u76EE\u914D\u7F6E\u8DEF\u5F84",
                 placeholder: "/\u4EFB\u610F/\u8DEF\u5F84\uFF08\u4E0D\u9650\u4E8E DSH \u5DE5\u4F5C\u533A\uFF09",
                 value: newPath,
                 onChange: (e) => setNewPath(e.target.value),
@@ -15770,12 +15980,13 @@ function IdeView({ api, ctx }) {
           ] })
         ] })
       ] }) : active === void 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-empty", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { children: "\u8FD8\u6CA1\u6709\u9879\u76EE\u914D\u7F6E" }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-note", children: "\u6253\u5F00\u4E0A\u9762\u7684\u300C\u603B\u89C8\u300D\uFF0C\u5728\u6700\u4E0B\u9762\u90A3\u5F20\u5361\u7247\u91CC\u586B\u4E00\u4E2A\u8DEF\u5F84" })
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-title", children: "\u8FD8\u6CA1\u6709\u9879\u76EE\u914D\u7F6E" }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-note", children: "\u603B\u89C8\u6700\u4E0B\u9762\u90A3\u5F20\u5361\u7247\u53EF\u4EE5\u586B\u8DEF\u5F84\uFF0C\u628A\u4EFB\u610F\u76EE\u5F55\u52A0\u8FDB\u6765" }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-btn", "data-kind": "primary", onClick: () => setOverview(true), children: "\u53BB\u603B\u89C8\u6DFB\u52A0" })
       ] }) : /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-master", "data-folded": folded, children: folded ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-foldrow", children: [
           /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "ide-mdot-title", onDoubleClick: () => setFolded(false), title: "\u53CC\u51FB\u5C55\u5F00", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-dot", "data-state": runState?.status ?? "idle" }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-dot", "data-state": runState?.status ?? "idle", "aria-hidden": "true" }),
             /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-mname", children: activeConfig === void 0 ? "\uFF08\u8FD8\u6CA1\u6709\u542F\u52A8\u914D\u7F6E\uFF09" : activeConfig.name }),
             runState !== void 0 && runState.port !== "" ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "ide-port", children: [
               ":",
@@ -15786,17 +15997,42 @@ function IdeView({ api, ctx }) {
           ] }),
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { flex: 1 } }),
           activeConfig === void 0 ? null : /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
-            isRunning(runState?.status) ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-btn", onClick: () => {
-              void runAction("stop");
-            }, children: "\u505C\u6B62" }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-btn", "data-kind": "primary", onClick: () => {
-              void runAction("start");
-            }, children: "\u542F\u52A8" }),
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-btn", disabled: runState?.status !== "running", onClick: () => {
-              void (async () => {
-                await runAction("stop");
-                await runAction("start");
-              })();
-            }, children: "\u91CD\u542F" })
+            isRunning(runState?.status) ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+              "button",
+              {
+                type: "button",
+                className: "ide-btn",
+                disabled: runBusy !== void 0,
+                onClick: () => {
+                  void runAction("stop");
+                },
+                children: runBusy === "stop" ? "\u505C\u6B62\u4E2D\u2026" : "\u505C\u6B62"
+              }
+            ) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+              "button",
+              {
+                type: "button",
+                className: "ide-btn",
+                "data-kind": "primary",
+                disabled: runBusy !== void 0,
+                onClick: () => {
+                  void runAction("start");
+                },
+                children: runBusy === "start" ? "\u542F\u52A8\u4E2D\u2026" : "\u542F\u52A8"
+              }
+            ),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+              "button",
+              {
+                type: "button",
+                className: "ide-btn",
+                disabled: runState?.status !== "running" || runBusy !== void 0,
+                onClick: () => {
+                  void restartRun();
+                },
+                children: runBusy === "restart" ? "\u91CD\u542F\u4E2D\u2026" : "\u91CD\u542F"
+              }
+            )
           ] }),
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-btn", onClick: () => setFolded(false), title: "\u5C55\u5F00\u63A7\u5236\u533A", children: "\u5C55\u5F00" })
         ] }) : /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
@@ -15805,7 +16041,17 @@ function IdeView({ api, ctx }) {
               /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-mheadtop", children: [
                 /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-title", title: active.title, children: active.title }),
                 /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { flex: 1 } }),
-                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-btn", "data-on": editing, onClick: () => setEditing((v) => !v), children: "\u2699 \u914D\u7F6E" })
+                /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                  "button",
+                  {
+                    type: "button",
+                    className: "ide-btn",
+                    "data-on": editing,
+                    "aria-expanded": editing,
+                    onClick: () => setEditing((v) => !v),
+                    children: "\u2699 \u914D\u7F6E"
+                  }
+                )
               ] }),
               /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-note ide-mono ide-mpath", title: active.path, children: active.path })
             ] }),
@@ -15821,7 +16067,7 @@ function IdeView({ api, ctx }) {
                   title: `${c.name} \u2014 ${describeRun(snapshot)}`,
                   onClick: () => selectConfig(c.id),
                   children: [
-                    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-dot", "data-state": snapshot?.status ?? "idle" }),
+                    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-dot", "data-state": snapshot?.status ?? "idle", "aria-hidden": "true" }),
                     /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-mname", children: c.name }),
                     c.origin === "agent" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-chip", title: "\u8FD9\u6761\u914D\u7F6E\u7531 agent \u5199\u5165\uFF08ide_launch_save\uFF09", children: "agent" }) : null,
                     snapshot !== void 0 && snapshot.port !== "" ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "ide-port", children: [
@@ -15843,7 +16089,7 @@ function IdeView({ api, ctx }) {
             /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-dhead", children: [
               /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-configtitle", children: activeConfig.name }),
               /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { flex: 1 } }),
-              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-note", children: flash }),
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-note", role: "status", children: flash }),
               /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-btn", onClick: () => setFolded(true), title: "\u6298\u53E0\u63A7\u5236\u533A\uFF0C\u628A\u9AD8\u5EA6\u8BA9\u7ED9\u65E5\u5FD7\uFF08\u53CC\u51FB\u7D27\u51D1\u884C\u4E5F\u80FD\u5C55\u5F00\uFF09", children: "\u6298\u53E0" })
             ] }),
             /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-dmeter", children: [
@@ -15871,29 +16117,35 @@ function IdeView({ api, ctx }) {
                   type: "button",
                   className: "ide-btn",
                   "data-kind": "primary",
-                  disabled: isRunning(runState?.status),
+                  disabled: isRunning(runState?.status) || runBusy !== void 0,
                   onClick: () => {
                     void runAction("start");
                   },
-                  children: "\u542F\u52A8"
+                  children: runBusy === "start" ? "\u542F\u52A8\u4E2D\u2026" : "\u542F\u52A8"
                 }
               ),
-              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-btn", disabled: runState?.status !== "running", onClick: () => {
-                void runAction("stop");
-              }, children: "\u505C\u6B62" }),
               /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
                 "button",
                 {
                   type: "button",
                   className: "ide-btn",
-                  disabled: runState?.status !== "running",
+                  disabled: runState?.status !== "running" || runBusy !== void 0,
                   onClick: () => {
-                    void (async () => {
-                      await runAction("stop");
-                      await runAction("start");
-                    })();
+                    void runAction("stop");
                   },
-                  children: "\u91CD\u542F"
+                  children: runBusy === "stop" ? "\u505C\u6B62\u4E2D\u2026" : "\u505C\u6B62"
+                }
+              ),
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                "button",
+                {
+                  type: "button",
+                  className: "ide-btn",
+                  disabled: runState?.status !== "running" || runBusy !== void 0,
+                  onClick: () => {
+                    void restartRun();
+                  },
+                  children: runBusy === "restart" ? "\u91CD\u542F\u4E2D\u2026" : "\u91CD\u542F"
                 }
               )
             ] }),
@@ -15905,26 +16157,42 @@ function IdeView({ api, ctx }) {
               /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
                 "input",
                 {
-                  className: "ide-field ide-mono",
+                  className: "ide-field ide-mono ide-filtersearch",
+                  "aria-label": "\u65E5\u5FD7\u8FC7\u6EE4\u5173\u952E\u5B57",
                   placeholder: "\u8FC7\u6EE4\u5173\u952E\u5B57",
                   value: filterQ,
-                  onChange: (e) => setFilterQ(e.target.value)
+                  onChange: (e) => setFilterQ(e.target.value),
+                  onKeyDown: (e) => {
+                    if (e.key === "Escape" && filterQ !== "") setFilterQ("");
+                  }
                 }
               ),
-              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-chip", "data-sel": filterRegex, onClick: () => setFilterRegex((v) => !v), children: "\u6B63\u5219" }),
-              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-chip", "data-sel": onlyMatch, onClick: () => setOnlyMatch((v) => !v), children: "\u4EC5\u770B\u5339\u914D" }),
-              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { flex: 1 } }),
-              LEVELS.map((lv) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+              filterQ !== "" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                "button",
+                {
+                  type: "button",
+                  className: "ide-btn ide-iconbtn",
+                  "aria-label": "\u6E05\u9664\u8FC7\u6EE4\u5173\u952E\u5B57",
+                  title: "\u6E05\u9664\u8FC7\u6EE4\u5173\u952E\u5B57\uFF08Esc\uFF09",
+                  onClick: () => setFilterQ(""),
+                  children: "\xD7"
+                }
+              ) : null,
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-chip", "data-sel": filterRegex, "aria-pressed": filterRegex, onClick: () => setFilterRegex((v) => !v), children: "\u6B63\u5219" }),
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-chip", "data-sel": onlyMatch, "aria-pressed": onlyMatch, onClick: () => setOnlyMatch((v) => !v), children: "\u4EC5\u770B\u5339\u914D" }),
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-lvgroup", children: LEVELS.map((lv) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
                 "button",
                 {
                   type: "button",
                   className: "ide-chip",
                   "data-sel": levels[lv],
+                  "aria-pressed": levels[lv],
+                  title: `${lv} \u7EA7\u522B\uFF1A${levels[lv] ? "\u663E\u793A\u4E2D\uFF0C\u70B9\u51FB\u9690\u85CF" : "\u5DF2\u9690\u85CF\uFF0C\u70B9\u51FB\u663E\u793A"}`,
                   onClick: () => setLevels((prev) => ({ ...prev, [lv]: !prev[lv] })),
                   children: lv
                 },
                 lv
-              ))
+              )) })
             ] })
           ] })
         ] }) }),
@@ -15951,7 +16219,18 @@ function IdeView({ api, ctx }) {
                 children: discoveryBusy ? "\u6B63\u5728\u626B\u63CF\u2026" : "\u4ECE IDEA \u5BFC\u5165"
               }
             ),
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-btn", "data-kind": "danger", onClick: () => removeProject(active.workspaceId), children: "\u79FB\u9664\u9879\u76EE\u914D\u7F6E" })
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+              "button",
+              {
+                type: "button",
+                className: "ide-btn",
+                "data-kind": "danger",
+                "data-armed": armed === "project:" + active.workspaceId,
+                title: armed === "project:" + active.workspaceId ? "\u518D\u70B9\u4E00\u6B21\uFF1A\u5220\u9664\u8FD9\u6761\u9879\u76EE\u914D\u7F6E\uFF0C\u8FDE\u540C\u5B83\u7684\u5168\u90E8\u542F\u52A8\u914D\u7F6E\u4E0E\u78C1\u76D8\u65E5\u5FD7" : "\u5220\u9664\u8FD9\u6761\u9879\u76EE\u914D\u7F6E\uFF08\u8FDE\u540C\u5B83\u7684\u5168\u90E8\u542F\u52A8\u914D\u7F6E\u4E0E\u78C1\u76D8\u65E5\u5FD7\uFF09",
+                onClick: () => armDelete("project:" + active.workspaceId, () => removeProject(active.workspaceId)),
+                children: armed === "project:" + active.workspaceId ? "\u786E\u8BA4\u5220\u9664\u9879\u76EE\u914D\u7F6E" : "\u5220\u9664\u9879\u76EE\u914D\u7F6E"
+              }
+            )
           ] }),
           discovery !== null ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-form", children: [
             /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-line", children: [
@@ -15966,7 +16245,7 @@ function IdeView({ api, ctx }) {
               /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { flex: 1 } }),
               /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-btn", onClick: () => setDiscovery(null), children: "\u6536\u8D77" })
             ] }),
-            discovery.errors.length > 0 ? discovery.errors.map((message, index) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-err", children: message }, index)) : null,
+            discovery.errors.length > 0 ? discovery.errors.map((message, index) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-err", role: "alert", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: message }) }, index)) : null,
             discovery.candidates.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-note", children: "\u6CA1\u627E\u5230\u53EF\u5BFC\u5165\u7684 Spring Boot \u8FD0\u884C\u914D\u7F6E\uFF08\u53EA\u8BA4 .idea/workspace.xml \u4E0E .run/*.xml\uFF09" }) : null,
             discovery.candidates.map((candidate) => {
               const planned = plannedConfigName(candidate.name, active.configs.map((c) => c.name));
@@ -15997,10 +16276,30 @@ function IdeView({ api, ctx }) {
           activeDraft === void 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ide-note", children: "\u8FD9\u4E2A\u9879\u76EE\u8FD8\u6CA1\u6709\u542F\u52A8\u914D\u7F6E \u2014\u2014 \u7528\u5DE6\u5217\u300C\uFF0B \u542F\u52A8\u914D\u7F6E\u300D\u6216\u4E0A\u9762\u7684\u300C\u4ECE IDEA \u5BFC\u5165\u300D\u52A0\u4E00\u6761" }) : /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-form", children: [
             /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-line", children: [
               /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-label", children: "\u540D\u79F0" }),
-              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { className: "ide-field", style: { maxWidth: 240 }, value: activeDraft.name, onChange: (e) => patchDraft(activeDraft, { name: e.target.value }) }),
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                "input",
+                {
+                  className: "ide-field",
+                  style: { maxWidth: 240 },
+                  "aria-label": "\u914D\u7F6E\u540D\u79F0",
+                  value: activeDraft.name,
+                  onChange: (e) => patchDraft(activeDraft, { name: e.target.value })
+                }
+              ),
               activeDraft.origin === "agent" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-chip", "data-sel": true, title: "\u8FD9\u6761\u914D\u7F6E\u662F agent \u901A\u8FC7 ide_launch_save \u5199\u7684\uFF1A\u4FDD\u5B58\u4E00\u6B21\u5C31\u5F52\u4F60\uFF0C\u6807\u8BB0\u6D88\u5931", children: "agent \u5199\u5165" }) : null,
               /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { flex: 1 } }),
-              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-btn", "data-kind": "danger", onClick: () => removeConfig(active, activeDraft.id), children: "\u5220\u9664" })
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                "button",
+                {
+                  type: "button",
+                  className: "ide-btn",
+                  "data-kind": "danger",
+                  "data-armed": armed === "config:" + activeDraft.id,
+                  title: armed === "config:" + activeDraft.id ? "\u518D\u70B9\u4E00\u6B21\uFF1A\u5220\u6389\u8FD9\u6761\u542F\u52A8\u914D\u7F6E\uFF08\u8FDE\u5B83\u7684\u65E5\u5FD7\uFF09" : "\u5220\u9664\u8FD9\u6761\u542F\u52A8\u914D\u7F6E\uFF08\u8FDE\u5B83\u7684\u65E5\u5FD7\uFF09",
+                  onClick: () => armDelete("config:" + activeDraft.id, () => removeConfig(active, activeDraft.id)),
+                  children: armed === "config:" + activeDraft.id ? "\u786E\u8BA4\u5220\u9664" : "\u5220\u9664"
+                }
+              )
             ] }),
             /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-line", children: [
               /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-label", children: "\u542F\u52A8\u547D\u4EE4" }),
@@ -16009,6 +16308,7 @@ function IdeView({ api, ctx }) {
                 {
                   className: "ide-field ide-mono",
                   style: { flex: 1, minWidth: 280 },
+                  "aria-label": "\u542F\u52A8\u547D\u4EE4",
                   placeholder: "\u4F8B\u5982\uFF1Amvn -o -pl kun-ai-web spring-boot:run",
                   value: activeDraft.command,
                   onChange: (e) => patchDraft(activeDraft, { command: e.target.value })
@@ -16017,7 +16317,16 @@ function IdeView({ api, ctx }) {
             ] }),
             /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-line", children: [
               /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-label", children: "\u5DE5\u4F5C\u76EE\u5F55" }),
-              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { className: "ide-field ide-mono", style: { flex: 1, minWidth: 280 }, value: activeDraft.cwd, onChange: (e) => patchDraft(activeDraft, { cwd: e.target.value }) })
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                "input",
+                {
+                  className: "ide-field ide-mono",
+                  style: { flex: 1, minWidth: 280 },
+                  "aria-label": "\u5DE5\u4F5C\u76EE\u5F55\uFF08\u7559\u7A7A = \u9879\u76EE\u8DEF\u5F84\uFF09",
+                  value: activeDraft.cwd,
+                  onChange: (e) => patchDraft(activeDraft, { cwd: e.target.value })
+                }
+              )
             ] }),
             /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "ide-line", style: { alignItems: "flex-start" }, children: [
               /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ide-label", children: "\u73AF\u5883\u53D8\u91CF" }),
@@ -16029,6 +16338,7 @@ function IdeView({ api, ctx }) {
                       "input",
                       {
                         className: "ide-field ide-mono",
+                        "aria-label": `\u73AF\u5883\u53D8\u91CF ${index + 1} \u540D\u79F0`,
                         value: env.name,
                         placeholder: "NAME",
                         onChange: (e) => patchDraft(activeDraft, { envs: activeDraft.envs.map((x, i) => i === index ? { ...x, name: e.target.value } : x) })
@@ -16046,6 +16356,7 @@ function IdeView({ api, ctx }) {
                             className: "ide-field ide-mono",
                             type: "password",
                             style: { maxWidth: 220 },
+                            "aria-label": `${env.name} \u7684\u5BC6\u94A5\u503C`,
                             placeholder: "\u586B\u5165\u503C\uFF08\u5B58\u8FDB DSH \u51ED\u636E\u5E93\uFF09",
                             value: secretInput[env.name] ?? "",
                             onChange: (e) => setSecretInput((prev) => ({ ...prev, [env.name]: e.target.value }))
@@ -16070,13 +16381,24 @@ function IdeView({ api, ctx }) {
                       {
                         className: "ide-field ide-mono",
                         type: isSecretName(env.name) ? "password" : "text",
+                        "aria-label": `${env.name || `\u73AF\u5883\u53D8\u91CF ${index + 1}`} \u7684\u503C`,
                         title: isSecretName(env.name) ? "\u5BC6\u94A5\u7C7B\u53D8\u91CF\u5728\u754C\u9762\u4E0A\u63A9\u7801\u663E\u793A" : void 0,
                         value: env.value,
                         placeholder: "value",
                         onChange: (e) => patchDraft(activeDraft, { envs: activeDraft.envs.map((x, i) => i === index ? { ...x, value: e.target.value } : x) })
                       }
                     ) }),
-                    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("td", { style: { width: 32 }, children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-btn", onClick: () => patchDraft(activeDraft, { envs: activeDraft.envs.filter((_, i) => i !== index) }), children: "\xD7" }) })
+                    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("td", { style: { width: 32 }, children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                      "button",
+                      {
+                        type: "button",
+                        className: "ide-btn ide-iconbtn",
+                        "aria-label": `\u5220\u9664\u73AF\u5883\u53D8\u91CF ${env.name || index + 1}`,
+                        title: "\u5220\u9664\u8FD9\u4E2A\u73AF\u5883\u53D8\u91CF",
+                        onClick: () => patchDraft(activeDraft, { envs: activeDraft.envs.filter((_, i) => i !== index) }),
+                        children: "\xD7"
+                      }
+                    ) })
                   ] }, index);
                 }) }) }),
                 /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "ide-chip", onClick: () => patchDraft(activeDraft, { envs: [...activeDraft.envs, { name: "", value: "", from: "literal" }] }), children: "\uFF0B \u53D8\u91CF" })
@@ -16142,6 +16464,7 @@ function IdeView({ api, ctx }) {
                 type: "button",
                 className: "ide-btn",
                 "data-on": !following,
+                "aria-pressed": !following,
                 title: following ? "\u8DDF\u968F\u6700\u65B0\u65E5\u5FD7\uFF1B\u70B9\u4E00\u4E0B\u51BB\u7ED3\u89C6\u56FE\uFF08\u4E5F\u53EF\u4EE5\u76F4\u63A5\u4E0A\u6EDA\uFF09" : "\u5DF2\u6682\u505C\uFF1B\u70B9\u4E00\u4E0B\u6062\u590D\u8DDF\u968F\u5E76\u8DF3\u5230\u6700\u65B0",
                 onClick: () => {
                   const next = !following;
@@ -16173,6 +16496,7 @@ function IdeView({ api, ctx }) {
               {
                 type: "button",
                 className: "ide-btn",
+                "aria-label": "\u6E05\u7A7A\u65E5\u5FD7\u89C6\u56FE\uFF08\u4E0D\u5220\u9664\u78C1\u76D8\u65E5\u5FD7\uFF09",
                 title: "\u53EA\u6E05\u9762\u677F\u91CC\u7684\u663E\u793A\uFF1B\u5BBF\u4E3B\u7F13\u51B2\u4E0E\u78C1\u76D8\u4E0A\u7684\u65E5\u5FD7\u6587\u4EF6\u90FD\u4E0D\u52A8\uFF08\u5237\u65B0\u9875\u9762\u53EF\u91CD\u65B0\u8BFB\u5230\uFF09",
                 onClick: clearLogView,
                 children: "\u6E05\u7A7A"
