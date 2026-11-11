@@ -4,6 +4,10 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- 收藏设置从「设置 → 插件」里的标签页搬到「插件」面板中本插件自己的页面：打开「插件」面板、点开「收藏」，即可管理会话切换与网址收藏。插件页的标题和一句话说明来自包内 `locale` 的 `meta`，不再显示包名。
+
 ## [0.5.9] - 2026-10-27
 
 ### Changed
