@@ -96,15 +96,7 @@ dsh plugin --profile web add dsh-newbe-input-enhancer
 dsh plugin --profile web add 'dsh-newbe-input-enhancer@1.1.0'
 ```
 
-### 方式二：alpha 通道（npm dist-tag `alpha`）
-
-版本形如 `x.x.x-alpha`，与 rc 稳定线并行：
-
-```sh
-dsh plugin --profile web add 'dsh-newbe-input-enhancer@alpha'
-```
-
-### 方式三：从本地目录安装
+### 方式二：从本地目录安装
 
 ```sh
 git clone https://github.com/qiqiangvae/dsh-newbe-plugins.git

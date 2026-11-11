@@ -18,14 +18,16 @@
     ".": "./lib/index.js",
     "./client": "./lib/client.js",
     "./typert": "./lib/typert.host.js",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json"
   },
   "files": [
     "lib/**",
     "build.mjs",
     "cordis.patch.yml",
     "README.md",
-    "README.zh.md"
+    "README.zh.md",
+    "locale/**"
   ],
   "dsh": {
     "bundle": {
@@ -33,7 +35,7 @@
     },
     "client": {
       "inject": [
-        "@deepseek-ai/dsh-client-ui-settings-plugins",
+        "@deepseek-ai/dsh-client-ui-plugin-manager",
         "@deepseek-ai/dsh-client-ui-sidebar",
         "@deepseek-ai/dsh-client-ui-conversation"
       ],

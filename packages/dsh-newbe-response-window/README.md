@@ -31,16 +31,10 @@ DeepSeek Harness (DSH) Web 插件：把一轮里的 think（推理）和工具�
 
 ## 安装
 
-从 npm 安装（rc 稳定线，跟 `latest`）：
+从 npm 安装：
 
 ```bash
 dsh plugin --profile web add dsh-newbe-response-window
-```
-
-装 alpha 通道（跟 npm 的 `alpha` dist-tag，版本形如 `x.x.x-alpha`）：
-
-```bash
-dsh plugin --profile web add dsh-newbe-response-window@alpha
 ```
 
 或本地 link 方式（开发调试）：
@@ -83,7 +77,7 @@ dsh plugin --profile web add "link:$(pwd)/packages/dsh-newbe-response-window"
 - **绝不移走 React 拥有的 `[data-chat-anchor-key]` 行节点**。实测：把行移进自定义容器后，一旦 DSH 后续移除该行（会话切换/编辑/压缩），React 会调用 `parent.removeChild(row)` 抛 `NotFoundError`，整个会话树被卸载——因此本插件只用「slot shadow + 类/CSS」两种方式，对 React 行结构零改动。
 - 原生 Think 行隐藏与 slide 内的 think 同步：只对「该段内有 slide」的原生 `data-variant="think"` 行加 `display:none`（DOM 类/CSS，无重挂、无删除），其余（无工具调用的纯 Think 段）保持原生显示。0.1.7 把消息流行套进了 process-group 容器（`[data-chat-flow] > group root > content > 行`），行不再是 flow 的直接子节点，所以这段判定改成按文档顺序读全部 `[data-chat-flow-kind]` 行。（改动前 `flow.children` 只看到组外壳，永远匹配不到 Think，导致 slide 与原生 Think 双份显示。）
 - 插件只读会话快照，不写快照、不调宿主 API。0.1.2-alpha 起快照从 slot 标准 prop **`useChat`** 读取（`{ locations.getTurn(turn), nodes.get(key) }` 形状），不再走 `useSession` 的 `chat` 字段；「幽灵行」判定通过 DOM 行上的 `data-chat-flow-key` 与该快照对号，不再嗅探 markdown CSS 类名（新版 CSS Module 类名已不含 `_markdown`）。
-- 浏览器半依赖 `@deepseek-ai/dsh-client-store`（`createSnapshotStore`，shell 内置 seed module），替代旧版的 `@deepseek-ai/dsh-client-runtime`（该包在新 alpha 已移除）。旧版 `dsh.plugin.json` 清单在新 alpha 不再被读取，已删除。
+- 浏览器半依赖 `@deepseek-ai/dsh-client-store`（`createSnapshotStore`，shell 内置 seed module），替代旧版的 `@deepseek-ai/dsh-client-runtime`（该包在 DSH 0.1.2-alpha.1 已移除）。旧版 `dsh.plugin.json` 清单也不再被读取，已删除。
 - **设置持久化走 `configForms`**：0.1.7 移除了 `settingsScope` 服务，改为每个 profile 条目一个 controller（`ctx.configForms.get(条目 id)`，id 即 settings namespace）。宿主半的 `Config` 必须把用户可改字段标 `.volatile()`（settings 文档只投影 volatile 字段），并 `settings.configure({ auto: false }, ctx.fiber)` 退出自动生成的配置页。旧写法（`settingsScope` + `settings.register()`）会让 `inject` 永远等不到服务、整个插件静默不挂载——这正是 0.1.7 升级后 slide 全消失的原因。
 - 宿主半因此要求 `@deepseek-ai/schemastery` **≥ 3.18.3**（`.volatile()` 的引入版本；随 DSH 0.1.7-alpha.1 发布）。
 

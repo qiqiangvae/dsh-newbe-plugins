@@ -4,12 +4,12 @@
 
 ## 兼容性
 
-- 本插件要求 **DSH ≥ `v0.1.2-rc.1`**，并已针对 `v0.1.2-rc.1` ~ `v0.1.7-alpha.1` 适配。
-- Typert 严格 codec 在 `v0.1.6-alpha.2` 从 `{ mode, typeSymbol, schema }` 改成 `{ mode, typeSymbol, create }`（两代的 loader 与 registry 都只查自己认识的字段）。本插件的宿主清单与客户端 descriptors 统一由 `src/schema.ts` 的 `strictCodec()` 构造，**两个字段同时带**，因此在 `v0.1.2-rc.1` ~ `v0.1.7-alpha.1` 都能启动。
+- 本插件要求 **DSH ≥ `v0.1.2-rc.1`**，并已针对 `v0.1.2-rc.1` ~ `v0.2.2-rc.1` 适配。
+- Typert 严格 codec 在 `v0.1.6-alpha.2` 从 `{ mode, typeSymbol, schema }` 改成 `{ mode, typeSymbol, create }`（两代的 loader 与 registry 都只查自己认识的字段）。本插件的宿主清单与客户端 descriptors 统一由 `src/schema.ts` 的 `strictCodec()` 构造，**两个字段同时带**，因此在 `v0.1.2-rc.1` ~ `v0.2.2-rc.1` 都能启动。
 - 文件夹图标在 `v0.1.7-alpha.1` 从 `IconFolder*16` 改名成 `IconFolder*Regular`（旧名变成 `undefined`）。插件在运行时二选一，两代都能挂载。
 - **不兼容 DSH `v0.1.2-alpha.1` 及更早版本**：`v0.1.2-rc.1` 存在破坏性更新——
   - `@deepseek-ai/dsh-client-store` 与 `@deepseek-ai/dsh-client-ui-primitives` 不再是独立发布的 npm 包，而是由 Web 外壳以「基线静态模块」（`PLATFORM_MODULES`）注入浏览器模块表；插件 `dsh.client.inject` 已移除对这两个包的包级依赖。
-  - 插件设置标签页 `settings.plugins.tab` 改由 `@deepseek-ai/dsh-client-ui-settings-plugins` 声明，`dsh.client.inject` 相应更新。
+  - 插件设置页自 `v0.1.6-alpha.2` 起挂在「插件」面板的插件页面（`plugins.bundle.config`，按 npm 包名分派），`dsh.client.inject` 依赖 `@deepseek-ai/dsh-client-ui-plugin-manager`。更早的 DSH 没有这个槽位：收藏功能本身不受影响，但不会显示设置页。
 - `@deepseek-ai/dsh-home-paths` 已发布到公共 npm（`0.1.2-rc.1`），插件把它声明为 `dependencies`，宿主编译产物经普通 Node ESM 解析加载；其余 `@deepseek-ai/dsh-client-*` 基线模块由 DSH 宿主在运行时注入，不写入 `dependencies`/`peerDependencies`。请使用对应版本的 DSH Desktop 安装本插件。
 
 ## 功能
@@ -41,7 +41,7 @@
 
 ### 插件配置
 
-在 **设置 → 插件 → 插件配置 → 收藏** 中可以：
+在左侧侧栏的 **插件** 面板里点开 **收藏** 插件卡片，就是这个插件的设置页：
 
 - 新增网址收藏；
 - 编辑名称、URL 和自定义字母徽标；
@@ -71,11 +71,7 @@ pnpm run build
 DSH 通过 `dsh plugin` 子命令管理 profile 插件（等价于在 profile 目录内执行 `pnpm`）。安装本插件：
 
 ```bash
-# rc 稳定线（npm latest）
 dsh plugin --profile web add dsh-newbe-my-favorites
-
-# alpha 通道（npm alpha dist-tag，版本形如 x.x.x-alpha）
-dsh plugin --profile web add dsh-newbe-my-favorites@alpha
 
 # 本机/开发：从本地路径软链接安装
 dsh plugin --profile web add "link:$(pwd)/packages/dsh-newbe-my-favorites"
