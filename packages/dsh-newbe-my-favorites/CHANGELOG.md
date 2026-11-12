@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented in this file.
 
+## [Unreleased]
+
+### Changed
+
+- 侧栏「收藏会话」入口从「新会话」按钮下方移到「插件」「自动化任务」「记忆系统」那一列的最前面：与这些行同列、同 2px 行距、随列表一起滚动，不再自成一块。
+
 ## [0.6.0] - 2026-11-11
 
 ### Changed
